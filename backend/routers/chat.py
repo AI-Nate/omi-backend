@@ -97,13 +97,6 @@ def send_message(
     def process_message(response: str, callback_data: dict):
         memories = callback_data.get('memories_found', [])
         ask_for_nps = callback_data.get('ask_for_nps', False)
-
-        # cited extraction
-        cited_conversation_idxs = {int(i) for i in re.findall(r'\[(\d+)\]', response)}
-        if len(cited_conversation_idxs) > 0:
-            response = re.sub(r'\[\d+\]', '', response)
-        memories = [memories[i - 1] for i in cited_conversation_idxs if 0 < i and i <= len(memories)]
-
         memories_id = []
         # check if the items in the conversations list are dict
         if memories:
@@ -114,42 +107,62 @@ def send_message(
                 else:
                     converted_memories.append(m)
             memories_id = [m.id for m in converted_memories]
-
         ai_message = Message(
             id=str(uuid.uuid4()),
             text=response,
             created_at=datetime.now(timezone.utc),
             sender='ai',
-            plugin_id=app_id,
+            plugin_id=plugin_id,
             type='text',
             memories_id=memories_id,
         )
-        if chat_session:
-            ai_message.chat_session_id = chat_session.id
-            chat_db.add_message_to_chat_session(uid, chat_session.id, ai_message.id)
-
         chat_db.add_message(uid, ai_message.dict())
         ai_message.memories = [MessageConversation(**m) for m in (memories if len(memories) < 5 else memories[:5])]
-        if app_id:
-            record_app_usage(uid, app_id, UsageHistoryType.chat_message_sent, message_id=ai_message.id)
+
+        if plugin_id:
+            record_app_usage(uid, plugin_id, UsageHistoryType.chat_message_sent, message_id=ai_message.id)
 
         return ai_message, ask_for_nps
 
+    callback_data = {}
+
     async def generate_stream():
         callback_data = {}
-        async for chunk in execute_graph_chat_stream(uid, messages, app, cited=True, callback_data=callback_data, chat_session=chat_session):
-            if chunk:
-                msg = chunk.replace("\n", "__CRLF__")
-                yield f'{msg}\n\n'
-            else:
-                response = callback_data.get('answer')
-                if response:
+        try:
+            async for chunk in execute_graph_chat_stream(uid, messages, app, cited=True, callback_data=callback_data, chat_session=chat_session):
+                if chunk:
+                    msg = chunk.replace("\n", "__CRLF__")
+                    yield f'{msg}\n\n'
+                else:
+                    response = callback_data.get('answer')
+                    if not response:
+                        # Ensure we have a response even if answer is empty
+                        response = "I'm sorry, I couldn't process your request properly. Please try again."
+                        callback_data['answer'] = response
+                        callback_data['memories_found'] = []
+                        callback_data['ask_for_nps'] = False
+                    
                     ai_message, ask_for_nps = process_message(response, callback_data)
                     ai_message_dict = ai_message.dict()
                     response_message = ResponseMessage(**ai_message_dict)
                     response_message.ask_for_nps = ask_for_nps
                     data = base64.b64encode(bytes(response_message.model_dump_json(), 'utf-8')).decode('utf-8')
                     yield f"done: {data}\n\n"
+        except Exception as e:
+            # Handle any exceptions in the stream generation
+            print(f"Error in generate_stream: {e}")
+            # Send a fallback response
+            response = "I'm sorry, I encountered an issue processing your request. Please try again later."
+            callback_data['answer'] = response
+            callback_data['memories_found'] = []
+            callback_data['ask_for_nps'] = False
+            
+            ai_message, ask_for_nps = process_message(response, callback_data)
+            ai_message_dict = ai_message.dict()
+            response_message = ResponseMessage(**ai_message_dict)
+            response_message.ask_for_nps = ask_for_nps
+            data = base64.b64encode(bytes(response_message.model_dump_json(), 'utf-8')).decode('utf-8')
+            yield f"done: {data}\n\n"
 
     return StreamingResponse(
         generate_stream(),

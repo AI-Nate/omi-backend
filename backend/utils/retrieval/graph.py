@@ -272,42 +272,47 @@ def query_vectors(state: GraphState):
     # if state.get('streaming', False):
     #     state['callback'].put_thought_nowait("Searching through your memories")
 
-    date_filters = state.get("date_filters")
-    uid = state.get("uid")
-    # vector = (
-    #    generate_embedding(state.get("parsed_question", ""))
-    #    if state.get("parsed_question")
-    #    else [0] * 3072
-    # )
+    try:
+        date_filters = state.get("date_filters")
+        uid = state.get("uid")
+        # vector = (
+        #    generate_embedding(state.get("parsed_question", ""))
+        #    if state.get("parsed_question")
+        #    else [0] * 3072
+        # )
 
-    # Use [1] * dimension to trigger the score distance to fetch all vectors by meta filters
-    vector = ([1] * 3072)
-    print("query_vectors vector:", vector[:5])
+        # Use [1] * dimension to trigger the score distance to fetch all vectors by meta filters
+        vector = ([1] * 3072)
+        print("query_vectors vector:", vector[:5])
 
-    # TODO: enable it when the in-accurate topic filter get fixed
-    is_topic_filter_enabled = date_filters.get("start") is None
-    memories_id = query_vectors_by_metadata(
-        uid,
-        vector,
-        dates_filter=[date_filters.get("start"), date_filters.get("end")],
-        people=state.get("filters", {}).get("people", []) if is_topic_filter_enabled else [],
-        topics=state.get("filters", {}).get("topics", []) if is_topic_filter_enabled else [],
-        entities=state.get("filters", {}).get("entities", []) if is_topic_filter_enabled else [],
-        dates=state.get("filters", {}).get("dates", []),
-        limit=100,
-    )
-    memories = conversations_db.get_conversations_by_id(uid, memories_id)
+        # TODO: enable it when the in-accurate topic filter get fixed
+        is_topic_filter_enabled = date_filters.get("start") is None
+        memories_id = query_vectors_by_metadata(
+            uid,
+            vector,
+            dates_filter=[date_filters.get("start"), date_filters.get("end")],
+            people=state.get("filters", {}).get("people", []) if is_topic_filter_enabled else [],
+            topics=state.get("filters", {}).get("topics", []) if is_topic_filter_enabled else [],
+            entities=state.get("filters", {}).get("entities", []) if is_topic_filter_enabled else [],
+            dates=state.get("filters", {}).get("dates", []),
+            limit=100,
+        )
+        memories = conversations_db.get_conversations_by_id(uid, memories_id)
 
-    # stream
-    # if state.get('streaming', False):
-    #    if len(memories) == 0:
-    #        msg = "No relevant memories found"
-    #    else:
-    #        msg = f"Found {len(memories)} relevant memories"
-    #    state['callback'].put_thought_nowait(msg)
+        # stream
+        # if state.get('streaming', False):
+        #    if len(memories) == 0:
+        #        msg = "No relevant memories found"
+        #    else:
+        #        msg = f"Found {len(memories)} relevant memories"
+        #    state['callback'].put_thought_nowait(msg)
 
-    # print(memories_id)
-    return {"memories_found": memories}
+        # print(memories_id)
+        return {"memories_found": memories}
+    except Exception as e:
+        print(f"Error in query_vectors: {e}")
+        # Return an empty list of memories if there was an error
+        return {"memories_found": []}
 
 
 def qa_handler(state: GraphState):
@@ -438,29 +443,61 @@ async def execute_graph_chat_stream(
     tz = notification_db.get_user_time_zone(uid)
     callback = AsyncStreamingCallback()
 
-    task = asyncio.create_task(graph_stream.ainvoke(
-        {"uid": uid, "tz": tz, "cited": cited, "messages": messages, "plugin_selected": plugin,
-         "streaming": True, "callback": callback, "chat_session": chat_session, },
-        {"configurable": {"thread_id": str(uuid.uuid4())}},
-    ))
-
-    while True:
-        try:
-            chunk = await callback.queue.get()
-            if chunk:
-                yield chunk
-            else:
+    try:
+        # Create task with timeout of 30 seconds for the entire operation
+        task = asyncio.create_task(graph_stream.ainvoke(
+            {"uid": uid, "tz": tz, "cited": cited, "messages": messages, "plugin_selected": plugin,
+             "streaming": True, "callback": callback, "chat_session": chat_session, },
+            {"configurable": {"thread_id": str(uuid.uuid4())}},
+        ))
+        
+        # Set up a timeout for receiving data from the queue
+        while True:
+            try:
+                # Wait for data with a timeout
+                chunk = await asyncio.wait_for(callback.queue.get(), timeout=30.0)
+                if chunk:
+                    yield chunk
+                else:
+                    break
+            except asyncio.TimeoutError:
+                print("Timeout waiting for response from graph_stream")
+                # End the streaming process if timeout occurs
+                callback_data['answer'] = "I'm sorry, I encountered a timeout while processing your request. Please try again."
+                callback_data['memories_found'] = []
+                callback_data['ask_for_nps'] = False
+                yield None
+                return
+            except asyncio.CancelledError:
                 break
-        except asyncio.CancelledError:
-            break
-    await task
-    result = task.result()
-    callback_data['answer'] = result.get("answer")
-    callback_data['memories_found'] = result.get("memories_found", [])
-    callback_data['ask_for_nps'] = result.get('ask_for_nps', False)
-
-    yield None
-    return
+        
+        # Wait for the task to complete with a timeout
+        try:
+            await asyncio.wait_for(task, timeout=30.0)
+            result = task.result()
+            callback_data['answer'] = result.get("answer")
+            callback_data['memories_found'] = result.get("memories_found", [])
+            callback_data['ask_for_nps'] = result.get('ask_for_nps', False)
+        except asyncio.TimeoutError:
+            print("Timeout waiting for graph_stream task to complete")
+            # Set a fallback answer if we timed out
+            callback_data['answer'] = "I'm sorry, I encountered a timeout while processing your request. Please try again."
+            callback_data['memories_found'] = []
+            callback_data['ask_for_nps'] = False
+            # Cancel the task if it's still running
+            if not task.done():
+                task.cancel()
+        
+        yield None
+        return
+    except Exception as e:
+        print(f"Error in execute_graph_chat_stream: {e}")
+        # Set a fallback answer if we encountered an error
+        callback_data['answer'] = f"I'm sorry, I encountered an error while processing your request: {str(e)}"
+        callback_data['memories_found'] = []
+        callback_data['ask_for_nps'] = False
+        yield None
+        return
 
 
 async def execute_persona_chat_stream(
