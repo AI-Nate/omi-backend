@@ -17,8 +17,7 @@ redis_pool = redis.ConnectionPool(
     socket_keepalive=True,
     health_check_interval=10,
     max_connections=20,
-    retry_on_timeout=True,
-    retry=3
+    retry_on_timeout=True
 )
 
 # Create the Redis client using the pool
