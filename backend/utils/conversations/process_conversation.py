@@ -235,34 +235,46 @@ def _extract_trends(conversation: Conversation):
 
 
 def save_structured_vector(uid: str, conversation: Conversation, update_only: bool = False):
-    vector = generate_embedding(str(conversation.structured)) if not update_only else None
-    tz = notification_db.get_user_time_zone(uid)
+    try:
+        vector = generate_embedding(str(conversation.structured)) if not update_only else None
+        tz = notification_db.get_user_time_zone(uid)
 
-    metadata = {}
+        metadata = {}
 
-    # Extract metadata based on conversation source
-    if conversation.source == ConversationSource.external_integration:
-        text_source = conversation.external_data.get('text_source')
-        text_content = conversation.external_data.get('text')
-        if text_content and len(text_content) > 0 and text_content and len(text_content) > 0:
-            text_source_spec = conversation.external_data.get('text_source_spec')
-            if text_source == ExternalIntegrationConversationSource.message.value:
-                metadata = retrieve_metadata_from_message(uid, conversation.created_at, text_content, tz, text_source_spec)
-            elif text_source == ExternalIntegrationConversationSource.other.value:
-                metadata = retrieve_metadata_from_text(uid, conversation.created_at, text_content, tz, text_source_spec)
-    else:
-        # For regular conversations with transcript segments
-        segments = [t.dict() for t in conversation.transcript_segments]
-        metadata = retrieve_metadata_fields_from_transcript(uid, conversation.created_at, segments, tz)
+        # Extract metadata based on conversation source
+        if conversation.source == ConversationSource.external_integration:
+            text_source = conversation.external_data.get('text_source')
+            text_content = conversation.external_data.get('text')
+            if text_content and len(text_content) > 0 and text_content and len(text_content) > 0:
+                text_source_spec = conversation.external_data.get('text_source_spec')
+                if text_source == ExternalIntegrationConversationSource.message.value:
+                    metadata = retrieve_metadata_from_message(uid, conversation.created_at, text_content, tz, text_source_spec)
+                elif text_source == ExternalIntegrationConversationSource.other.value:
+                    metadata = retrieve_metadata_from_text(uid, conversation.created_at, text_content, tz, text_source_spec)
+        else:
+            # For regular conversations with transcript segments
+            segments = [t.dict() for t in conversation.transcript_segments]
+            metadata = retrieve_metadata_fields_from_transcript(uid, conversation.created_at, segments, tz)
 
-    metadata['created_at'] = int(conversation.created_at.timestamp())
+        metadata['created_at'] = int(conversation.created_at.timestamp())
 
-    if not update_only:
-        print('save_structured_vector creating vector')
-        upsert_vector2(uid, conversation, vector, metadata)
-    else:
-        print('save_structured_vector updating metadata')
-        update_vector_metadata(uid, conversation.id, metadata)
+        if not update_only:
+            print('save_structured_vector creating vector')
+            if vector is not None:
+                print(f'Vector dimensions: {len(vector)}')
+                upsert_vector2(uid, conversation, vector, metadata)
+            else:
+                print('Warning: Generated vector is None, skipping vector storage')
+        else:
+            print('save_structured_vector updating metadata')
+            update_vector_metadata(uid, conversation.id, metadata)
+    except Exception as e:
+        # Handle any exceptions that might occur during embedding or vector storage
+        print(f"Error in save_structured_vector for conversation {conversation.id}: {str(e)}")
+        if "does not match the dimension of the index" in str(e):
+            print(f"Vector dimension mismatch detected. Please ensure the embedding model dimensions match your Pinecone index.")
+        # Continue processing without failing the entire operation
+        pass
 
 
 def _update_personas_async(uid: str):

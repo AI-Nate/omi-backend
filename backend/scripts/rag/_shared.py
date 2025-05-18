@@ -33,7 +33,8 @@ import database.memories as facts_d
 
 uid = 'viUv7GtdoHXbK1UBCDlPuTDuPgJ2'
 
-openai_embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+# Using text-embedding-3-small with 1024 dimensions to match the Pinecone index
+openai_embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1024)
 
 
 def query_vectors(query: str, uid: str, k: int = 1000) -> List[str]:

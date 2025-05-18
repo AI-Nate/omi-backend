@@ -7,7 +7,8 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from models.conversation import Conversation
 
 llm_mini = ChatOpenAI(model='gpt-4o-mini')
-embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+# Using text-embedding-3-small with 1024 dimensions to match the Pinecone index
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1024)
 
 load_dotenv('../../.env')
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '../../' + os.getenv('GOOGLE_APPLICATION_CREDENTIALS')

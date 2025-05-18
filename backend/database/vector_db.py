@@ -35,10 +35,23 @@ def upsert_vector(uid: str, conversation: Conversation, vector: List[float]):
 
 
 def upsert_vector2(uid: str, conversation: Conversation, vector: List[float], metadata: dict):
-    data = _get_data(uid, conversation.id, vector)
-    data['metadata'].update(metadata)
-    res = index.upsert(vectors=[data], namespace="ns1")
-    print('upsert_vector', res)
+    try:
+        # Check if vector dimensions match what's expected by Pinecone
+        expected_dimension = 1024  # The dimension of the Pinecone index
+        actual_dimension = len(vector)
+        
+        if actual_dimension != expected_dimension:
+            print(f"WARNING: Vector dimension mismatch. Expected {expected_dimension}, got {actual_dimension}. "
+                  f"Skipping vector storage for conversation {conversation.id}")
+            return
+            
+        data = _get_data(uid, conversation.id, vector)
+        data['metadata'].update(metadata)
+        res = index.upsert(vectors=[data], namespace="ns1")
+        print('upsert_vector', res)
+    except Exception as e:
+        print(f"Error in upsert_vector2 for conversation {conversation.id}: {str(e)}")
+        # Don't re-raise the exception to allow the application to continue
 
 
 def update_vector_metadata(uid: str, conversation_id: str, metadata: dict):

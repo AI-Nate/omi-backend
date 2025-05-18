@@ -49,7 +49,8 @@ llm_persona_medium_stream = ChatOpenAI(
     default_headers={"X-Title": "Omi Chat"},
     streaming=True,
 )
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+# Using text-embedding-3-small with 1024 dimensions to match the Pinecone index
+embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1024)
 parser = PydanticOutputParser(pydantic_object=Structured)
 
 encoding = tiktoken.encoding_for_model('gpt-4')
