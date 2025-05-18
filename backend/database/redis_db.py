@@ -12,12 +12,13 @@ redis_pool = redis.ConnectionPool(
     port=int(os.getenv('REDIS_DB_PORT')) if os.getenv('REDIS_DB_PORT') is not None else 6379,
     username='default',
     password=os.getenv('REDIS_DB_PASSWORD'),
-    socket_timeout=5,
-    socket_connect_timeout=5,
+    socket_timeout=10,
+    socket_connect_timeout=10,
     socket_keepalive=True,
-    health_check_interval=15,
-    max_connections=10,
-    retry_on_timeout=True
+    health_check_interval=10,
+    max_connections=20,
+    retry_on_timeout=True,
+    retry=3
 )
 
 # Create the Redis client using the pool
@@ -26,15 +27,24 @@ r = redis.Redis(connection_pool=redis_pool)
 
 def try_catch_decorator(func):
     def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (ConnectionError, TimeoutError) as e:
-            print(f'Redis connection error in {func.__name__}:', e)
-            # You could implement a retry mechanism here if needed
-            return None
-        except Exception as e:
-            print(f'Error calling {func.__name__}', e)
-            return None
+        retries = 2
+        backoff = 1
+
+        for attempt in range(retries + 1):
+            try:
+                return func(*args, **kwargs)
+            except (ConnectionError, TimeoutError) as e:
+                if attempt < retries:
+                    retry_delay = backoff * (2 ** attempt)
+                    print(f'Redis connection error in {func.__name__} (attempt {attempt+1}/{retries+1}): {e}, retrying in {retry_delay}s')
+                    import time
+                    time.sleep(retry_delay)
+                else:
+                    print(f'Redis connection error in {func.__name__}: {e}, giving up after {retries+1} attempts')
+                    return None
+            except Exception as e:
+                print(f'Error calling {func.__name__}', e)
+                return None
 
     return wrapper
 
