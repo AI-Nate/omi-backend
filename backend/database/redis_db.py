@@ -4,20 +4,34 @@ import os
 from typing import List, Union, Optional
 
 import redis
+from redis.exceptions import ConnectionError, TimeoutError
 
-r = redis.Redis(
+# Create a connection pool with better settings
+redis_pool = redis.ConnectionPool(
     host=os.getenv('REDIS_DB_HOST'),
     port=int(os.getenv('REDIS_DB_PORT')) if os.getenv('REDIS_DB_PORT') is not None else 6379,
     username='default',
     password=os.getenv('REDIS_DB_PASSWORD'),
-    health_check_interval=30
+    socket_timeout=5,
+    socket_connect_timeout=5,
+    socket_keepalive=True,
+    health_check_interval=15,
+    max_connections=10,
+    retry_on_timeout=True
 )
+
+# Create the Redis client using the pool
+r = redis.Redis(connection_pool=redis_pool)
 
 
 def try_catch_decorator(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
+        except (ConnectionError, TimeoutError) as e:
+            print(f'Redis connection error in {func.__name__}:', e)
+            # You could implement a retry mechanism here if needed
+            return None
         except Exception as e:
             print(f'Error calling {func.__name__}', e)
             return None
