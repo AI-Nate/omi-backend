@@ -18,7 +18,7 @@ redis_pool = redis.ConnectionPool(
     health_check_interval=10,
     max_connections=20,
     retry_on_timeout=True,
-    ssl=True  # Enable SSL for Upstash Redis
+    ssl_cert_reqs=None  # Enable SSL for Upstash Redis without certificate verification
 )
 
 # Create the Redis client using the pool
