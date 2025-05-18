@@ -5,9 +5,11 @@ from typing import List, Union, Optional
 
 import redis
 from redis.exceptions import ConnectionError, TimeoutError
+from redis.connection import SSLConnection
 
 # Create a connection pool with better settings
 redis_pool = redis.ConnectionPool(
+    connection_class=SSLConnection,
     host=os.getenv('REDIS_DB_HOST'),
     port=int(os.getenv('REDIS_DB_PORT')) if os.getenv('REDIS_DB_PORT') is not None else 6379,
     username='default',
@@ -17,8 +19,7 @@ redis_pool = redis.ConnectionPool(
     socket_keepalive=True,
     health_check_interval=10,
     max_connections=20,
-    retry_on_timeout=True,
-    ssl_cert_reqs=None  # Enable SSL for Upstash Redis without certificate verification
+    retry_on_timeout=True
 )
 
 # Create the Redis client using the pool
