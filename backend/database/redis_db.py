@@ -43,9 +43,9 @@ def check_redis_connection():
         value = r.get("test_connection")
         print(f"Redis SET/GET test: {value}")
         
-        # Check connection pool stats
-        pool_stats = redis_pool.get_stats()
-        print(f"Connection pool stats: {pool_stats}")
+        # Check connection pool info
+        print(f"Connection pool: {redis_pool.__class__.__name__}")
+        print(f"Connection class: {redis_pool.connection_class.__name__}")
         
         print("Redis connection SUCCESS")
         return True
