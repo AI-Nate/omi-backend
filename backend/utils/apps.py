@@ -99,14 +99,11 @@ def get_popular_apps() -> List[App]:
 
 
 def get_available_apps(uid: str, include_reviews: bool = False) -> List[App]:
-    private_data = []
-    public_approved_data = []
-    public_unapproved_data = []
-    tester_apps = []
-    all_apps = []
     tester = is_tester(uid)
-    if cachedApps := get_generic_cache('get_public_approved_apps_data'):
-        print('get_public_approved_plugins_data from cache')
+    tester_apps = []
+    cachedApps = get_generic_cache('get_public_approved_apps_data')
+    if cachedApps:
+        print('get_public_approved_apps_data from cache')
         public_approved_data = cachedApps
         public_unapproved_data = get_public_unapproved_apps(uid)
         private_data = get_private_apps(uid)
@@ -119,7 +116,15 @@ def get_available_apps(uid: str, include_reviews: bool = False) -> List[App]:
         set_generic_cache('get_public_approved_apps_data', public_approved_data, 60 * 10)  # 10 minutes cached
     if tester:
         tester_apps = get_apps_for_tester_db(uid)
-    user_enabled = set(get_enabled_plugins(uid))
+    
+    # Get enabled plugins with error handling
+    try:
+        user_enabled = set(get_enabled_plugins(uid))
+    except Exception as e:
+        print(f"Error getting enabled plugins for user {uid}: {str(e)}")
+        print("Using empty set as fallback for enabled plugins")
+        user_enabled = set()
+        
     all_apps = private_data + public_approved_data + public_unapproved_data + tester_apps
     apps = []
 

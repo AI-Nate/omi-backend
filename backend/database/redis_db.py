@@ -23,6 +23,58 @@ redis_pool = redis.ConnectionPool(
 # Create the Redis client using the pool
 r = redis.Redis(connection_pool=redis_pool)
 
+# Diagnostics function to check Redis connection
+def check_redis_connection():
+    """Test Redis connection and print diagnostic information"""
+    print("Redis Connection Diagnostics:")
+    print(f"Host: {os.getenv('REDIS_DB_HOST')}")
+    print(f"Port: {os.getenv('REDIS_DB_PORT', 6379)}")
+    print(f"Password: {'*' * (len(os.getenv('REDIS_DB_PASSWORD', '')) if os.getenv('REDIS_DB_PASSWORD') else 0)}")
+    
+    try:
+        # Try ping command
+        response = r.ping()
+        print(f"Redis PING response: {response}")
+        
+        # Try simple set/get
+        r.set("test_connection", "OK")
+        value = r.get("test_connection")
+        print(f"Redis SET/GET test: {value}")
+        
+        # Check connection pool stats
+        pool_stats = redis_pool.get_stats()
+        print(f"Connection pool stats: {pool_stats}")
+        
+        print("Redis connection SUCCESS")
+        return True
+    except Exception as e:
+        print(f"Redis connection FAILED: {type(e).__name__}: {str(e)}")
+        
+        # Try direct connection without pooling to isolate the issue
+        try:
+            print("Trying direct connection without pooling...")
+            direct_client = redis.Redis(
+                host=os.getenv('REDIS_DB_HOST'),
+                port=int(os.getenv('REDIS_DB_PORT')) if os.getenv('REDIS_DB_PORT') is not None else 6379,
+                username='default',
+                password=os.getenv('REDIS_DB_PASSWORD'),
+                socket_timeout=10,
+                decode_responses=True
+            )
+            direct_response = direct_client.ping()
+            print(f"Direct connection PING response: {direct_response}")
+        except Exception as direct_error:
+            print(f"Direct connection failed: {type(direct_error).__name__}: {str(direct_error)}")
+        
+        return False
+
+# Call this at startup to check the Redis connection
+try:
+    print("Checking Redis connection at startup...")
+    check_redis_connection()
+except Exception as e:
+    print(f"Error during Redis connection check: {str(e)}")
+
 
 def try_catch_decorator(func):
     def wrapper(*args, **kwargs):
@@ -240,11 +292,18 @@ def disable_app(uid: str, app_id: str):
     r.srem(f'users:{uid}:enabled_plugins', app_id)
 
 
+@try_catch_decorator
 def get_enabled_plugins(uid: str):
-    val = r.smembers(f'users:{uid}:enabled_plugins')
-    if not val:
+    try:
+        val = r.smembers(f'users:{uid}:enabled_plugins')
+        if not val:
+            return []
+        return [x.decode() for x in val]
+    except Exception as e:
+        print(f"Error in get_enabled_plugins for user {uid}: {str(e)}")
+        print("Returning empty list as fallback")
+        # Return empty list as fallback when Redis is unavailable
         return []
-    return [x.decode() for x in val]
 
 
 def get_plugin_reviews(plugin_id: str) -> dict:
