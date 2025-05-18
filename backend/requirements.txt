@@ -141,8 +141,7 @@ pandas==2.2.2
 parso==0.8.4
 pexpect==4.9.0
 pillow==10.4.0
-pinecone-client==5.0.1
-pinecone-plugin-inference==1.0.3
+pinecone==6.0.2
 pinecone-plugin-interface==0.0.7
 platformdirs==4.2.2
 plotly==5.23.0

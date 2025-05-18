@@ -10,6 +10,7 @@ from models.conversation import Conversation
 from utils.llm import embeddings
 
 if os.getenv('PINECONE_API_KEY') is not None:
+    # Initialize pinecone with current API format (v6.x)
     pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY', ''))
     index = pc.Index(os.getenv('PINECONE_INDEX_NAME', ''))
 else:

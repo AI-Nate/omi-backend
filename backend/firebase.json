@@ -1,0 +1,10 @@
+{
+  "firestore": {
+    "database": "(default)",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "extensions": {
+    "firestore-typesense-search": "typesense/firestore-typesense-search@2.0.1"
+  }
+}

@@ -5,15 +5,24 @@ from typing import Dict
 
 import typesense
 
-client = typesense.Client({
-    'nodes': [{
-        'host': os.getenv('TYPESENSE_HOST'),
-        'port': os.getenv('TYPESENSE_HOST_PORT'),
-        'protocol': 'https'
-    }],
-    'api_key': os.getenv('TYPESENSE_API_KEY'),
-    'connection_timeout_seconds': 2
-})
+# Only initialize the Typesense client if all required env variables are present
+typesense_available = all([
+    os.getenv('TYPESENSE_HOST'),
+    os.getenv('TYPESENSE_HOST_PORT'),
+    os.getenv('TYPESENSE_API_KEY')
+])
+
+client = None
+if typesense_available:
+    client = typesense.Client({
+        'nodes': [{
+            'host': os.getenv('TYPESENSE_HOST'),
+            'port': os.getenv('TYPESENSE_HOST_PORT'),
+            'protocol': 'https'
+        }],
+        'api_key': os.getenv('TYPESENSE_API_KEY'),
+        'connection_timeout_seconds': 2
+    })
 
 
 def search_conversations(
@@ -26,6 +35,15 @@ def search_conversations(
         end_date: int = None,
 ) -> Dict:
     try:
+        # If Typesense is not configured, return an empty result set
+        if not typesense_available or client is None:
+            return {
+                'items': [],
+                'total_pages': 0,
+                'current_page': page,
+                'per_page': per_page,
+                'message': 'Search functionality requires Typesense configuration. Please set TYPESENSE_HOST, TYPESENSE_HOST_PORT, and TYPESENSE_API_KEY environment variables.'
+            }
 
         filter_by = f'userId:={uid} && deleted:=false'
         if not include_discarded:
@@ -60,4 +78,13 @@ def search_conversations(
             'per_page': per_page
         }
     except Exception as e:
+        # Include a helpful message if there's a configuration issue
+        if not typesense_available:
+            return {
+                'items': [],
+                'total_pages': 0,
+                'current_page': page,
+                'per_page': per_page,
+                'message': 'Search functionality requires Typesense configuration. Please set TYPESENSE_HOST, TYPESENSE_HOST_PORT, and TYPESENSE_API_KEY environment variables.'
+            }
         raise Exception(f"Failed to search conversations: {str(e)}")

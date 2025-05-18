@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from opuslib import Decoder
+from pyogg import OpusDecoder
 from pydub import AudioSegment
 
 from database.conversations import get_closest_conversation_to_timestamps, update_conversation_segments
@@ -26,7 +26,10 @@ import wave
 
 
 def decode_opus_file_to_wav(opus_file_path, wav_file_path, sample_rate=16000, channels=1, frame_size: int = 160):
-    decoder = Decoder(sample_rate, channels)
+    decoder = OpusDecoder()
+    decoder.set_sampling_frequency(sample_rate)
+    decoder.set_channels(channels)
+    
     with open(opus_file_path, 'rb') as f:
         pcm_data = []
         frame_count = 0
@@ -46,12 +49,13 @@ def decode_opus_file_to_wav(opus_file_path, wav_file_path, sample_rate=16000, ch
                 print(f"Unexpected end of file at frame {frame_count}.")
                 break
             try:
-                pcm_frame = decoder.decode(opus_data, frame_size=frame_size)
+                pcm_frame = decoder.decode(opus_data)
                 pcm_data.append(pcm_frame)
                 frame_count += 1
             except Exception as e:
                 print(f"Error decoding frame {frame_count}: {e}")
                 break
+        
         if pcm_data:
             pcm_bytes = b''.join(pcm_data)
             with wave.open(wav_file_path, 'wb') as wav_file:

@@ -12,9 +12,11 @@ from database.redis_db import cache_signed_url, get_cached_signed_url
 if os.environ.get('SERVICE_ACCOUNT_JSON'):
     service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_JSON"])
     credentials = service_account.Credentials.from_service_account_info(service_account_info)
-    storage_client = storage.Client(credentials=credentials)
+    project_id = os.environ.get('GOOGLE_CLOUD_PROJECT') or service_account_info.get('project_id')
+    storage_client = storage.Client(project=project_id, credentials=credentials)
 else:
-    storage_client = storage.Client()
+    project_id = os.environ.get('GOOGLE_CLOUD_PROJECT')
+    storage_client = storage.Client(project=project_id)
 
 speech_profiles_bucket = os.getenv('BUCKET_SPEECH_PROFILES')
 postprocessing_audio_bucket = os.getenv('BUCKET_POSTPROCESSING')
