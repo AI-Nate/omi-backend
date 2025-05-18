@@ -16,7 +16,11 @@ if os.environ.get('SERVICE_ACCOUNT_JSON'):
     credentials = firebase_admin.credentials.Certificate(service_account_info)
     firebase_admin.initialize_app(credentials)
 else:
-    firebase_admin.initialize_app()
+    # Initialize Firebase with project ID
+    options = {
+        'projectId': os.environ.get('GOOGLE_CLOUD_PROJECT', 'omi-how-to-learn-fd5fd')
+    }
+    firebase_admin.initialize_app(options=options)
 
 app = FastAPI()
 app.include_router(transcribe.router)
