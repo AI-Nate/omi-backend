@@ -131,6 +131,40 @@ print(f"Initializing Deepgram client with key: {deepgram_api_key[:5]}...{deepgra
 deepgram = DeepgramClient(deepgram_api_key, deepgram_options)
 deepgram_beta = DeepgramClient(deepgram_api_key, deepgram_beta_options)
 
+# Add a connection rate limiter to control the number of concurrent connections
+# This helps prevent rate limiting by Deepgram
+class DeepgramConnectionRateLimiter:
+    def __init__(self, max_concurrent_connections=3, rate_limit_period=5):
+        self.semaphore = asyncio.Semaphore(max_concurrent_connections)
+        self.rate_limit_period = rate_limit_period  # seconds
+        self.last_connection_time = 0
+        self.lock = asyncio.Lock()
+    
+    async def acquire(self):
+        """Acquire permission to create a new connection"""
+        await self.semaphore.acquire()
+        async with self.lock:
+            # Ensure we wait at least rate_limit_period seconds between connections
+            current_time = time.time()
+            time_since_last = current_time - self.last_connection_time
+            if time_since_last < self.rate_limit_period:
+                wait_time = self.rate_limit_period - time_since_last
+                print(f"Rate limiting: waiting {wait_time:.2f}s before next Deepgram connection")
+                await asyncio.sleep(wait_time)
+            
+            self.last_connection_time = time.time()
+            
+    def release(self):
+        """Release a connection slot"""
+        self.semaphore.release()
+
+# Create a connection rate limiter instance with conservative limits
+# Allow at most 2 concurrent connections with 5 second spacing
+connection_limiter = DeepgramConnectionRateLimiter(
+    max_concurrent_connections=int(os.getenv('DEEPGRAM_MAX_CONCURRENT', '2')),
+    rate_limit_period=float(os.getenv('DEEPGRAM_RATE_LIMIT_PERIOD', '5.0'))
+)
+
 async def process_audio_dg(
     stream_transcript, language: str, sample_rate: int, channels: int, preseconds: int = 0, model: str = 'nova-2-general',
     websocket_active_check=None  # Add a callback to check if the client is still connected
@@ -217,8 +251,13 @@ def calculate_backoff_with_jitter(attempt, base_delay=1000, max_delay=32000):
     return backoff
 
 
-def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample_rate: int, channels: int, model: str, websocket_active_check=None, retries=10):
+async def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample_rate: int, channels: int, model: str, websocket_active_check=None, retries=10):
     print("connect_to_deepgram_with_backoff")
+    
+    # Acquire a connection slot from our rate limiter
+    await connection_limiter.acquire()
+    print("Acquired connection slot from rate limiter")
+    
     for attempt in range(retries):
         try:
             return connect_to_deepgram(on_message, on_error, language, sample_rate, channels, model)
@@ -236,11 +275,14 @@ def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample
                 print(f'An error occurred: {error}')
                 
             if attempt == retries - 1:  # Last attempt
+                # We don't release the connection slot here because it's already released in connect_to_deepgram
                 raise
             
             # Check if client is still connected before waiting
             if websocket_active_check and not websocket_active_check():
                 print("Client disconnected during backoff. Aborting Deepgram connection attempts.")
+                # Release the connection slot if the client disconnects
+                connection_limiter.release()
                 raise Exception("Client disconnected")
             
             # Use a more aggressive backoff for rate limits
@@ -252,13 +294,16 @@ def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample
                 backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=2000, max_delay=30000)
                 
             print(f"Waiting {backoff_delay:.0f}ms before next retry...")
-            time.sleep(backoff_delay / 1000)  # Convert ms to seconds for sleep
+            await asyncio.sleep(backoff_delay / 1000)  # Convert ms to seconds for sleep
         
         # Check again after waiting if client is still connected
         if websocket_active_check and not websocket_active_check():
             print("Client disconnected after backoff wait. Aborting Deepgram connection attempts.")
+            # Release the connection slot if the client disconnects
+            connection_limiter.release()
             raise Exception("Client disconnected")
 
+    # We don't release the connection slot here because it's already released in connect_to_deepgram
     raise Exception(f'Could not open socket: All retry attempts failed.')
 
 
@@ -287,6 +332,8 @@ def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, c
 
         def on_close(self, close, **kwargs):
             print("Connection Closed")
+            # Release the connection slot when the connection is closed
+            connection_limiter.release()
 
         def on_unhandled(self, unhandled, **kwargs):
             print(f"Unhandled Websocket Message: {unhandled}")
@@ -324,6 +371,8 @@ def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, c
             print('Deepgram connection started:', result)
             return dg_connection
         except websockets.exceptions.WebSocketException as e:
+            # Release the connection slot on error
+            connection_limiter.release()
             if "HTTP 429" in str(e):
                 print(f"Rate limit exceeded (HTTP 429) when starting connection")
             elif "HTTP 403" in str(e):
@@ -331,9 +380,13 @@ def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, c
                 print(f"API Key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
             raise Exception(f'Could not open socket: WebSocketException {e}')
         except Exception as e:
+            # Release the connection slot on error
+            connection_limiter.release()
             raise Exception(f'Could not open socket: {e}')
             
     except websockets.exceptions.WebSocketException as e:
+        # Release the connection slot on error at websocket level
+        connection_limiter.release()
         if "HTTP 429" in str(e):
             print(f"Rate limit exceeded (HTTP 429) when creating connection")
         elif "HTTP 403" in str(e):
@@ -341,6 +394,8 @@ def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, c
             print(f"API Key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
         raise Exception(f'Could not open socket: WebSocketException {e}')
     except Exception as e:
+        # Release the connection slot on error
+        connection_limiter.release()
         raise Exception(f'Could not open socket: {e}')
 
 async def process_audio_soniox(stream_transcript, sample_rate: int, language: str, uid: str, preseconds: int = 0, language_hints: List[str] = []):
