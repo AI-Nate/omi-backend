@@ -133,6 +133,7 @@ deepgram_beta = DeepgramClient(deepgram_api_key, deepgram_beta_options)
 
 async def process_audio_dg(
     stream_transcript, language: str, sample_rate: int, channels: int, preseconds: int = 0, model: str = 'nova-2-general',
+    websocket_active_check=None  # Add a callback to check if the client is still connected
 ):
     print('process_audio_dg', language, sample_rate, channels, preseconds)
 
@@ -182,11 +183,25 @@ async def process_audio_dg(
     max_connection_attempts = 3
     for attempt in range(max_connection_attempts):
         try:
+            # Check if client is still connected before attempting to connect to Deepgram
+            if websocket_active_check and not websocket_active_check():
+                print("Client disconnected. Aborting Deepgram connection attempts.")
+                raise Exception("Client disconnected")
+                
             print("Connecting to Deepgram")  # Log before connection attempt
-            return connect_to_deepgram_with_backoff(on_message, on_error, language, sample_rate, channels, model)
+            return connect_to_deepgram_with_backoff(on_message, on_error, language, sample_rate, channels, model, websocket_active_check)
         except Exception as e:
+            if "Client disconnected" in str(e):
+                print("Aborting Deepgram connection due to client disconnection")
+                raise
+                
             print(f"Failed to connect to Deepgram (attempt {attempt+1}/{max_connection_attempts}): {e}")
             if attempt < max_connection_attempts - 1:
+                # Check again if client is still connected before waiting
+                if websocket_active_check and not websocket_active_check():
+                    print("Client disconnected during retry. Aborting Deepgram connection attempts.")
+                    raise Exception("Client disconnected")
+                    
                 # Add delay between connection attempts
                 backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=3000, max_delay=30000)
                 print(f"Waiting {backoff_delay:.0f}ms before retry...")
@@ -202,7 +217,7 @@ def calculate_backoff_with_jitter(attempt, base_delay=1000, max_delay=32000):
     return backoff
 
 
-def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample_rate: int, channels: int, model: str, retries=10):
+def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample_rate: int, channels: int, model: str, websocket_active_check=None, retries=10):
     print("connect_to_deepgram_with_backoff")
     for attempt in range(retries):
         try:
@@ -222,10 +237,20 @@ def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample
                 
             if attempt == retries - 1:  # Last attempt
                 raise
+            
+            # Check if client is still connected before waiting
+            if websocket_active_check and not websocket_active_check():
+                print("Client disconnected during backoff. Aborting Deepgram connection attempts.")
+                raise Exception("Client disconnected")
                 
         backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=2000, max_delay=60000)
         print(f"Waiting {backoff_delay:.0f}ms before next retry...")
         time.sleep(backoff_delay / 1000)  # Convert ms to seconds for sleep
+        
+        # Check again after waiting if client is still connected
+        if websocket_active_check and not websocket_active_check():
+            print("Client disconnected after backoff wait. Aborting Deepgram connection attempts.")
+            raise Exception("Client disconnected")
 
     raise Exception(f'Could not open socket: All retry attempts failed.')
 

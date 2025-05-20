@@ -343,10 +343,25 @@ async def _listen(
 
             # DEEPGRAM
             if stt_service == STTService.deepgram:
+                # Create a function to check if the WebSocket is still active
+                def check_websocket_active():
+                    nonlocal websocket_active
+                    nonlocal websocket
+                    try:
+                        return websocket_active and websocket.client_state == WebSocketState.CONNECTED
+                    except Exception:
+                        return False
+
                 deepgram_socket = await process_audio_dg(
-                    stream_transcript, stt_language, sample_rate, 1, preseconds=speech_profile_duration, model=stt_model,)
+                    stream_transcript, stt_language, sample_rate, 1, 
+                    preseconds=speech_profile_duration, model=stt_model,
+                    websocket_active_check=check_websocket_active)
+                
                 if speech_profile_duration:
-                    deepgram_socket2 = await process_audio_dg(stream_transcript, stt_language, sample_rate, 1, model=stt_model)
+                    deepgram_socket2 = await process_audio_dg(
+                        stream_transcript, stt_language, sample_rate, 1, 
+                        model=stt_model,
+                        websocket_active_check=check_websocket_active)
 
                     async def deepgram_socket_send(data):
                         return deepgram_socket.send(data)
@@ -748,8 +763,53 @@ async def _listen(
         finally:
             websocket_active = False
 
-    # Start
-    #
+    # Ensure resources are properly cleaned up
+    async def cleanup_resources():
+        nonlocal deepgram_socket, deepgram_socket2, soniox_socket, soniox_socket2, speechmatics_socket
+        print("Cleaning up STT resources", uid)
+        
+        # Close Deepgram connections
+        try:
+            if deepgram_socket and hasattr(deepgram_socket, 'finish'):
+                await deepgram_socket.finish()
+                print("Closed primary Deepgram connection", uid)
+        except Exception as e:
+            print(f"Error closing primary Deepgram connection: {e}", uid)
+            
+        try:
+            if deepgram_socket2 and hasattr(deepgram_socket2, 'finish'):
+                await deepgram_socket2.finish()
+                print("Closed secondary Deepgram connection", uid)
+        except Exception as e:
+            print(f"Error closing secondary Deepgram connection: {e}", uid)
+            
+        # Close Soniox connections
+        try:
+            if soniox_socket and not soniox_socket.closed:
+                await soniox_socket.close()
+                print("Closed primary Soniox connection", uid)
+        except Exception as e:
+            print(f"Error closing primary Soniox connection: {e}", uid)
+            
+        try:
+            if soniox_socket2 and not soniox_socket2.closed:
+                await soniox_socket2.close()
+                print("Closed secondary Soniox connection", uid)
+        except Exception as e:
+            print(f"Error closing secondary Soniox connection: {e}", uid)
+            
+        # Close Speechmatics connection
+        try:
+            if speechmatics_socket and not speechmatics_socket.closed:
+                await speechmatics_socket.close()
+                print("Closed Speechmatics connection", uid)
+        except Exception as e:
+            print(f"Error closing Speechmatics connection: {e}", uid)
+            
+        print("STT resources cleanup completed", uid)
+    
+    
+    # Update the main WebSocket handler to call cleanup
     try:
         # Init STT
         _send_message_event(MessageServiceStatusEvent(status="stt_initiating", status_text="STT Service Starting"))
@@ -781,37 +841,19 @@ async def _listen(
     except Exception as e:
         print(f"Error during WebSocket operation: {e}", uid)
     finally:
+        # Ensure resources are cleaned up
         websocket_active = False
-
-        # STT sockets
+        await cleanup_resources()
+        
+        # Close the client WebSocket if it's still open
         try:
-            if deepgram_socket:
-                deepgram_socket.finish()
-            if deepgram_socket2:
-                deepgram_socket2.finish()
-            if soniox_socket:
-                await soniox_socket.close()
-            if soniox_socket2:
-                await soniox_socket2.close()
-            if speechmatics_socket:
-                await speechmatics_socket.close()
-        except Exception as e:
-            print(f"Error closing STT sockets: {e}", uid)
-
-        # Client sockets
-        if websocket.client_state == WebSocketState.CONNECTED:
-            try:
+            if websocket.client_state == WebSocketState.CONNECTED:
+                print("Closing client WebSocket", uid)
                 await websocket.close(code=websocket_close_code)
-            except Exception as e:
-                print(f"Error closing Client WebSocket: {e}", uid)
-
-        # Pusher sockets
-        if pusher_close is not None:
-            try:
-                await pusher_close()
-            except Exception as e:
-                print(f"Error closing Pusher: {e}", uid)
-    print("_listen ended", uid)
+        except Exception as e:
+            print(f"Error closing Client WebSocket: {e}", uid)
+        
+        print("_listen ended", uid)
 
 @router.websocket("/v3/listen")
 async def listen_handler_v3(
