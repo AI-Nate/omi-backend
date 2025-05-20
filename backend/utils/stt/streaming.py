@@ -2,7 +2,7 @@ import asyncio
 import os
 import random
 import time
-from typing import List
+from typing import List, Dict, Optional
 from enum import Enum
 
 import websockets
@@ -11,10 +11,9 @@ from deepgram.clients.live.v1 import LiveOptions
 
 from utils.stt.soniox_util import *
 
-headers = {
-    "Authorization": f"Token {os.getenv('DEEPGRAM_API_KEY')}",
-    "Content-Type": "audio/*"
-}
+# Define a global lock for Deepgram connection creation
+# This ensures we don't create multiple connections simultaneously
+DEEPGRAM_LOCK = asyncio.Lock()
 
 class STTService(str, Enum):
     deepgram = "deepgram"
@@ -91,83 +90,49 @@ async def send_initial_file(data: List[List[int]], transcript_socket):
     print('send_initial_file', time.time() - start)
 
 
-# Initialize Deepgram client based on environment configuration
-is_dg_self_hosted = os.getenv('DEEPGRAM_SELF_HOSTED_ENABLED', '').lower() == 'true'
+# Calculate backoff with jitter for more effective rate limit handling
+def calculate_backoff_with_jitter(attempt, base_delay=2000, max_delay=60000):
+    jitter = random.random() * base_delay * 0.5  # Add up to 50% jitter
+    backoff = min(((2 ** attempt) * base_delay) + jitter, max_delay)
+    return backoff
 
-# Verify API key exists
-deepgram_api_key = os.getenv('DEEPGRAM_API_KEY')
-if not deepgram_api_key:
-    raise ValueError("Deepgram API key is not set. Please set the DEEPGRAM_API_KEY environment variable.")
 
-deepgram_options = DeepgramClientOptions(
-    options={
-        "keepalive": "true", 
-        "termination_exception_connect": "true",
-        "timeout": "60000",  # Increase timeout to 60 seconds
-        "max_retries": "5",  # Allow more retries for API calls
-    }
-)
-
-deepgram_beta_options = DeepgramClientOptions(
-    options={
-        "keepalive": "true", 
-        "termination_exception_connect": "true",
-        "timeout": "60000",  # Increase timeout to 60 seconds
-        "max_retries": "5",  # Allow more retries for API calls
-    }
-)
-deepgram_beta_options.url = "https://api.beta.deepgram.com"
-
-if is_dg_self_hosted:
-    dg_self_hosted_url = os.getenv('DEEPGRAM_SELF_HOSTED_URL')
-    if not dg_self_hosted_url:
-        raise ValueError("DEEPGRAM_SELF_HOSTED_URL must be set when DEEPGRAM_SELF_HOSTED_ENABLED is true")
-    # Override only the URL while keeping all other options
-    deepgram_options.url = dg_self_hosted_url
-    deepgram_beta_options.url = dg_self_hosted_url
-    print(f"Using Deepgram self-hosted at: {dg_self_hosted_url}")
-
-print(f"Initializing Deepgram client with key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
-deepgram = DeepgramClient(deepgram_api_key, deepgram_options)
-deepgram_beta = DeepgramClient(deepgram_api_key, deepgram_beta_options)
-
-# Add a connection rate limiter to control the number of concurrent connections
-# This helps prevent rate limiting by Deepgram
-class DeepgramConnectionRateLimiter:
-    def __init__(self, max_concurrent_connections=3, rate_limit_period=5):
-        self.semaphore = asyncio.Semaphore(max_concurrent_connections)
-        self.rate_limit_period = rate_limit_period  # seconds
-        self.last_connection_time = 0
-        self.lock = asyncio.Lock()
+# Create a new DeepgramClient instance for each connection to avoid shared state issues
+def create_deepgram_client(is_beta: bool = False) -> DeepgramClient:
+    # Verify API key exists
+    deepgram_api_key = os.getenv('DEEPGRAM_API_KEY')
+    if not deepgram_api_key:
+        raise ValueError("Deepgram API key is not set. Please set the DEEPGRAM_API_KEY environment variable.")
     
-    async def acquire(self):
-        """Acquire permission to create a new connection"""
-        await self.semaphore.acquire()
-        async with self.lock:
-            # Ensure we wait at least rate_limit_period seconds between connections
-            current_time = time.time()
-            time_since_last = current_time - self.last_connection_time
-            if time_since_last < self.rate_limit_period:
-                wait_time = self.rate_limit_period - time_since_last
-                print(f"Rate limiting: waiting {wait_time:.2f}s before next Deepgram connection")
-                await asyncio.sleep(wait_time)
-            
-            self.last_connection_time = time.time()
-            
-    def release(self):
-        """Release a connection slot"""
-        self.semaphore.release()
+    # Configure client options
+    client_options = DeepgramClientOptions(
+        options={
+            "keepalive": "true", 
+            "termination_exception_connect": "true",
+            "timeout": "60000",  # Increase timeout to 60 seconds
+            "max_retries": "5",  # Allow more retries for API calls
+        }
+    )
+    
+    # Set appropriate URL based on whether this is the beta API
+    if is_beta:
+        client_options.url = "https://api.beta.deepgram.com"
+    
+    # Check for self-hosted configuration
+    is_dg_self_hosted = os.getenv('DEEPGRAM_SELF_HOSTED_ENABLED', '').lower() == 'true'
+    if is_dg_self_hosted:
+        dg_self_hosted_url = os.getenv('DEEPGRAM_SELF_HOSTED_URL')
+        if not dg_self_hosted_url:
+            raise ValueError("DEEPGRAM_SELF_HOSTED_URL must be set when DEEPGRAM_SELF_HOSTED_ENABLED is true")
+        client_options.url = dg_self_hosted_url
+    
+    # Create and return a fresh client instance
+    return DeepgramClient(deepgram_api_key, client_options)
 
-# Create a connection rate limiter instance with conservative limits
-# Allow at most 2 concurrent connections with 5 second spacing
-connection_limiter = DeepgramConnectionRateLimiter(
-    max_concurrent_connections=int(os.getenv('DEEPGRAM_MAX_CONCURRENT', '2')),
-    rate_limit_period=float(os.getenv('DEEPGRAM_RATE_LIMIT_PERIOD', '5.0'))
-)
 
 async def process_audio_dg(
-    stream_transcript, language: str, sample_rate: int, channels: int, preseconds: int = 0, model: str = 'nova-2-general',
-    websocket_active_check=None  # Add a callback to check if the client is still connected
+    stream_transcript, language: str, sample_rate: int, channels: int, preseconds: int = 0, 
+    model: str = 'nova-2-general', websocket_active_check=None
 ):
     print('process_audio_dg', language, sample_rate, channels, preseconds)
 
@@ -214,189 +179,134 @@ async def process_audio_dg(
     def on_error(self, error, **kwargs):
         print(f"Deepgram Error: {error}")
 
-    max_connection_attempts = 3
-    for attempt in range(max_connection_attempts):
+    # Attempt to connect with max_retries and backoff strategy
+    max_retries = int(os.getenv('DEEPGRAM_MAX_RETRIES', '5'))
+    
+    for attempt in range(max_retries):
         try:
-            # Check if client is still connected before attempting to connect to Deepgram
+            # Check if client is still connected before making another attempt
             if websocket_active_check and not websocket_active_check():
                 print("Client disconnected. Aborting Deepgram connection attempts.")
                 raise Exception("Client disconnected")
                 
-            print("Connecting to Deepgram")  # Log before connection attempt
-            return connect_to_deepgram_with_backoff(on_message, on_error, language, sample_rate, channels, model, websocket_active_check)
-        except Exception as e:
-            if "Client disconnected" in str(e):
-                print("Aborting Deepgram connection due to client disconnection")
-                raise
-                
-            print(f"Failed to connect to Deepgram (attempt {attempt+1}/{max_connection_attempts}): {e}")
-            if attempt < max_connection_attempts - 1:
-                # Check again if client is still connected before waiting
-                if websocket_active_check and not websocket_active_check():
-                    print("Client disconnected during retry. Aborting Deepgram connection attempts.")
-                    raise Exception("Client disconnected")
-                    
-                # Add delay between connection attempts
-                backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=3000, max_delay=30000)
-                print(f"Waiting {backoff_delay:.0f}ms before retry...")
-                await asyncio.sleep(backoff_delay / 1000)
-            else:
-                raise
-
-
-# Calculate backoff with jitter
-def calculate_backoff_with_jitter(attempt, base_delay=1000, max_delay=32000):
-    jitter = random.random() * base_delay
-    backoff = min(((2 ** attempt) * base_delay) + jitter, max_delay)
-    return backoff
-
-
-async def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample_rate: int, channels: int, model: str, websocket_active_check=None, retries=10):
-    print("connect_to_deepgram_with_backoff")
-    
-    # Acquire a connection slot from our rate limiter
-    await connection_limiter.acquire()
-    print("Acquired connection slot from rate limiter")
-    
-    for attempt in range(retries):
-        try:
-            return connect_to_deepgram(on_message, on_error, language, sample_rate, channels, model)
-        except Exception as error:
-            if 'HTTP 429' in str(error):
-                print(f'Rate limit exceeded (HTTP 429). Implementing backoff strategy.')
-            elif 'HTTP 403' in str(error):
-                print(f'Authentication failed (HTTP 403). Please check your Deepgram API key and permissions.')
-                # If we get a 403 after the first attempt, it's likely an authentication issue, not a temporary problem
+            print(f"Connecting to Deepgram (attempt {attempt+1}/{max_retries})")
+            
+            # Use a global lock to prevent concurrent connection attempts
+            async with DEEPGRAM_LOCK:
+                # Add forced delay between connection attempts (from env or default to 5s)
                 if attempt > 0:
-                    print(f'Continuing retry attempts in case this is a temporary issue...')
-                else:
-                    print(f'CRITICAL: Your Deepgram API key may be invalid or expired.')
-            else:
-                print(f'An error occurred: {error}')
+                    connection_delay_ms = int(os.getenv('DEEPGRAM_CONNECTION_DELAY', '5000'))
+                    print(f"Waiting {connection_delay_ms}ms before next connection attempt...")
+                    await asyncio.sleep(connection_delay_ms / 1000.0)
                 
-            if attempt == retries - 1:  # Last attempt
-                # We don't release the connection slot here because it's already released in connect_to_deepgram
-                raise
-            
-            # Check if client is still connected before waiting
-            if websocket_active_check and not websocket_active_check():
-                print("Client disconnected during backoff. Aborting Deepgram connection attempts.")
-                # Release the connection slot if the client disconnects
-                connection_limiter.release()
-                raise Exception("Client disconnected")
-            
-            # Use a more aggressive backoff for rate limits
-            if 'HTTP 429' in str(error):
-                # For rate limits, use a longer base delay and max delay
-                backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=4000, max_delay=60000)
-            else:
-                # For other errors, use the standard delay
-                backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=2000, max_delay=30000)
+                # Create a fresh DeepgramClient for each connection attempt
+                is_beta = (model == "nova-3")
+                client = create_deepgram_client(is_beta=is_beta)
                 
-            print(f"Waiting {backoff_delay:.0f}ms before next retry...")
-            await asyncio.sleep(backoff_delay / 1000)  # Convert ms to seconds for sleep
+                # Set up connection
+                print(f"Setting up connection with {'beta' if is_beta else 'standard'} client")
+                dg_connection = client.listen.websocket.v("1")
+                
+                # Register event handlers
+                dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
+                dg_connection.on(LiveTranscriptionEvents.Error, on_error)
+                
+                # Define event callbacks
+                def on_open(self, open, **kwargs):
+                    print("Connection Open")
+                
+                def on_metadata(self, metadata, **kwargs):
+                    print(f"Metadata: {metadata}")
+                
+                def on_speech_started(self, speech_started, **kwargs):
+                    print("Speech Started")
+                
+                def on_utterance_end(self, utterance_end, **kwargs):
+                    pass
+                
+                def on_close(self, close, **kwargs):
+                    print("Connection Closed")
+                
+                def on_unhandled(self, unhandled, **kwargs):
+                    print(f"Unhandled Websocket Message: {unhandled}")
+                
+                # Register additional event handlers
+                dg_connection.on(LiveTranscriptionEvents.Open, on_open)
+                dg_connection.on(LiveTranscriptionEvents.Metadata, on_metadata)
+                dg_connection.on(LiveTranscriptionEvents.SpeechStarted, on_speech_started)
+                dg_connection.on(LiveTranscriptionEvents.UtteranceEnd, on_utterance_end)
+                dg_connection.on(LiveTranscriptionEvents.Close, on_close)
+                dg_connection.on(LiveTranscriptionEvents.Unhandled, on_unhandled)
+                
+                # Configure transcription options
+                options = LiveOptions(
+                    punctuate=True,
+                    no_delay=True,
+                    endpointing=100,
+                    language=language,
+                    interim_results=False,
+                    smart_format=True,
+                    profanity_filter=False,
+                    diarize=True,
+                    filler_words=False,
+                    channels=channels,
+                    multichannel=channels > 1,
+                    model=model,
+                    sample_rate=sample_rate,
+                    encoding='linear16',
+                )
+                
+                # Start the connection with options
+                try:
+                    result = dg_connection.start(options)
+                    print('Deepgram connection started:', result)
+                    return dg_connection
+                except websockets.exceptions.WebSocketException as e:
+                    if "HTTP 429" in str(e):
+                        print(f"Rate limit exceeded (HTTP 429) when starting connection")
+                        # Let the outer try/except handle the backoff
+                        raise
+                    elif "HTTP 403" in str(e):
+                        print(f"Authentication failed (HTTP 403). Your API key may be invalid or expired.")
+                        print(f"API Key: {os.getenv('DEEPGRAM_API_KEY')[:5]}...{os.getenv('DEEPGRAM_API_KEY')[-5:]}")
+                        raise Exception(f'Could not open socket: WebSocketException {e}')
+                    else:
+                        print(f"WebSocket exception: {e}")
+                        raise Exception(f'Could not open socket: WebSocketException {e}')
         
-        # Check again after waiting if client is still connected
-        if websocket_active_check and not websocket_active_check():
-            print("Client disconnected after backoff wait. Aborting Deepgram connection attempts.")
-            # Release the connection slot if the client disconnects
-            connection_limiter.release()
-            raise Exception("Client disconnected")
-
-    # We don't release the connection slot here because it's already released in connect_to_deepgram
-    raise Exception(f'Could not open socket: All retry attempts failed.')
-
-
-def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, channels: int, model: str):
-    try:
-        # get connection by model
-        if model == "nova-3":
-            dg_connection = deepgram_beta.listen.websocket.v("1")
-        else:
-            dg_connection = deepgram.listen.websocket.v("1")
-
-        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-        dg_connection.on(LiveTranscriptionEvents.Error, on_error)
-
-        def on_open(self, open, **kwargs):
-            print("Connection Open")
-
-        def on_metadata(self, metadata, **kwargs):
-            print(f"Metadata: {metadata}")
-
-        def on_speech_started(self, speech_started, **kwargs):
-            print("Speech Started")
-
-        def on_utterance_end(self, utterance_end, **kwargs):
-            pass
-
-        def on_close(self, close, **kwargs):
-            print("Connection Closed")
-            # Release the connection slot when the connection is closed
-            connection_limiter.release()
-
-        def on_unhandled(self, unhandled, **kwargs):
-            print(f"Unhandled Websocket Message: {unhandled}")
-
-        dg_connection.on(LiveTranscriptionEvents.Open, on_open)
-        dg_connection.on(LiveTranscriptionEvents.Metadata, on_metadata)
-        dg_connection.on(LiveTranscriptionEvents.SpeechStarted, on_speech_started)
-        dg_connection.on(LiveTranscriptionEvents.UtteranceEnd, on_utterance_end)
-        dg_connection.on(LiveTranscriptionEvents.Close, on_close)
-        dg_connection.on(LiveTranscriptionEvents.Unhandled, on_unhandled)
-        options = LiveOptions(
-            punctuate=True,
-            no_delay=True,
-            endpointing=100,
-            language=language,
-            interim_results=False,
-            smart_format=True,
-            profanity_filter=False,
-            diarize=True,
-            filler_words=False,
-            channels=channels,
-            multichannel=channels > 1,
-            model=model,
-            sample_rate=sample_rate,
-            encoding='linear16',
-        )
-        
-        # Add a connection delay based on environment variable
-        connection_delay_ms = int(os.getenv('DEEPGRAM_CONNECTION_DELAY', '500'))
-        if connection_delay_ms > 0:
-            time.sleep(connection_delay_ms / 1000.0)
-        
-        try:
-            result = dg_connection.start(options)
-            print('Deepgram connection started:', result)
-            return dg_connection
-        except websockets.exceptions.WebSocketException as e:
-            # Release the connection slot on error
-            connection_limiter.release()
-            if "HTTP 429" in str(e):
-                print(f"Rate limit exceeded (HTTP 429) when starting connection")
-            elif "HTTP 403" in str(e):
-                print(f"Authentication failed (HTTP 403). Your API key may be invalid or expired.")
-                print(f"API Key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
-            raise Exception(f'Could not open socket: WebSocketException {e}')
         except Exception as e:
-            # Release the connection slot on error
-            connection_limiter.release()
-            raise Exception(f'Could not open socket: {e}')
+            print(f"Failed to connect to Deepgram: {e}")
             
-    except websockets.exceptions.WebSocketException as e:
-        # Release the connection slot on error at websocket level
-        connection_limiter.release()
-        if "HTTP 429" in str(e):
-            print(f"Rate limit exceeded (HTTP 429) when creating connection")
-        elif "HTTP 403" in str(e):
-            print(f"Authentication failed (HTTP 403). Your API key may be invalid or expired.")
-            print(f"API Key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
-        raise Exception(f'Could not open socket: WebSocketException {e}')
-    except Exception as e:
-        # Release the connection slot on error
-        connection_limiter.release()
-        raise Exception(f'Could not open socket: {e}')
+            # Handle rate limits with longer backoff times
+            if "HTTP 429" in str(e) or "Rate limit exceeded" in str(e):
+                if attempt < max_retries - 1:  # If not the last attempt
+                    # Use an aggressive backoff for rate limits
+                    backoff_delay = calculate_backoff_with_jitter(
+                        attempt,
+                        base_delay=int(os.getenv('DEEPGRAM_BACKOFF_BASE', '5000')),
+                        max_delay=int(os.getenv('DEEPGRAM_BACKOFF_MAX', '60000'))
+                    )
+                    print(f"Rate limit exceeded. Waiting {backoff_delay:.0f}ms before retry...")
+                    await asyncio.sleep(backoff_delay / 1000)
+                else:
+                    print(f"Maximum retry attempts reached for rate limit. Giving up.")
+                    raise Exception("Maximum retry attempts reached for Deepgram rate limit")
+            elif "Client disconnected" in str(e):
+                # Don't retry if the client has disconnected
+                raise Exception("Client disconnected")
+            else:
+                # For other errors, use a shorter backoff
+                if attempt < max_retries - 1:
+                    backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=1000, max_delay=15000)
+                    print(f"Error occurred. Waiting {backoff_delay:.0f}ms before retry...")
+                    await asyncio.sleep(backoff_delay / 1000)
+                else:
+                    print(f"Maximum retry attempts reached. Giving up.")
+                    raise Exception(f"Failed to connect to Deepgram after {max_retries} attempts: {e}")
+
+    # If we get here, all retries failed
+    raise Exception("Failed to connect to Deepgram after all retry attempts")
+
 
 async def process_audio_soniox(stream_transcript, sample_rate: int, language: str, uid: str, preseconds: int = 0, language_hints: List[str] = []):
     # Soniox supports diarization primarily for English

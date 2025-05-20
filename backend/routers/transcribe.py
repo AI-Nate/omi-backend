@@ -358,20 +358,11 @@ async def _listen(
                     websocket_active_check=check_websocket_active)
                 
                 if speech_profile_duration:
-                    # Add a delay between Deepgram connections to avoid rate limiting
-                    connection_delay_ms = int(os.getenv('DEEPGRAM_CONNECTION_DELAY', '1000'))
-                    if connection_delay_ms > 0:
-                        print(f"Waiting {connection_delay_ms}ms before creating second Deepgram connection")
-                        await asyncio.sleep(connection_delay_ms / 1000.0)
-                        
-                    deepgram_socket2 = await process_audio_dg(
-                        stream_transcript, stt_language, sample_rate, 1, 
-                        model=stt_model,
-                        websocket_active_check=check_websocket_active)
-
+                    # We'll use the same socket for speech profile data instead of creating a second connection
+                    # This helps avoid hitting rate limits
                     async def deepgram_socket_send(data):
                         return deepgram_socket.send(data)
-
+                    
                     safe_create_task(send_initial_file_path(file_path, deepgram_socket_send))
 
             # SONIOX
@@ -747,15 +738,7 @@ async def _listen(
 
                     # Handle Deepgram sockets
                     if dg_socket1 is not None:
-                        elapsed_seconds = time.time() - timer_start
-                        if elapsed_seconds > speech_profile_duration or not dg_socket2:
-                            dg_socket1.send(data)
-                            if dg_socket2:
-                                print('Killing deepgram_socket2', uid)
-                                dg_socket2.finish()
-                                dg_socket2 = None
-                        else:
-                            dg_socket2.send(data)
+                        dg_socket1.send(data)
 
                 # Send to external trigger
                 if audio_bytes_send is not None:
@@ -782,12 +765,14 @@ async def _listen(
         except Exception as e:
             print(f"Error closing primary Deepgram connection: {e}", uid)
             
-        try:
-            if deepgram_socket2 and hasattr(deepgram_socket2, 'finish'):
-                await deepgram_socket2.finish()
-                print("Closed secondary Deepgram connection", uid)
-        except Exception as e:
-            print(f"Error closing secondary Deepgram connection: {e}", uid)
+            # The second Deepgram socket is no longer used, but we'll keep the code
+            # for backward compatibility for now
+            try:
+                if deepgram_socket2 and hasattr(deepgram_socket2, 'finish'):
+                    await deepgram_socket2.finish()
+                    print("Closed secondary Deepgram connection", uid)
+            except Exception as e:
+                print(f"Error closing secondary Deepgram connection: {e}", uid)
             
         # Close Soniox connections
         try:
