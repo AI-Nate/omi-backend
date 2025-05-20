@@ -93,6 +93,12 @@ async def send_initial_file(data: List[List[int]], transcript_socket):
 
 # Initialize Deepgram client based on environment configuration
 is_dg_self_hosted = os.getenv('DEEPGRAM_SELF_HOSTED_ENABLED', '').lower() == 'true'
+
+# Verify API key exists
+deepgram_api_key = os.getenv('DEEPGRAM_API_KEY')
+if not deepgram_api_key:
+    raise ValueError("Deepgram API key is not set. Please set the DEEPGRAM_API_KEY environment variable.")
+
 deepgram_options = DeepgramClientOptions(
     options={
         "keepalive": "true", 
@@ -121,8 +127,9 @@ if is_dg_self_hosted:
     deepgram_beta_options.url = dg_self_hosted_url
     print(f"Using Deepgram self-hosted at: {dg_self_hosted_url}")
 
-deepgram = DeepgramClient(os.getenv('DEEPGRAM_API_KEY'), deepgram_options)
-deepgram_beta = DeepgramClient(os.getenv('DEEPGRAM_API_KEY'), deepgram_beta_options)
+print(f"Initializing Deepgram client with key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
+deepgram = DeepgramClient(deepgram_api_key, deepgram_options)
+deepgram_beta = DeepgramClient(deepgram_api_key, deepgram_beta_options)
 
 async def process_audio_dg(
     stream_transcript, language: str, sample_rate: int, channels: int, preseconds: int = 0, model: str = 'nova-2-general',
@@ -203,6 +210,13 @@ def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample
         except Exception as error:
             if 'HTTP 429' in str(error):
                 print(f'Rate limit exceeded (HTTP 429). Implementing backoff strategy.')
+            elif 'HTTP 403' in str(error):
+                print(f'Authentication failed (HTTP 403). Please check your Deepgram API key and permissions.')
+                # If we get a 403 after the first attempt, it's likely an authentication issue, not a temporary problem
+                if attempt > 0:
+                    print(f'Continuing retry attempts in case this is a temporary issue...')
+                else:
+                    print(f'CRITICAL: Your Deepgram API key may be invalid or expired.')
             else:
                 print(f'An error occurred: {error}')
                 
@@ -266,7 +280,6 @@ def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, c
             model=model,
             sample_rate=sample_rate,
             encoding='linear16',
-            tier="enhanced"  # Add reliability tier for more consistent performance
         )
         
         # Add a connection delay based on environment variable
@@ -281,6 +294,9 @@ def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, c
         except websockets.exceptions.WebSocketException as e:
             if "HTTP 429" in str(e):
                 print(f"Rate limit exceeded (HTTP 429) when starting connection")
+            elif "HTTP 403" in str(e):
+                print(f"Authentication failed (HTTP 403). Your API key may be invalid or expired.")
+                print(f"API Key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
             raise Exception(f'Could not open socket: WebSocketException {e}')
         except Exception as e:
             raise Exception(f'Could not open socket: {e}')
@@ -288,6 +304,9 @@ def connect_to_deepgram(on_message, on_error, language: str, sample_rate: int, c
     except websockets.exceptions.WebSocketException as e:
         if "HTTP 429" in str(e):
             print(f"Rate limit exceeded (HTTP 429) when creating connection")
+        elif "HTTP 403" in str(e):
+            print(f"Authentication failed (HTTP 403). Your API key may be invalid or expired.")
+            print(f"API Key: {deepgram_api_key[:5]}...{deepgram_api_key[-5:]}")
         raise Exception(f'Could not open socket: WebSocketException {e}')
     except Exception as e:
         raise Exception(f'Could not open socket: {e}')
