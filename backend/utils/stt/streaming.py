@@ -242,10 +242,17 @@ def connect_to_deepgram_with_backoff(on_message, on_error, language: str, sample
             if websocket_active_check and not websocket_active_check():
                 print("Client disconnected during backoff. Aborting Deepgram connection attempts.")
                 raise Exception("Client disconnected")
+            
+            # Use a more aggressive backoff for rate limits
+            if 'HTTP 429' in str(error):
+                # For rate limits, use a longer base delay and max delay
+                backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=4000, max_delay=60000)
+            else:
+                # For other errors, use the standard delay
+                backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=2000, max_delay=30000)
                 
-        backoff_delay = calculate_backoff_with_jitter(attempt, base_delay=2000, max_delay=60000)
-        print(f"Waiting {backoff_delay:.0f}ms before next retry...")
-        time.sleep(backoff_delay / 1000)  # Convert ms to seconds for sleep
+            print(f"Waiting {backoff_delay:.0f}ms before next retry...")
+            time.sleep(backoff_delay / 1000)  # Convert ms to seconds for sleep
         
         # Check again after waiting if client is still connected
         if websocket_active_check and not websocket_active_check():

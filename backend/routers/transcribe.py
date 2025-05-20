@@ -358,6 +358,12 @@ async def _listen(
                     websocket_active_check=check_websocket_active)
                 
                 if speech_profile_duration:
+                    # Add a delay between Deepgram connections to avoid rate limiting
+                    connection_delay_ms = int(os.getenv('DEEPGRAM_CONNECTION_DELAY', '1000'))
+                    if connection_delay_ms > 0:
+                        print(f"Waiting {connection_delay_ms}ms before creating second Deepgram connection")
+                        await asyncio.sleep(connection_delay_ms / 1000.0)
+                        
                     deepgram_socket2 = await process_audio_dg(
                         stream_transcript, stt_language, sample_rate, 1, 
                         model=stt_model,
