@@ -11,8 +11,8 @@ class Structured {
 
   // New fields for enriched summary
   List<String> keyTakeaways = [];
-  List<String> thingsToImprove = [];
-  List<String> thingsToLearn = [];
+  List<ResourceItem> thingsToImprove = [];
+  List<ResourceItem> thingsToLearn = [];
 
   List<ActionItem> actionItems = [];
 
@@ -49,15 +49,25 @@ class Structured {
     if (json['thingsToImprove'] != null || json['things_to_improve'] != null) {
       final improvements =
           json['thingsToImprove'] ?? json['things_to_improve'] ?? [];
-      structured.thingsToImprove = (improvements as List)
-          .map<String>((item) => item.toString())
-          .toList();
+      structured.thingsToImprove =
+          (improvements as List).map<ResourceItem>((item) {
+        if (item is String) {
+          return ResourceItem(item);
+        } else {
+          return ResourceItem.fromJson(item);
+        }
+      }).toList();
     }
 
     if (json['thingsToLearn'] != null || json['things_to_learn'] != null) {
       final learning = json['thingsToLearn'] ?? json['things_to_learn'] ?? [];
-      structured.thingsToLearn =
-          (learning as List).map<String>((item) => item.toString()).toList();
+      structured.thingsToLearn = (learning as List).map<ResourceItem>((item) {
+        if (item is String) {
+          return ResourceItem(item);
+        } else {
+          return ResourceItem.fromJson(item);
+        }
+      }).toList();
     }
 
     var aItems = json['actionItems'] ?? json['action_items'];
@@ -107,7 +117,7 @@ class Structured {
     if (thingsToImprove.isNotEmpty) {
       str += 'Things to Improve:\n';
       for (var item in thingsToImprove) {
-        str += '- $item\n';
+        str += '- ${item.content}\n';
       }
       str += '\n';
     }
@@ -115,7 +125,7 @@ class Structured {
     if (thingsToLearn.isNotEmpty) {
       str += 'Things to Learn:\n';
       for (var item in thingsToLearn) {
-        str += '- $item\n';
+        str += '- ${item.content}\n';
       }
       str += '\n';
     }
@@ -143,8 +153,8 @@ class Structured {
       'emoji': emoji,
       'category': category,
       'keyTakeaways': keyTakeaways,
-      'thingsToImprove': thingsToImprove,
-      'thingsToLearn': thingsToLearn,
+      'thingsToImprove': thingsToImprove.map((item) => item.toJson()).toList(),
+      'thingsToLearn': thingsToLearn.map((item) => item.toJson()).toList(),
       'actionItems': actionItems.map((item) => item.description).toList(),
       'events': events.map((event) => event.toJson()).toList(),
     };
@@ -226,6 +236,30 @@ class ConversationPhoto {
     return {
       'base64': base64,
       'description': description,
+    };
+  }
+}
+
+class ResourceItem {
+  String content;
+  String url;
+  String title;
+
+  ResourceItem(this.content, {this.url = '', this.title = ''});
+
+  static ResourceItem fromJson(Map<String, dynamic> json) {
+    return ResourceItem(
+      json['content'],
+      url: json['url'] ?? '',
+      title: json['title'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'content': content,
+      'url': url,
+      'title': title,
     };
   }
 }

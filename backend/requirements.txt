@@ -118,7 +118,7 @@ mdurl==0.1.2
 modal==0.64.7
 monotonic==1.6
 more-itertools==10.5.0
-mplcursors==0.5.3
+mplcursors==0.6
 mpld3==0.5.10
 mpmath==1.3.0
 msgpack==1.1.0

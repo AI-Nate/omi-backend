@@ -190,13 +190,25 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
             - Add a brief explanation of the benefit or why this improvement matters
             - Consider both short-term quick wins and longer-term growth opportunities
             - Be direct and concise, focusing on practical implementation
+            - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
             
             For "Things to Learn":
             - Suggest specific topics or skills rather than broad areas
             - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
-            - Explain briefly how this learning connects to {user_name}'s interests or needs
+            - Explain briefly how this learning connects to interests or needs from the conversation
             - Focus on knowledge or skills that would have immediate practical value
-            """
+            - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
+            
+            For the category field, you MUST choose one of the following values EXACTLY as written:
+            {valid_categories_str}
+            
+            For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
+            Be thorough but concise. Prioritize the most important information.
+            {user_memories_context}
+
+            Finished Conversation:
+            {transcript}
+            '''.replace('    ', '').strip()
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
     
@@ -218,12 +230,14 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     - Add a brief explanation of the benefit or why this improvement matters
     - Consider both short-term quick wins and longer-term growth opportunities
     - Be direct and concise, focusing on practical implementation
+    - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
     
     For the "Things to Learn" section:
     - Suggest specific topics or skills rather than broad areas
     - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
     - Explain briefly how this learning connects to interests or needs from the conversation
     - Focus on knowledge or skills that would have immediate practical value
+    - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
     
     For the category field, you MUST choose one of the following values EXACTLY as written:
     {valid_categories_str}
@@ -398,12 +412,14 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     - Add a brief explanation of the benefit or why this improvement matters
     - Consider both short-term quick wins and longer-term growth opportunities
     - Be direct and concise, focusing on practical implementation
+    - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
     
     For the "Things to Learn" section:
     - Suggest specific topics or skills rather than broad areas
     - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
     - Explain briefly how this learning connects to interests or needs from the conversation
     - Focus on knowledge or skills that would have immediate practical value
+    - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
     
     For the category field, you MUST choose one of the following values EXACTLY as written:
     {valid_categories_str}

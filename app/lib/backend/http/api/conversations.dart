@@ -497,9 +497,11 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
     3. Things to Learn (1-2 specific learning opportunities for ${userName})
     
     Format your response as JSON with these keys: keyTakeaways, thingsToImprove, thingsToLearn.
-    Each key should have an array of strings.
-    
-    For thingsToImprove and thingsToLearn, provide only the content without URLs or resource links.
+    Each keyTakeaways should be a string.
+    Each of thingsToImprove and thingsToLearn should be an object with these properties:
+      - content: The actual recommendation or learning opportunity (required)
+      - url: "" (empty string for now)
+      - title: "" (empty string for now)
     
     User Information for Personalization:
     - Name: ${userName}
@@ -660,9 +662,11 @@ Future<void> enrichConversationSummaryWithImage(
     4. Things to Learn (1-2 specific learning opportunities for ${userName}, related to the image content)
     
     Format your response as JSON with these keys: overview, keyTakeaways, thingsToImprove, thingsToLearn.
-    Each of keyTakeaways, thingsToImprove, thingsToLearn should have an array of strings.
-    
-    For thingsToImprove and thingsToLearn, provide only the content without URLs or resource links.
+    Each of keyTakeaways should be a string.
+    Each of thingsToImprove and thingsToLearn should be an object with these properties:
+      - content: The actual recommendation or learning opportunity (required)
+      - url: "" (empty string for now)
+      - title: "" (empty string for now)
     
     User Information for Personalization:
     - Name: ${userName}
@@ -841,9 +845,11 @@ Future<void> enrichConversationSummaryWithMultipleImages(
     4. Things to Learn (1-2 specific learning opportunities for ${userName}, related to the image content)
     
     Format your response as JSON with these keys: overview, keyTakeaways, thingsToImprove, thingsToLearn.
-    Each of keyTakeaways, thingsToImprove, thingsToLearn should have an array of strings.
-    
-    For thingsToImprove and thingsToLearn, provide only the content without URLs or resource links.
+    Each of keyTakeaways should be a string.
+    Each of thingsToImprove and thingsToLearn should be an object with these properties:
+      - content: The actual recommendation or learning opportunity (required)
+      - url: "" (empty string for now)
+      - title: "" (empty string for now)
     
     User Information for Personalization:
     - Name: ${userName}
