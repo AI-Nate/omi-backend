@@ -174,41 +174,39 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     # Get user memories if uid is provided
     user_memories_context = ""
     if uid:
+        # First try to import the module
         try:
             from utils.llms.memory import get_prompt_memories
+        except Exception as e:
+            print(f"Error importing get_prompt_memories: {e}")
+            return Structured(title='', overview='')
+            
+        # Then try to use the imported function
+        try:
             user_name, memories_str = get_prompt_memories(uid)
-            user_memories_context = f"""
-            For personalization context about the user:
-            User name: {user_name}
-            {memories_str}
-            
-            When generating "Things to Improve" and "Things to Learn" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.
-            
-            For "Things to Improve":
-            - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
-            - Include specific, measurable steps that {user_name} can take immediately
-            - Add a brief explanation of the benefit or why this improvement matters
-            - Consider both short-term quick wins and longer-term growth opportunities
-            - Be direct and concise, focusing on practical implementation
-            - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
-            
-            For "Things to Learn":
-            - Suggest specific topics or skills rather than broad areas
-            - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
-            - Explain briefly how this learning connects to interests or needs from the conversation
-            - Focus on knowledge or skills that would have immediate practical value
-            - For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)
-            
-            For the category field, you MUST choose one of the following values EXACTLY as written:
-            {valid_categories_str}
-            
-            For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
-            Be thorough but concise. Prioritize the most important information.
-            {user_memories_context}
-
-            Finished Conversation:
-            {transcript}
-            '''.replace('    ', '').strip()
+            user_memories_context = (
+                f"For personalization context about the user:\n"
+                f"User name: {user_name}\n"
+                f"{memories_str}\n\n"
+                f"When generating \"Things to Improve\" and \"Things to Learn\" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.\n\n"
+                f"For \"Things to Improve\":\n"
+                f"- Start each item with a clear action verb (e.g., \"Practice...\", \"Implement...\", \"Develop...\")\n"
+                f"- Include specific, measurable steps that {user_name} can take immediately\n"
+                f"- Add a brief explanation of the benefit or why this improvement matters\n"
+                f"- Consider both short-term quick wins and longer-term growth opportunities\n"
+                f"- Be direct and concise, focusing on practical implementation\n"
+                f"- For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)\n\n"
+                f"For \"Things to Learn\":\n"
+                f"- Suggest specific topics or skills rather than broad areas\n"
+                f"- Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)\n"
+                f"- Explain briefly how this learning connects to interests or needs from the conversation\n"
+                f"- Focus on knowledge or skills that would have immediate practical value\n"
+                f"- For each item, provide a structure with: content (the suggestion itself), url (empty string), and title (empty string)\n\n"
+                f"For the category field, you MUST choose one of the following values EXACTLY as written:\n"
+                f"{valid_categories_str}\n\n"
+                f"For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime('%A, %B %d at %I:%M %p')} ({tz}).\n"
+                f"Be thorough but concise. Prioritize the most important information."
+            )
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
     
@@ -368,29 +366,33 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     # Get user memories if uid is provided
     user_memories_context = ""
     if uid:
+        # First try to import the module
         try:
             from utils.llms.memory import get_prompt_memories
+        except Exception as e:
+            print(f"Error importing get_prompt_memories: {e}")
+            return Structured(title=title if title else '', overview='')
+            
+        # Then try to use the imported function
+        try:
             user_name, memories_str = get_prompt_memories(uid)
-            user_memories_context = f"""
-            For personalization context about the user:
-            User name: {user_name}
-            {memories_str}
-            
-            When generating "Things to Improve" and "Things to Learn" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.
-            
-            For "Things to Improve":
-            - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
-            - Include specific, measurable steps that {user_name} can take immediately
-            - Add a brief explanation of the benefit or why this improvement matters
-            - Consider both short-term quick wins and longer-term growth opportunities
-            - Be direct and concise, focusing on practical implementation
-            
-            For "Things to Learn":
-            - Suggest specific topics or skills rather than broad areas
-            - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
-            - Explain briefly how this learning connects to {user_name}'s interests or needs
-            - Focus on knowledge or skills that would have immediate practical value
-            """
+            user_memories_context = (
+                f"For personalization context about the user:\n"
+                f"User name: {user_name}\n"
+                f"{memories_str}\n\n"
+                f"When generating \"Things to Improve\" and \"Things to Learn\" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.\n\n"
+                f"For \"Things to Improve\":\n"
+                f"- Start each item with a clear action verb (e.g., \"Practice...\", \"Implement...\", \"Develop...\")\n"
+                f"- Include specific, measurable steps that {user_name} can take immediately\n"
+                f"- Add a brief explanation of the benefit or why this improvement matters\n"
+                f"- Consider both short-term quick wins and longer-term growth opportunities\n"
+                f"- Be direct and concise, focusing on practical implementation\n\n"
+                f"For \"Things to Learn\":\n"
+                f"- Suggest specific topics or skills rather than broad areas\n"
+                f"- Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)\n"
+                f"- Explain briefly how this learning connects to {user_name}'s interests or needs\n"
+                f"- Focus on knowledge or skills that would have immediate practical value"
+            )
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
     
@@ -653,27 +655,36 @@ def summarize_experience_text(text: str, text_source_spec: str = None) -> Struct
 
 
 def get_conversation_summary(uid: str, memories: List[Conversation]) -> str:
-    user_name, memories_str = get_prompt_memories(uid)
+    # First try to import the module
+    try:
+        from utils.llms.memory import get_prompt_memories
+    except Exception as e:
+        print(f"Error importing get_prompt_memories: {e}")
+        return "Could not retrieve conversation summary due to an error."
+        
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        conversation_history = Conversation.conversations_to_string(memories)
 
-    conversation_history = Conversation.conversations_to_string(memories)
+        prompt = f"""
+        You are an experienced mentor, that helps people achieve their goals and improve their lives.
+        You are advising {user_name} right now, {memories_str}
 
-    prompt = f"""
-    You are an experienced mentor, that helps people achieve their goals and improve their lives.
-    You are advising {user_name} right now, {memories_str}
+        The following are a list of {user_name}'s conversations from today, with the transcripts and a slight summary of each, that {user_name} had during his day.
+        {user_name} wants to get a summary of the key action items {user_name} has to take based on today's conversations.
 
-    The following are a list of {user_name}'s conversations from today, with the transcripts and a slight summary of each, that {user_name} had during his day.
-    {user_name} wants to get a summary of the key action items {user_name} has to take based on today's conversations.
+        Remember {user_name} is busy so this has to be very efficient and concise.
+        Respond in at most 50 words.
 
-    Remember {user_name} is busy so this has to be very efficient and concise.
-    Respond in at most 50 words.
-
-    Output your response in plain text, without markdown. No newline character and only use numbers for the action items.
-    ```
-    ${conversation_history}
-    ```
-    """.replace('    ', '').strip()
-    # print(prompt)
-    return llm_mini.invoke(prompt).content
+        Output your response in plain text, without markdown. No newline character and only use numbers for the action items.
+        ```
+        {conversation_history}
+        ```
+        """.replace('    ', '').strip()
+        return llm_mini.invoke(prompt).content
+    except Exception as e:
+        print(f"Error in get_conversation_summary: {e}")
+        return "Could not retrieve conversation summary due to an error."
 
 
 def generate_embedding(content: str) -> List[float]:
