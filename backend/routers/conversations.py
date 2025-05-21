@@ -449,10 +449,10 @@ def process_image_summary(
     if not image_description:
         raise HTTPException(status_code=400, detail="Image description is required")
 
-    # Get user info for personalization
-    user = users_db.get_user(uid)
-    user_name = user.get('name', 'User')
-    user_language = user.get('language', 'English')
+    # Get user language preference (or use English as default)
+    user_language = users_db.get_user_language_preference(uid) or 'English'
+    # Since we don't have a direct function to get the user's name, we'll use a default
+    user_name = 'User'
     
     # Create a prompt to analyze the image and update the summary
     prompt = f"""
