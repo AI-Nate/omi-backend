@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_provider_utilities/flutter_provider_utilities.dart';
 import 'package:omi/backend/http/api/conversations.dart';
 import 'package:omi/backend/http/api/users.dart';
@@ -14,6 +15,12 @@ import 'package:omi/providers/conversation_provider.dart';
 import 'package:omi/utils/analytics/mixpanel.dart';
 import 'package:instabug_flutter/instabug_flutter.dart';
 import 'package:tuple/tuple.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:omi/backend/http/openai.dart'; // For getPhotoDescription
+import 'package:omi/backend/http/api/apps.dart';
+import 'package:omi/backend/mixpanel.dart';
+import 'package:omi/pages/provider.dart';
+import 'package:omi/utils/haptic.dart';
 
 class ConversationDetailProvider extends ChangeNotifier
     with MessageNotifierMixin {
@@ -28,6 +35,7 @@ class ConversationDetailProvider extends ChangeNotifier
   bool isLoading = false;
   bool loadingReprocessConversation = false;
   bool loadingEnhancedSummary = false;
+  bool loadingImageAnalysis = false;
   String reprocessConversationId = '';
   App? selectedAppForReprocessing;
 
@@ -76,6 +84,14 @@ class ConversationDetailProvider extends ChangeNotifier
   bool editSegmentLoading = false;
 
   bool showUnassignedFloatingButton = true;
+
+  // Image analysis data
+  List<Uint8List> summaryImageDataList = [];
+  List<String> summaryImageDescriptions = [];
+  bool hasImageEnhancedSummary = false;
+
+  // ScrollController for the summary page
+  final ScrollController summaryScrollController = ScrollController();
 
   void toggleEditSegmentLoading(bool value) {
     editSegmentLoading = value;
@@ -379,5 +395,235 @@ class ConversationDetailProvider extends ChangeNotifier
     return conversation.structured.keyTakeaways.isNotEmpty ||
         conversation.structured.thingsToImprove.isNotEmpty ||
         conversation.structured.thingsToLearn.isNotEmpty;
+  }
+
+  // Method to handle adding an image to the summary
+  Future<void> addImageToSummary(BuildContext context) async {
+    try {
+      // Show image picker
+      final pickedFile =
+          await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (pickedFile == null) return;
+
+      // Read file bytes
+      final bytes = await pickedFile.readAsBytes();
+
+      // Store the image data
+      summaryImageDataList.add(bytes);
+
+      // Set loading state
+      loadingImageAnalysis = true;
+      notifyListeners();
+
+      // Show processing dialog with a clear message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Analyzing image and enhancing summary...'),
+            duration: Duration(seconds: 10),
+          ),
+        );
+      }
+
+      // Call API to analyze image and update summary
+      // If this is the first image, use the single image API
+      // If it's an additional image, use the multi-image API with all previous images
+      final updatedConversation = summaryImageDataList.length == 1
+          ? await analyzeImageAndUpdateSummary(conversation.id, bytes)
+          : await analyzeImageAndUpdateSummary(
+              conversation.id,
+              bytes,
+              additionalImages: summaryImageDataList.sublist(
+                  0, summaryImageDataList.length - 1),
+            );
+
+      if (updatedConversation != null) {
+        // Update conversation with enriched content (preserve existing image-related content)
+        // For the first image, just replace the content
+        if (summaryImageDataList.length == 1) {
+          conversation.structured.overview =
+              updatedConversation.structured.overview;
+          conversation.structured.keyTakeaways =
+              updatedConversation.structured.keyTakeaways;
+          conversation.structured.thingsToImprove =
+              updatedConversation.structured.thingsToImprove;
+          conversation.structured.thingsToLearn =
+              updatedConversation.structured.thingsToLearn;
+        } else {
+          // For subsequent images, intelligently merge the content to avoid duplication
+          // Add new insights from the latest image analysis
+          _mergeStructuredContent(updatedConversation.structured);
+        }
+
+        // Get the image description
+        final imageDescription = await getPhotoDescription(bytes);
+        summaryImageDescriptions.add(imageDescription);
+
+        hasImageEnhancedSummary = true;
+
+        // Update in the provider
+        if (conversationProvider != null) {
+          conversationProvider!.updateConversation(conversation);
+        }
+
+        // Show success message with more details
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Summary enhanced with ${summaryImageDataList.length > 1 ? "additional " : ""}image content! ✨'),
+              action: SnackBarAction(
+                label: 'View',
+                onPressed: () {
+                  // Scroll to summary section
+                  scrollToSummarySection(context);
+                },
+              ),
+              duration: const Duration(seconds: 5),
+              backgroundColor: Colors.green.shade700,
+            ),
+          );
+
+          // Vibrate to indicate completion
+          HapticFeedback.mediumImpact();
+        }
+      } else {
+        // Remove the image data if processing failed
+        if (summaryImageDataList.isNotEmpty) {
+          summaryImageDataList.removeLast();
+        }
+
+        // Show error message
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Failed to analyze image content'),
+              backgroundColor: Colors.red.shade700,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error adding image to summary: $e');
+      // Remove the last image if there was an error
+      if (summaryImageDataList.isNotEmpty) {
+        summaryImageDataList.removeLast();
+      }
+      if (summaryImageDescriptions.isNotEmpty) {
+        summaryImageDescriptions.removeLast();
+      }
+
+      // Show error message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Error processing image'),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      // Reset loading state
+      loadingImageAnalysis = false;
+      notifyListeners();
+    }
+  }
+
+  // Helper method to merge new content with existing structured data
+  void _mergeStructuredContent(Structured newContent) {
+    // For overview, append new insights if they're not already present
+    if (!conversation.structured.overview.contains(newContent.overview)) {
+      conversation.structured.overview =
+          '${conversation.structured.overview}\n\nAdditional insights from image: ${newContent.overview}';
+    }
+
+    // For key takeaways, add new ones that aren't duplicates
+    for (var takeaway in newContent.keyTakeaways) {
+      if (!_containsSimilarItem(
+          conversation.structured.keyTakeaways, takeaway)) {
+        conversation.structured.keyTakeaways.add(takeaway);
+      }
+    }
+
+    // For things to improve, add new ones that aren't duplicates
+    for (var improvement in newContent.thingsToImprove) {
+      String content = improvement is ResourceItem
+          ? improvement.content
+          : improvement.toString();
+
+      if (!_containsSimilarItem(
+          conversation.structured.thingsToImprove, improvement)) {
+        if (improvement is ResourceItem) {
+          conversation.structured.thingsToImprove.add(improvement);
+        } else {
+          conversation.structured.thingsToImprove.add(ResourceItem(content));
+        }
+      }
+    }
+
+    // For things to learn, add new ones that aren't duplicates
+    for (var learning in newContent.thingsToLearn) {
+      String content =
+          learning is ResourceItem ? learning.content : learning.toString();
+
+      if (!_containsSimilarItem(
+          conversation.structured.thingsToLearn, learning)) {
+        if (learning is ResourceItem) {
+          conversation.structured.thingsToLearn.add(learning);
+        } else {
+          conversation.structured.thingsToLearn.add(ResourceItem(content));
+        }
+      }
+    }
+  }
+
+  // Helper to check if a similar item already exists
+  bool _containsSimilarItem(List items, dynamic newItem) {
+    if (items.isEmpty) return false;
+
+    if (items[0] is String && newItem is String) {
+      return items.any((item) =>
+          item.toLowerCase().contains(newItem.toLowerCase()) ||
+          newItem.toLowerCase().contains(item.toLowerCase()));
+    } else if (items[0] is ResourceItem && newItem is ResourceItem) {
+      return items.any((item) =>
+          item.content.toLowerCase().contains(newItem.content.toLowerCase()) ||
+          newItem.content.toLowerCase().contains(item.content.toLowerCase()));
+    } else if (items[0] is ResourceItem && newItem is String) {
+      return items.any((item) =>
+          item.content.toLowerCase().contains(newItem.toLowerCase()) ||
+          newItem.toLowerCase().contains(item.content.toLowerCase()));
+    } else if (items[0] is String && newItem is ResourceItem) {
+      return items.any((item) =>
+          item.toLowerCase().contains(newItem.content.toLowerCase()) ||
+          newItem.content.toLowerCase().contains(item.toLowerCase()));
+    }
+
+    return false;
+  }
+
+  // Helper method to scroll to summary section
+  void scrollToSummarySection(BuildContext context) {
+    if (summaryScrollController.hasClients) {
+      // Scroll to bottom where the image is displayed
+      summaryScrollController.animateTo(
+        summaryScrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    } else {
+      // Fallback message if we can't scroll
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Summary updated in Overview section ☝️'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 }
