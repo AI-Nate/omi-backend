@@ -157,13 +157,29 @@ class EnhancedSummaryOutput(BaseModel):
     )
 
 
-def get_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str) -> Structured:
+def get_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str, uid: str = None) -> Structured:
     if len(transcript) == 0:
         return Structured(title='', overview='')
 
     # Define valid categories
     valid_categories = [cat.value for cat in CategoryEnum]
     valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+    
+    # Get user memories if uid is provided
+    user_memories_context = ""
+    if uid:
+        try:
+            from utils.llms.memory import get_prompt_memories
+            user_name, memories_str = get_prompt_memories(uid)
+            user_memories_context = f"""
+            For personalization context about the user:
+            User name: {user_name}
+            {memories_str}
+            
+            When generating "Things to Improve" and "Things to Learn" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.
+            """
+        except Exception as e:
+            print(f"Error retrieving user memories: {e}")
     
     prompt = f'''
     You will be given a finished conversation transcript.
@@ -182,6 +198,7 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     
     For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
     Be thorough but concise. Prioritize the most important information.
+    {user_memories_context}
 
     Finished Conversation:
     {transcript}
@@ -246,13 +263,29 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
 
 
 def get_reprocess_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str,
-                                       title: str) -> Structured:
+                                       title: str, uid: str = None) -> Structured:
     if len(transcript) == 0:
         return Structured(title='', overview='')
 
     # Define valid categories
     valid_categories = [cat.value for cat in CategoryEnum]
     valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+    
+    # Get user memories if uid is provided
+    user_memories_context = ""
+    if uid:
+        try:
+            from utils.llms.memory import get_prompt_memories
+            user_name, memories_str = get_prompt_memories(uid)
+            user_memories_context = f"""
+            For personalization context about the user:
+            User name: {user_name}
+            {memories_str}
+            
+            When generating "Things to Improve" and "Things to Learn" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.
+            """
+        except Exception as e:
+            print(f"Error retrieving user memories: {e}")
     
     prompt = f'''
     You will be given a finished conversation transcript.
@@ -271,6 +304,7 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     
     For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
     Be thorough but concise. Prioritize the most important information.
+    {user_memories_context}
     
     Existing Title: {title}
     

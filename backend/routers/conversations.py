@@ -420,7 +420,8 @@ def generate_enhanced_summary(
         full_transcript, 
         conversation.started_at or conversation.created_at,
         conversation.language or 'en',
-        tz
+        tz,
+        uid  # Pass the user ID to enable personalization
     )
     
     # Update the conversation with enhanced structured data

@@ -45,7 +45,7 @@ def _get_structured(
         tz = notification_db.get_user_time_zone(uid)
         if conversation.source == ConversationSource.workflow or conversation.source == ConversationSource.external_integration:
             if conversation.text_source == ExternalIntegrationConversationSource.audio:
-                structured = get_transcript_structure(conversation.text, conversation.started_at, language_code, tz)
+                structured = get_transcript_structure(conversation.text, conversation.started_at, language_code, tz, uid)
                 return structured, False
 
             if conversation.text_source == ExternalIntegrationConversationSource.message:
@@ -68,7 +68,7 @@ def _get_structured(
         if force_process:
             # reprocess endpoint
 
-            return get_reprocess_transcript_structure(conversation.get_transcript(False), conversation.started_at, language_code, tz, conversation.structured.title), False
+            return get_reprocess_transcript_structure(conversation.get_transcript(False), conversation.started_at, language_code, tz, conversation.structured.title, uid), False
 
         discarded = should_discard_conversation(conversation.get_transcript(False))
         if discarded:
