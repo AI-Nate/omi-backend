@@ -199,9 +199,9 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
         )
 
         # Add enhanced fields
-        structured.keyTakeaways = response.key_takeaways
-        structured.thingsToImprove = response.things_to_improve
-        structured.thingsToLearn = response.things_to_learn
+        structured.key_takeaways = response.key_takeaways
+        structured.things_to_improve = response.things_to_improve
+        structured.things_to_learn = response.things_to_learn
 
         # Process action items and events
         for item in response.action_items:
@@ -291,9 +291,9 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
         )
 
         # Add enhanced fields
-        structured.keyTakeaways = response.key_takeaways
-        structured.thingsToImprove = response.things_to_improve
-        structured.thingsToLearn = response.things_to_learn
+        structured.key_takeaways = response.key_takeaways
+        structured.things_to_improve = response.things_to_improve
+        structured.things_to_learn = response.things_to_learn
 
         # Process action items and events
         for item in response.action_items:
