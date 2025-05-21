@@ -264,53 +264,71 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
         
         # Process improvement items with web search
         for item in response.things_to_improve:
-            content = item.content if hasattr(item, 'content') else item
-            
-            # Use web search to find relevant resources
-            search_query = f"How to {content.lower()}"
-            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
-            
-            resource_url = ""
-            resource_title = ""
-            
-            # Get the first URL if available
-            if url_mapping:
-                first_url = next(iter(url_mapping.keys()), "")
-                resource_url = first_url
-                resource_title = url_mapping.get(first_url, "")
-            
-            # Create resource item
-            resource_item = ResourceItem(
-                content=content,
-                url=resource_url,
-                title=resource_title
-            )
-            structured.things_to_improve.append(resource_item)
+            try:
+                # Handle both string items and ResourceItem objects
+                if isinstance(item, str):
+                    content = item
+                else:
+                    content = item.content if hasattr(item, 'content') else str(item)
+                
+                # Use web search to find relevant resources
+                search_query = f"How to {content.lower()}"
+                search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+                
+                resource_url = ""
+                resource_title = ""
+                
+                # Get the first URL if available
+                if url_mapping:
+                    first_url = next(iter(url_mapping.keys()), "")
+                    resource_url = first_url
+                    resource_title = url_mapping.get(first_url, "")
+                
+                # Create resource item
+                resource_item = ResourceItem(
+                    content=content,
+                    url=resource_url,
+                    title=resource_title
+                )
+                structured.things_to_improve.append(resource_item)
+            except Exception as e:
+                print(f"Error processing improvement item: {e}")
+                # Add as simple ResourceItem with just content
+                structured.things_to_improve.append(ResourceItem(content=str(item)))
         
         # Process learning items with web search
         for item in response.things_to_learn:
-            content = item.content if hasattr(item, 'content') else item
-            
-            # Use web search to find relevant resources
-            search_query = f"Best resources to learn about {content.lower()}"
-            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
-            
-            resource_url = ""
-            resource_title = ""
-            
-            # Get the first URL if available
-            if url_mapping:
-                first_url = next(iter(url_mapping.keys()), "")
-                resource_url = first_url
-                resource_title = url_mapping.get(first_url, "")
-            
-            # Create resource item
-            resource_item = ResourceItem(
-                content=content,
-                url=resource_url,
-                title=resource_title
-            )
-            structured.things_to_learn.append(resource_item)
+            try:
+                # Handle both string items and ResourceItem objects
+                if isinstance(item, str):
+                    content = item
+                else:
+                    content = item.content if hasattr(item, 'content') else str(item)
+                
+                # Use web search to find relevant resources
+                search_query = f"Best resources to learn about {content.lower()}"
+                search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+                
+                resource_url = ""
+                resource_title = ""
+                
+                # Get the first URL if available
+                if url_mapping:
+                    first_url = next(iter(url_mapping.keys()), "")
+                    resource_url = first_url
+                    resource_title = url_mapping.get(first_url, "")
+                
+                # Create resource item
+                resource_item = ResourceItem(
+                    content=content,
+                    url=resource_url,
+                    title=resource_title
+                )
+                structured.things_to_learn.append(resource_item)
+            except Exception as e:
+                print(f"Error processing learning item: {e}")
+                # Add as simple ResourceItem with just content
+                structured.things_to_learn.append(ResourceItem(content=str(item)))
 
         # Process action items and events
         for item in response.action_items:
@@ -453,53 +471,71 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
         
         # Process improvement items with web search
         for item in response.things_to_improve:
-            content = item.content if hasattr(item, 'content') else item
-            
-            # Use web search to find relevant resources
-            search_query = f"How to {content.lower()}"
-            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
-            
-            resource_url = ""
-            resource_title = ""
-            
-            # Get the first URL if available
-            if url_mapping:
-                first_url = next(iter(url_mapping.keys()), "")
-                resource_url = first_url
-                resource_title = url_mapping.get(first_url, "")
-            
-            # Create resource item
-            resource_item = ResourceItem(
-                content=content,
-                url=resource_url,
-                title=resource_title
-            )
-            structured.things_to_improve.append(resource_item)
+            try:
+                # Handle both string items and ResourceItem objects
+                if isinstance(item, str):
+                    content = item
+                else:
+                    content = item.content if hasattr(item, 'content') else str(item)
+                
+                # Use web search to find relevant resources
+                search_query = f"How to {content.lower()}"
+                search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+                
+                resource_url = ""
+                resource_title = ""
+                
+                # Get the first URL if available
+                if url_mapping:
+                    first_url = next(iter(url_mapping.keys()), "")
+                    resource_url = first_url
+                    resource_title = url_mapping.get(first_url, "")
+                
+                # Create resource item
+                resource_item = ResourceItem(
+                    content=content,
+                    url=resource_url,
+                    title=resource_title
+                )
+                structured.things_to_improve.append(resource_item)
+            except Exception as e:
+                print(f"Error processing improvement item: {e}")
+                # Add as simple ResourceItem with just content
+                structured.things_to_improve.append(ResourceItem(content=str(item)))
         
         # Process learning items with web search
         for item in response.things_to_learn:
-            content = item.content if hasattr(item, 'content') else item
-            
-            # Use web search to find relevant resources
-            search_query = f"Best resources to learn about {content.lower()}"
-            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
-            
-            resource_url = ""
-            resource_title = ""
-            
-            # Get the first URL if available
-            if url_mapping:
-                first_url = next(iter(url_mapping.keys()), "")
-                resource_url = first_url
-                resource_title = url_mapping.get(first_url, "")
-            
-            # Create resource item
-            resource_item = ResourceItem(
-                content=content,
-                url=resource_url,
-                title=resource_title
-            )
-            structured.things_to_learn.append(resource_item)
+            try:
+                # Handle both string items and ResourceItem objects
+                if isinstance(item, str):
+                    content = item
+                else:
+                    content = item.content if hasattr(item, 'content') else str(item)
+                
+                # Use web search to find relevant resources
+                search_query = f"Best resources to learn about {content.lower()}"
+                search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+                
+                resource_url = ""
+                resource_title = ""
+                
+                # Get the first URL if available
+                if url_mapping:
+                    first_url = next(iter(url_mapping.keys()), "")
+                    resource_url = first_url
+                    resource_title = url_mapping.get(first_url, "")
+                
+                # Create resource item
+                resource_item = ResourceItem(
+                    content=content,
+                    url=resource_url,
+                    title=resource_title
+                )
+                structured.things_to_learn.append(resource_item)
+            except Exception as e:
+                print(f"Error processing learning item: {e}")
+                # Add as simple ResourceItem with just content
+                structured.things_to_learn.append(ResourceItem(content=str(item)))
 
         # Process action items and events
         for item in response.action_items:
@@ -708,32 +744,53 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
     try:
         from openai import OpenAI
         client = OpenAI()
-        completion = client.chat.completions.create(
-            model="gpt-4o-search-preview",
-            web_search_options={
-                "search_context_size": search_context_size,
-            },
-            messages=[
-                {
-                    "role": "user",
-                    "content": query,
-                }
-            ],
-        )
+        try:
+            # Try with web_search_options parameter
+            completion = client.chat.completions.create(
+                model="gpt-4o-search-preview",
+                web_search_options={
+                    "search_context_size": search_context_size,
+                },
+                messages=[
+                    {
+                        "role": "user",
+                        "content": query,
+                    }
+                ],
+            )
+        except TypeError as e:
+            if "unexpected keyword argument 'web_search_options'" in str(e):
+                # Fallback to regular completion without web search
+                print("Web search not available, using regular completion instead")
+                completion = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"Provide a brief response to: {query}",
+                        }
+                    ],
+                )
+            else:
+                raise e
         
         # Extract URLs and titles from annotations
         url_mapping = {}
-        annotations = completion.choices[0].message.annotations
-        if annotations:
-            for annotation in annotations:
-                if annotation.type == "url_citation":
-                    citation = annotation.url_citation
-                    url_mapping[citation.url] = citation.title
+        annotations = []
+        
+        # Check if message has annotations attribute
+        if hasattr(completion.choices[0].message, 'annotations'):
+            annotations = completion.choices[0].message.annotations
+            if annotations:
+                for annotation in annotations:
+                    if annotation.type == "url_citation":
+                        citation = annotation.url_citation
+                        url_mapping[citation.url] = citation.title
         
         return completion.choices[0].message.content, annotations, url_mapping
     except Exception as e:
         print(f"Error performing web search: {e}")
-        return "", [], {}
+        return f"Information about {query}", [], {}
 
 
 # ****************************************
