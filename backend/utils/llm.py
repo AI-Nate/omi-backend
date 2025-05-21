@@ -744,8 +744,11 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
     try:
         from openai import OpenAI
         client = OpenAI()
+        print(f"OpenAI client created with default settings, attempting web search for: {query}")
+        
         try:
             # Try with web_search_options parameter
+            print(f"Using model: gpt-4o-search-preview with web_search_options")
             completion = client.chat.completions.create(
                 model="gpt-4o-search-preview",
                 web_search_options={
@@ -758,10 +761,12 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
                     }
                 ],
             )
+            print("Web search completed successfully")
         except TypeError as e:
             if "unexpected keyword argument 'web_search_options'" in str(e):
+                print(f"Web search not available due to TypeError: {str(e)}")
                 # Fallback to regular completion without web search
-                print("Web search not available, using regular completion instead")
+                print("Using regular completion instead with model: gpt-4o")
                 completion = client.chat.completions.create(
                     model="gpt-4o",
                     messages=[
@@ -772,7 +777,21 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
                     ],
                 )
             else:
+                print(f"Unexpected TypeError in web search: {str(e)}")
                 raise e
+        except Exception as e:
+            print(f"Exception during web search attempt: {type(e).__name__}: {str(e)}")
+            # Fallback to regular completion
+            print("Falling back to regular completion with model: gpt-4o")
+            completion = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": f"Provide a brief response to: {query}",
+                    }
+                ],
+            )
         
         # Extract URLs and titles from annotations
         url_mapping = {}
@@ -780,16 +799,20 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
         
         # Check if message has annotations attribute
         if hasattr(completion.choices[0].message, 'annotations'):
+            print("Found annotations in response")
             annotations = completion.choices[0].message.annotations
             if annotations:
                 for annotation in annotations:
                     if annotation.type == "url_citation":
                         citation = annotation.url_citation
                         url_mapping[citation.url] = citation.title
+                print(f"Extracted {len(url_mapping)} URLs from annotations")
+        else:
+            print("No annotations attribute found in response")
         
         return completion.choices[0].message.content, annotations, url_mapping
     except Exception as e:
-        print(f"Error performing web search: {e}")
+        print(f"Critical error in perform_web_search: {type(e).__name__}: {str(e)}")
         return f"Information about {query}", [], {}
 
 
