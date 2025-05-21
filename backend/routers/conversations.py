@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Body
 from typing import Optional, List, Dict
 from datetime import datetime
 from pydantic import BaseModel
@@ -11,7 +11,7 @@ from models.conversation import SearchRequest
 
 from utils.conversations.process_conversation import process_conversation, retrieve_in_progress_conversation
 from utils.conversations.search import search_conversations
-from utils.llm import generate_summary_with_prompt, get_transcript_structure
+from utils.llm import generate_summary_with_prompt, get_transcript_structure, EnhancedSummaryOutput, process_prompt
 from utils.other import endpoints as auth
 from utils.other.storage import get_conversation_recording_if_exists
 from utils.app_integrations import trigger_external_integrations
@@ -27,6 +27,43 @@ def _get_conversation_by_id(uid: str, conversation_id: str) -> dict:
     if conversation is None or conversation.get('deleted', False):
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
+
+
+def get_conversation_transcript(conversation: dict) -> str:
+    """
+    Extract the transcript from a conversation dictionary.
+    """
+    segments = conversation.get('transcript_segments', [])
+    if not segments:
+        return ""
+    
+    # Sort segments by start time
+    sorted_segments = sorted(segments, key=lambda s: s.get('start_time', 0))
+    
+    # Build transcript text
+    transcript = []
+    for segment in sorted_segments:
+        speaker = "You" if segment.get('is_user', False) else "Speaker"
+        if segment.get('person_id'):
+            # Try to get name from person_id
+            speaker = segment.get('person_id')
+        transcript.append(f"{speaker}: {segment.get('text', '')}")
+    
+    return "\n".join(transcript)
+
+
+def _get_conversations_with_photos(uid: str, conversation: Optional[dict] = None) -> List[dict]:
+    if conversation is None:
+        conversations = conversations_db.get_conversations(uid, 100, 0, include_discarded=True)
+    else:
+        conversations = [conversation]
+    
+    conversations_with_photos = []
+    for conversation in conversations:
+        if conversation.get('photos', []):
+            conversations_with_photos.append(conversation)
+    
+    return conversations_with_photos
 
 
 @router.post("/v1/conversations", response_model=CreateConversationResponse, tags=['conversations'])
@@ -393,7 +430,76 @@ def test_prompt(conversation_id: str, request: TestPromptRequest, uid: str = Dep
     return {"summary": summary}
 
 
-@router.post("/v1/conversations/{conversation_id}/enhanced-summary", response_model=Conversation, tags=['conversations'])
+@router.post("/v1/conversations/{conversation_id}/image-summary", response_model=Conversation,
+            tags=['conversations'])
+def process_image_summary(
+    conversation_id: str, 
+    image_data: dict = Body(...), 
+    uid: str = Depends(auth.get_current_user_uid)
+):
+    """
+    Process an image description and update the conversation summary with insights from the image.
+    """
+    # Get the existing conversation
+    conversation = _get_conversation_by_id(uid, conversation_id)
+    
+    # Extract image description from request body
+    image_description = image_data.get("image_description", "")
+    if not image_description:
+        raise HTTPException(status_code=400, detail="Image description is required")
+
+    # Get user info for personalization
+    user = users_db.get_user(uid)
+    user_name = user.get('name', 'User')
+    user_language = user.get('language', 'English')
+    
+    # Create a prompt to analyze the image and update the summary
+    prompt = f"""
+    Based on this conversation transcript and image description, provide an updated:
+    1. Overview (a concise summary integrating the image content)
+    2. Key Takeaways (3-5 bullet points, including insights from the image)
+    3. Things to Improve (2-3 practical suggestions personalized for {user_name}, incorporating image insights)
+    4. Things to Learn (1-2 topics worth exploring tailored to {user_name}'s interests, related to the image content)
+    
+    User Information for Personalization:
+    - Name: {user_name}
+    - Primary language: {user_language}
+    
+    Make all sections highly personalized, actionable, and relevant based on both the conversation and the image content.
+    
+    Transcript:
+    {get_conversation_transcript(conversation)}
+    
+    Image Description:
+    {image_description.strip()}
+    """
+    
+    # Process the prompt with the LLM
+    result = process_prompt(
+        EnhancedSummaryOutput,
+        prompt,
+        model_name="gpt-4o",
+        temperature=0.1
+    )
+    
+    # Update the structured data with the enhanced summary
+    if 'structured' not in conversation:
+        conversation['structured'] = {}
+    
+    structured = conversation['structured']
+    structured['overview'] = result.overview
+    structured['key_takeaways'] = result.key_takeaways
+    structured['things_to_improve'] = result.things_to_improve
+    structured['things_to_learn'] = result.things_to_learn
+    
+    # Update the conversation in the database
+    conversations_db.upsert_conversation(uid, conversation)
+    
+    return Conversation(**conversation)
+
+
+@router.post("/v1/conversations/{conversation_id}/enhanced-summary", response_model=Conversation,
+            tags=['conversations'])
 def generate_enhanced_summary(
         conversation_id: str, uid: str = Depends(auth.get_current_user_uid)
 ):
