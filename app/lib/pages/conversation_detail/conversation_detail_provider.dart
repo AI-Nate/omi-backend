@@ -18,9 +18,10 @@ import 'package:tuple/tuple.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:omi/backend/http/openai.dart'; // For getPhotoDescription
 import 'package:omi/backend/http/api/apps.dart';
-import 'package:omi/backend/mixpanel.dart';
-import 'package:omi/pages/provider.dart';
-import 'package:omi/utils/haptic.dart';
+
+
+
+
 
 class ConversationDetailProvider extends ChangeNotifier
     with MessageNotifierMixin {
