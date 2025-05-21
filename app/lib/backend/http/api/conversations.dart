@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:omi/backend/http/shared.dart';
@@ -491,8 +493,8 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
     final prompt = '''
     Based on this conversation transcript, provide:
     1. Key Takeaways (3-5 bullet points)
-    2. Things to Improve (2-3 practical suggestions personalized for ${userName})
-    3. Things to Learn (1-2 topics worth exploring tailored to ${userName}'s interests)
+    2. Things to Improve (2-3 specific, actionable recommendations for ${userName})
+    3. Things to Learn (1-2 specific learning opportunities for ${userName})
     
     Format your response as JSON with these keys: keyTakeaways, thingsToImprove, thingsToLearn.
     Each key should have an array of strings.
@@ -501,6 +503,19 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
     - Name: ${userName}
     - Primary language: ${userLanguage}
     - Recent conversation topics: ${recentTitles.join(', ')}
+    
+    For "Things to Improve":
+    - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
+    - Include specific, measurable steps that ${userName} can take immediately
+    - Add a brief explanation of the benefit or why this improvement matters
+    - Consider both short-term quick wins and longer-term growth opportunities
+    - Be direct and concise, focusing on practical implementation
+    
+    For "Things to Learn":
+    - Suggest specific topics or skills rather than broad areas
+    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Explain briefly how this learning connects to ${userName}'s interests or needs
+    - Focus on knowledge or skills that would have immediate practical value
     
     Make "Things to Improve" and "Things to Learn" highly personalized, actionable, and relevant 
     based on both this conversation and the user's context.
@@ -541,5 +556,267 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
     }
   } catch (e) {
     debugPrint('Error generating enriched summary: $e');
+  }
+}
+
+Future<ServerConversation?> analyzeImageAndUpdateSummary(
+    String conversationId, Uint8List imageData,
+    {List<Uint8List>? additionalImages}) async {
+  try {
+    // Create a list to hold all images
+    List<Uint8List> allImages = [imageData];
+    if (additionalImages != null) {
+      allImages.addAll(additionalImages);
+    }
+
+    // Get descriptions for all images
+    List<String> descriptions = [];
+    for (var img in allImages) {
+      final description = await getPhotoDescription(img);
+      descriptions.add(description);
+    }
+
+    // Create the request body
+    Map<String, dynamic> requestBody;
+    if (descriptions.length == 1) {
+      // For backward compatibility, if there's only one image, use the old format
+      requestBody = {
+        'image_description': descriptions[0],
+      };
+    } else {
+      // For multiple images, use the new format
+      requestBody = {
+        'image_descriptions': descriptions,
+      };
+    }
+
+    // Call the API to update the summary with image content
+    var response = await makeApiCall(
+      url: '${Env.apiBaseUrl}v1/conversations/$conversationId/image-summary',
+      headers: {'Content-Type': 'application/json'},
+      method: 'POST',
+      body: jsonEncode(requestBody),
+    );
+
+    if (response == null) return null;
+    debugPrint('analyzeImageAndUpdateSummary: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      return ServerConversation.fromJson(jsonDecode(response.body));
+    }
+
+    // Fallback: If the API endpoint fails or doesn't exist yet,
+    // we'll generate it client-side using OpenAI
+    var conversation = await getConversationById(conversationId);
+    if (conversation != null) {
+      // Enrich the summary locally with image content
+      if (descriptions.length == 1) {
+        await enrichConversationSummaryWithImage(conversation, descriptions[0]);
+      } else {
+        await enrichConversationSummaryWithMultipleImages(
+            conversation, descriptions);
+      }
+      return conversation;
+    }
+
+    return null;
+  } catch (e) {
+    debugPrint('Error analyzing image and updating summary: $e');
+    return null;
+  }
+}
+
+// Helper method to locally enrich a conversation summary with image content
+Future<void> enrichConversationSummaryWithImage(
+    ServerConversation conversation, String imageDescription) async {
+  try {
+    final SharedPreferencesUtil prefs = SharedPreferencesUtil();
+    final userName = prefs.givenName.isEmpty ? 'User' : prefs.givenName;
+    final userLanguage = prefs.userPrimaryLanguage.isEmpty
+        ? 'English'
+        : prefs.userPrimaryLanguage;
+
+    final transcript = conversation.getTranscript(generate: true);
+
+    final prompt = '''
+    Based on this conversation transcript and image description, provide an updated:
+    1. Overview (a concise summary integrating the image content)
+    2. Key Takeaways (3-5 bullet points, including insights from the image)
+    3. Things to Improve (2-3 specific, actionable recommendations for ${userName}, incorporating image insights)
+    4. Things to Learn (1-2 specific learning opportunities for ${userName}, related to the image content)
+    
+    Format your response as JSON with these keys: overview, keyTakeaways, thingsToImprove, thingsToLearn.
+    Each of keyTakeaways, thingsToImprove, thingsToLearn should have an array of strings.
+    
+    User Information for Personalization:
+    - Name: ${userName}
+    - Primary language: ${userLanguage}
+    
+    For "Things to Improve":
+    - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
+    - Include specific, measurable steps that ${userName} can take immediately
+    - Add a brief explanation of the benefit or why this improvement matters
+    - Consider both short-term quick wins and longer-term growth opportunities
+    - Be direct and concise, focusing on practical implementation
+    
+    For "Things to Learn":
+    - Suggest specific topics or skills rather than broad areas
+    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Explain briefly how this learning connects to ${userName}'s interests or needs
+    - Focus on knowledge or skills that would have immediate practical value
+    
+    Make all sections highly personalized, actionable, and relevant based on both the conversation and the image content.
+    
+    Transcript:
+    ${transcript.trim()}
+    
+    Image Description:
+    ${imageDescription.trim()}
+    ''';
+
+    // Call the GPT-4o API
+    final response = await executeGptPrompt(prompt);
+
+    try {
+      final Map<String, dynamic> enrichmentData = jsonDecode(response);
+
+      // Update the structured data with enriched content
+      if (enrichmentData.containsKey('overview')) {
+        conversation.structured.overview = enrichmentData['overview'];
+      }
+
+      if (enrichmentData.containsKey('keyTakeaways')) {
+        conversation.structured.keyTakeaways =
+            (enrichmentData['keyTakeaways'] as List)
+                .map((item) => item.toString())
+                .toList();
+      }
+
+      if (enrichmentData.containsKey('thingsToImprove')) {
+        conversation.structured.thingsToImprove =
+            (enrichmentData['thingsToImprove'] as List)
+                .map((item) => item.toString())
+                .toList();
+      }
+
+      if (enrichmentData.containsKey('thingsToLearn')) {
+        conversation.structured.thingsToLearn =
+            (enrichmentData['thingsToLearn'] as List)
+                .map((item) => item.toString())
+                .toList();
+      }
+    } catch (e) {
+      debugPrint('Error parsing image enrichment data: $e');
+    }
+  } catch (e) {
+    debugPrint('Error generating image-enriched summary: $e');
+  }
+}
+
+// Helper method to locally enrich a conversation summary with multiple image descriptions
+Future<void> enrichConversationSummaryWithMultipleImages(
+    ServerConversation conversation, List<String> imageDescriptions) async {
+  try {
+    final SharedPreferencesUtil prefs = SharedPreferencesUtil();
+    final userName = prefs.givenName.isEmpty ? 'User' : prefs.givenName;
+    final userLanguage = prefs.userPrimaryLanguage.isEmpty
+        ? 'English'
+        : prefs.userPrimaryLanguage;
+
+    final transcript = conversation.getTranscript(generate: true);
+
+    // Format the image descriptions for the prompt
+    final imagesText = imageDescriptions
+        .asMap()
+        .entries
+        .map((entry) => "Image ${entry.key + 1}:\n${entry.value.trim()}")
+        .join("\n\n");
+
+    final prompt = '''
+    Based on this conversation transcript and the following image descriptions, provide an updated:
+    1. Overview (a concise summary integrating all image content)
+    2. Key Takeaways (3-5 bullet points, including insights from the images)
+    3. Things to Improve (2-3 specific, actionable recommendations for ${userName}, incorporating image insights)
+    4. Things to Learn (1-2 specific learning opportunities for ${userName}, related to the image content)
+    
+    Format your response as JSON with these keys: overview, keyTakeaways, thingsToImprove, thingsToLearn.
+    Each of keyTakeaways, thingsToImprove, thingsToLearn should have an array of strings.
+    
+    User Information for Personalization:
+    - Name: ${userName}
+    - Primary language: ${userLanguage}
+    
+    For "Things to Improve":
+    - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
+    - Include specific, measurable steps that ${userName} can take immediately
+    - Add a brief explanation of the benefit or why this improvement matters
+    - Consider both short-term quick wins and longer-term growth opportunities
+    - Be direct and concise, focusing on practical implementation
+    
+    For "Things to Learn":
+    - Suggest specific topics or skills rather than broad areas
+    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Explain briefly how this learning connects to ${userName}'s interests or needs
+    - Focus on knowledge or skills that would have immediate practical value
+    
+    Make all sections highly personalized, actionable, and relevant based on both the conversation and all image content.
+    
+    Transcript:
+    ${transcript.trim()}
+    
+    Image Descriptions:
+    ${imagesText}
+    ''';
+
+    // Call the GPT-4o API
+    final response = await executeGptPrompt(prompt);
+
+    try {
+      final Map<String, dynamic> enrichmentData = jsonDecode(response);
+
+      // Update the structured data with enriched content
+      if (enrichmentData.containsKey('overview')) {
+        // If this is a subsequent image analysis, append new insights
+        if (conversation.structured.overview.isNotEmpty &&
+            !conversation.structured.overview
+                .contains(enrichmentData['overview'])) {
+          conversation.structured.overview +=
+              "\n\nAdditional insights from images: " +
+                  enrichmentData['overview'];
+        } else {
+          conversation.structured.overview = enrichmentData['overview'];
+        }
+      }
+
+      // Helper function to merge lists without duplicates
+      void mergeLists(List<String> existingList, List<dynamic> newItems) {
+        for (var item in newItems) {
+          if (!existingList.any((existing) =>
+              existing.toLowerCase().contains(item.toString().toLowerCase()) ||
+              item.toString().toLowerCase().contains(existing.toLowerCase()))) {
+            existingList.add(item.toString());
+          }
+        }
+      }
+
+      if (enrichmentData.containsKey('keyTakeaways')) {
+        mergeLists(conversation.structured.keyTakeaways,
+            enrichmentData['keyTakeaways'] as List);
+      }
+
+      if (enrichmentData.containsKey('thingsToImprove')) {
+        mergeLists(conversation.structured.thingsToImprove,
+            enrichmentData['thingsToImprove'] as List);
+      }
+
+      if (enrichmentData.containsKey('thingsToLearn')) {
+        mergeLists(conversation.structured.thingsToLearn,
+            enrichmentData['thingsToLearn'] as List);
+      }
+    } catch (e) {
+      debugPrint('Error parsing image enrichment data: $e');
+    }
+  } catch (e) {
+    debugPrint('Error generating image-enriched summary: $e');
   }
 }

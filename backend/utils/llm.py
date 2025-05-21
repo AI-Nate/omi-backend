@@ -177,6 +177,19 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
             {memories_str}
             
             When generating "Things to Improve" and "Things to Learn" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.
+            
+            For "Things to Improve":
+            - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
+            - Include specific, measurable steps that {user_name} can take immediately
+            - Add a brief explanation of the benefit or why this improvement matters
+            - Consider both short-term quick wins and longer-term growth opportunities
+            - Be direct and concise, focusing on practical implementation
+            
+            For "Things to Learn":
+            - Suggest specific topics or skills rather than broad areas
+            - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+            - Explain briefly how this learning connects to {user_name}'s interests or needs
+            - Focus on knowledge or skills that would have immediate practical value
             """
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
@@ -188,10 +201,23 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     1. A descriptive title that captures the essence of the conversation
     2. A concise overview of what was discussed (1-2 paragraphs)
     3. 3-5 key takeaways from the conversation
-    4. 2-3 things that could be improved based on the conversation
-    5. 1-2 topics worth learning more about based on the conversation
+    4. 2-3 specific, actionable things that could be improved based on the conversation
+    5. 1-2 specific learning opportunities based on the conversation
     6. Any action items that need to be done
     7. Any calendar events mentioned that should be scheduled
+    
+    For the "Things to Improve" section:
+    - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
+    - Include specific, measurable steps that can be taken immediately
+    - Add a brief explanation of the benefit or why this improvement matters
+    - Consider both short-term quick wins and longer-term growth opportunities
+    - Be direct and concise, focusing on practical implementation
+    
+    For the "Things to Learn" section:
+    - Suggest specific topics or skills rather than broad areas
+    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Explain briefly how this learning connects to interests or needs from the conversation
+    - Focus on knowledge or skills that would have immediate practical value
     
     For the category field, you MUST choose one of the following values EXACTLY as written:
     {valid_categories_str}
@@ -283,6 +309,19 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
             {memories_str}
             
             When generating "Things to Improve" and "Things to Learn" sections, use this personalization data to provide more targeted, relevant suggestions based on the user's background, interests, and previous activities.
+            
+            For "Things to Improve":
+            - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
+            - Include specific, measurable steps that {user_name} can take immediately
+            - Add a brief explanation of the benefit or why this improvement matters
+            - Consider both short-term quick wins and longer-term growth opportunities
+            - Be direct and concise, focusing on practical implementation
+            
+            For "Things to Learn":
+            - Suggest specific topics or skills rather than broad areas
+            - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+            - Explain briefly how this learning connects to {user_name}'s interests or needs
+            - Focus on knowledge or skills that would have immediate practical value
             """
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
@@ -294,10 +333,23 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     1. A descriptive title (unless provided - use the existing title if given)
     2. A concise overview of what was discussed (1-2 paragraphs)
     3. 3-5 key takeaways from the conversation
-    4. 2-3 things that could be improved based on the conversation
-    5. 1-2 topics worth learning more about based on the conversation 
+    4. 2-3 specific, actionable things that could be improved based on the conversation
+    5. 1-2 specific learning opportunities based on the conversation
     6. Any action items that need to be done
     7. Any calendar events mentioned that should be scheduled
+    
+    For the "Things to Improve" section:
+    - Start each item with a clear action verb (e.g., "Practice...", "Implement...", "Develop...")
+    - Include specific, measurable steps that can be taken immediately
+    - Add a brief explanation of the benefit or why this improvement matters
+    - Consider both short-term quick wins and longer-term growth opportunities
+    - Be direct and concise, focusing on practical implementation
+    
+    For the "Things to Learn" section:
+    - Suggest specific topics or skills rather than broad areas
+    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Explain briefly how this learning connects to interests or needs from the conversation
+    - Focus on knowledge or skills that would have immediate practical value
     
     For the category field, you MUST choose one of the following values EXACTLY as written:
     {valid_categories_str}
