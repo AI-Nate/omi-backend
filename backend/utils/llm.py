@@ -742,75 +742,57 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
         - Dict mapping URLs to titles for easy access
     """
     try:
-        from openai import OpenAI
-        client = OpenAI()
-        print(f"OpenAI client created with default settings, attempting web search for: {query}")
+        print(f"Attempting web search for: {query}")
         
         try:
-            # Try with web_search_options parameter
-            print(f"Using model: gpt-4o-search-preview with web_search_options")
-            completion = client.chat.completions.create(
+            # Try using the search model with LangChain
+            print(f"Using LangChain with model: gpt-4o-search-preview")
+            
+            # Configure a special ChatOpenAI instance for web search
+            search_llm = ChatOpenAI(
                 model="gpt-4o-search-preview",
-                web_search_options={
-                    "search_context_size": search_context_size,
-                },
-                messages=[
-                    {
-                        "role": "user",
-                        "content": query,
+                extra_body={
+                    "web_search_options": {
+                        "search_context_size": search_context_size,
                     }
-                ],
+                }
             )
-            print("Web search completed successfully")
-        except TypeError as e:
-            if "unexpected keyword argument 'web_search_options'" in str(e):
-                print(f"Web search not available due to TypeError: {str(e)}")
-                # Fallback to regular completion without web search
-                print("Using regular completion instead with model: gpt-4o")
-                completion = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": f"Provide a brief response to: {query}",
-                        }
-                    ],
-                )
-            else:
-                print(f"Unexpected TypeError in web search: {str(e)}")
-                raise e
-        except Exception as e:
-            print(f"Exception during web search attempt: {type(e).__name__}: {str(e)}")
-            # Fallback to regular completion
-            print("Falling back to regular completion with model: gpt-4o")
-            completion = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"Provide a brief response to: {query}",
-                    }
-                ],
-            )
-        
-        # Extract URLs and titles from annotations
-        url_mapping = {}
-        annotations = []
-        
-        # Check if message has annotations attribute
-        if hasattr(completion.choices[0].message, 'annotations'):
-            print("Found annotations in response")
-            annotations = completion.choices[0].message.annotations
-            if annotations:
+            
+            # Create messages for the API call
+            messages = [
+                HumanMessage(content=query)
+            ]
+            
+            # Make the API call
+            response = search_llm.invoke(messages)
+            print("Web search completed successfully via LangChain")
+            
+            # Extract text content
+            content = response.content
+            
+            # Check if response has citations 
+            annotations = []
+            url_mapping = {}
+            
+            # Extract citations if available
+            if hasattr(response, 'annotations') and response.annotations:
+                print("Found annotations in response")
+                annotations = response.annotations
                 for annotation in annotations:
-                    if annotation.type == "url_citation":
+                    if hasattr(annotation, 'url_citation'):
                         citation = annotation.url_citation
                         url_mapping[citation.url] = citation.title
                 print(f"Extracted {len(url_mapping)} URLs from annotations")
-        else:
-            print("No annotations attribute found in response")
+            
+            return content, annotations, url_mapping
+            
+        except Exception as e:
+            print(f"Web search via LangChain failed: {type(e).__name__}: {str(e)}")
+            # Fallback to regular completion without web search
+            print("Falling back to standard ChatOpenAI (gpt-4o)")
+            fallback_response = llm_medium.invoke(f"Provide information about: {query}")
+            return fallback_response.content, [], {}
         
-        return completion.choices[0].message.content, annotations, url_mapping
     except Exception as e:
         print(f"Critical error in perform_web_search: {type(e).__name__}: {str(e)}")
         return f"Information about {query}", [], {}
