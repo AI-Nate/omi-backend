@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 import 'package:instabug_flutter/instabug_flutter.dart';
 import 'package:path/path.dart';
 import 'package:omi/backend/http/openai.dart';
+import 'package:omi/backend/preferences.dart';
 
 Future<CreateConversationResponse?> processInProgressConversation() async {
   var response = await makeApiCall(
@@ -462,16 +463,47 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
 
   final transcript = conversation.getTranscript(generate: true);
 
+  // Get user preferences and data from local storage for personalization
+  final prefs = SharedPreferencesUtil();
+  final userName = prefs.givenName ?? 'User';
+
+  // Fetch recent conversation titles to provide context
+  List<String> recentTitles = [];
+  try {
+    final recentConversations = await getConversations(limit: 5);
+    if (recentConversations != null && recentConversations.isNotEmpty) {
+      recentTitles = recentConversations
+          .map((c) => c.structured.title)
+          .where((title) => title.isNotEmpty)
+          .toList();
+    }
+  } catch (e) {
+    debugPrint('Error fetching recent conversations: $e');
+  }
+
+  // Get user language preference
+  final userLanguage = prefs.userPrimaryLanguage.isNotEmpty
+      ? prefs.userPrimaryLanguage
+      : 'English';
+
   // Use OpenAI to generate enhanced summary components
   try {
     final prompt = '''
     Based on this conversation transcript, provide:
     1. Key Takeaways (3-5 bullet points)
-    2. Things to Improve (2-3 suggestions)
-    3. Things to Learn (1-2 topics worth exploring)
+    2. Things to Improve (2-3 practical suggestions personalized for ${userName})
+    3. Things to Learn (1-2 topics worth exploring tailored to ${userName}'s interests)
     
     Format your response as JSON with these keys: keyTakeaways, thingsToImprove, thingsToLearn.
     Each key should have an array of strings.
+    
+    User Information for Personalization:
+    - Name: ${userName}
+    - Primary language: ${userLanguage}
+    - Recent conversation topics: ${recentTitles.join(', ')}
+    
+    Make "Things to Improve" and "Things to Learn" highly personalized, actionable, and relevant 
+    based on both this conversation and the user's context.
     
     Transcript:
     ${transcript.trim()}
