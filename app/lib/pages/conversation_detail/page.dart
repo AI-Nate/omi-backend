@@ -19,21 +19,25 @@ import 'package:omi/widgets/photos_grid.dart';
 import 'package:omi/widgets/transcript.dart';
 import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
+import 'package:gradient_borders/box_borders/gradient_box_border.dart';
 
 import 'conversation_detail_provider.dart';
 import 'widgets/name_speaker_sheet.dart';
+import 'widgets/enhanced_summary_section.dart';
 
 class ConversationDetailPage extends StatefulWidget {
   final ServerConversation conversation;
   final bool isFromOnboarding;
 
-  const ConversationDetailPage({super.key, this.isFromOnboarding = false, required this.conversation});
+  const ConversationDetailPage(
+      {super.key, this.isFromOnboarding = false, required this.conversation});
 
   @override
   State<ConversationDetailPage> createState() => _ConversationDetailPageState();
 }
 
-class _ConversationDetailPageState extends State<ConversationDetailPage> with TickerProviderStateMixin {
+class _ConversationDetailPageState extends State<ConversationDetailPage>
+    with TickerProviderStateMixin {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   final focusTitleField = FocusNode();
   final focusOverviewField = FocusNode();
@@ -48,7 +52,8 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
   void initState() {
     super.initState();
 
-    _controller = TabController(length: 3, vsync: this, initialIndex: 1); // Start with summary tab
+    _controller = TabController(
+        length: 3, vsync: this, initialIndex: 1); // Start with summary tab
     _controller!.addListener(() {
       setState(() {
         switch (_controller!.index) {
@@ -69,12 +74,15 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      var provider = Provider.of<ConversationDetailProvider>(context, listen: false);
+      var provider =
+          Provider.of<ConversationDetailProvider>(context, listen: false);
       await provider.initConversation();
       if (provider.conversation.appResults.isEmpty) {
         await Provider.of<ConversationProvider>(context, listen: false)
-            .updateSearchedConvoDetails(provider.conversation.id, provider.selectedDate, provider.conversationIdx);
-        provider.updateConversation(provider.conversationIdx, provider.selectedDate);
+            .updateSearchedConvoDetails(provider.conversation.id,
+                provider.selectedDate, provider.conversationIdx);
+        provider.updateConversation(
+            provider.conversationIdx, provider.selectedDate);
       }
     });
     // _animationController = AnimationController(
@@ -102,8 +110,9 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
       child: MessageListener<ConversationDetailProvider>(
         showError: (error) {
           if (error == 'REPROCESS_FAILED') {
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Error while processing conversation. Please try again later.')));
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text(
+                    'Error while processing conversation. Please try again later.')));
           }
         },
         showInfo: (info) {},
@@ -114,7 +123,8 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
           appBar: AppBar(
             automaticallyImplyLeading: false,
             backgroundColor: Theme.of(context).colorScheme.primary,
-            title: Consumer<ConversationDetailProvider>(builder: (context, provider, child) {
+            title: Consumer<ConversationDetailProvider>(
+                builder: (context, provider, child) {
               return Row(
                 mainAxisSize: MainAxisSize.max,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -124,8 +134,12 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
                     onPressed: () {
                       if (widget.isFromOnboarding) {
                         SchedulerBinding.instance.addPostFrameCallback((_) {
-                          Navigator.pushAndRemoveUntil(context,
-                              MaterialPageRoute(builder: (context) => const HomePageWrapper()), (route) => false);
+                          Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      const HomePageWrapper()),
+                              (route) => false);
                         });
                       } else {
                         Navigator.pop(context);
@@ -137,7 +151,8 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
                   Expanded(
                     child: GestureDetector(
                       onTap: () {
-                        if (provider.titleController != null && provider.titleFocusNode != null) {
+                        if (provider.titleController != null &&
+                            provider.titleFocusNode != null) {
                           provider.titleFocusNode!.requestFocus();
                           // Select all text in the title field
                           provider.titleController!.selection = TextSelection(
@@ -190,12 +205,18 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
                           controller: _controller,
                           physics: const NeverScrollableScrollPhysics(),
                           children: [
-                            Selector<ConversationDetailProvider, ConversationSource?>(
-                              selector: (context, provider) => provider.conversation?.source,
+                            Selector<ConversationDetailProvider,
+                                ConversationSource?>(
+                              selector: (context, provider) =>
+                                  provider.conversation?.source,
                               builder: (context, source, child) {
                                 return source == ConversationSource.openglass
                                     ? ListView(
-                                        shrinkWrap: true, children: const [PhotosGridComponent(), SizedBox(height: 32)])
+                                        shrinkWrap: true,
+                                        children: const [
+                                            PhotosGridComponent(),
+                                            SizedBox(height: 32)
+                                          ])
                                     : const TranscriptWidgets();
                               },
                             ),
@@ -220,8 +241,8 @@ class _ConversationDetailPageState extends State<ConversationDetailPage> with Ti
                     return ConversationBottomBar(
                       mode: ConversationBottomBarMode.detail,
                       selectedTab: selectedTab,
-                      hasSegments:
-                          conversation.transcriptSegments.isNotEmpty || conversation.externalIntegration != null,
+                      hasSegments: conversation.transcriptSegments.isNotEmpty ||
+                          conversation.externalIntegration != null,
                       onTabSelected: (tab) {
                         int index;
                         switch (tab) {
@@ -367,17 +388,116 @@ class SummaryTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      child: Selector<ConversationDetailProvider, Tuple3<bool, bool, Function(int)>>(
-        selector: (context, provider) =>
-            Tuple3(provider.conversation.discarded, provider.showRatingUI, provider.setConversationRating),
+      child: Selector<ConversationDetailProvider,
+          Tuple3<bool, bool, Function(int)>>(
+        selector: (context, provider) => Tuple3(provider.conversation.discarded,
+            provider.showRatingUI, provider.setConversationRating),
         builder: (context, data, child) {
+          // Get the most up-to-date conversation data
+          final provider =
+              Provider.of<ConversationDetailProvider>(context, listen: true);
+          final conversationProvider =
+              Provider.of<ConversationProvider>(context, listen: true);
+
+          // Check if we need to refresh the conversation data
+          if (provider.conversation.appResults.isEmpty &&
+              provider.conversation.structured.overview.trim().isNotEmpty) {
+            // If we have a structured overview but no app results, make sure the UI is updated
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              provider.notifyListeners();
+            });
+          } else if (provider.conversation.appResults.isNotEmpty) {
+            final summarizedApp = provider.getSummarizedApp();
+            if (summarizedApp != null && summarizedApp.content.trim().isEmpty) {
+              // If we have an empty summary, try to fetch updated data
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                await conversationProvider.updateSearchedConvoDetails(
+                    provider.conversation.id,
+                    provider.selectedDate,
+                    provider.conversationIdx);
+                provider.updateConversation(
+                    provider.conversationIdx, provider.selectedDate);
+              });
+            }
+          }
+
           return Stack(
             children: [
               ListView(
                 shrinkWrap: true,
                 children: [
                   const GetSummaryWidgets(),
-                  data.item1 ? const ReprocessDiscardedWidget() : const GetAppsWidgets(),
+
+                  // Enhanced Summary Section
+                  if (!data.item1 && provider.hasEnhancedSummary()) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: EnhancedSummarySection(
+                        structured: provider.conversation.structured,
+                      ),
+                    ),
+                  ] else if (!data.item1 &&
+                      !provider.loadingEnhancedSummary &&
+                      provider.conversation.structured.overview.isNotEmpty) ...[
+                    // Show generate enriched summary button when no enhanced summary is available
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: const GradientBoxBorder(
+                              gradient: LinearGradient(colors: [
+                                Color.fromARGB(127, 208, 208, 208),
+                                Color.fromARGB(127, 188, 99, 121),
+                                Color.fromARGB(127, 86, 101, 182),
+                                Color.fromARGB(127, 126, 190, 236)
+                              ]),
+                              width: 2,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: MaterialButton(
+                            onPressed: () async {
+                              await provider.fetchEnhancedSummary();
+                            },
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 8),
+                              child: Text(
+                                'Generate Enhanced Summary',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else if (!data.item1 &&
+                      provider.loadingEnhancedSummary) ...[
+                    const SizedBox(height: 32),
+                    const Center(
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text(
+                            'Generating enhanced summary...',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  data.item1
+                      ? const ReprocessDiscardedWidget()
+                      : const GetAppsWidgets(),
                   //const GetGeolocationWidgets(),
                   const SizedBox(height: 150)
                 ],
@@ -403,10 +523,12 @@ class TranscriptWidgets extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(top: 32),
             child: ExpandableTextWidget(
-              text: (provider.conversation.externalIntegration?.text ?? '').decodeString,
+              text: (provider.conversation.externalIntegration?.text ?? '')
+                  .decodeString,
               maxLines: 1000,
               linkColor: Colors.grey.shade300,
-              style: TextStyle(color: Colors.grey.shade300, fontSize: 15, height: 1.3),
+              style: TextStyle(
+                  color: Colors.grey.shade300, fontSize: 15, height: 1.3),
               toggleExpand: () {
                 provider.toggleIsTranscriptExpanded();
               },
@@ -424,7 +546,8 @@ class TranscriptWidgets extends StatelessWidget {
           isConversationDetail: true,
           bottomMargin: 200,
           editSegment: (i, j) {
-            final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
+            final connectivityProvider =
+                Provider.of<ConnectivityProvider>(context, listen: false);
             if (!connectivityProvider.isConnected) {
               ConnectivityProvider.showNoInternetDialog(context);
               return;
@@ -454,15 +577,18 @@ class EditSegmentWidget extends StatelessWidget {
   final int segmentIdx;
   final List<Person> people;
 
-  const EditSegmentWidget({super.key, required this.segmentIdx, required this.people});
+  const EditSegmentWidget(
+      {super.key, required this.segmentIdx, required this.people});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ConversationDetailProvider>(builder: (context, provider, child) {
+    return Consumer<ConversationDetailProvider>(
+        builder: (context, provider, child) {
       return Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
-          borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+          borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16), topRight: Radius.circular(16)),
         ),
         height: 320,
         child: Stack(
@@ -476,12 +602,14 @@ class EditSegmentWidget extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Row(
                       children: [
-                        Text('Who\'s segment is this?', style: Theme.of(context).textTheme.titleLarge),
+                        Text('Who\'s segment is this?',
+                            style: Theme.of(context).textTheme.titleLarge),
                         const Spacer(),
                         TextButton(
                           onPressed: () {
                             MixpanelManager().unassignedSegment();
-                            provider.unassignConversationTranscriptSegment(provider.conversation.id, segmentIdx);
+                            provider.unassignConversationTranscriptSegment(
+                                provider.conversation.id, segmentIdx);
                             Navigator.pop(context);
                           },
                           child: const Text(
@@ -498,20 +626,25 @@ class EditSegmentWidget extends StatelessWidget {
                   const SizedBox(height: 12),
                   CheckboxListTile(
                     title: const Text('Yours'),
-                    value: provider.conversation.transcriptSegments[segmentIdx].isUser,
-                    checkboxShape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                    value: provider
+                        .conversation.transcriptSegments[segmentIdx].isUser,
+                    checkboxShape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(8))),
                     onChanged: (bool? value) async {
                       if (provider.editSegmentLoading) return;
                       // setModalState(() => loading = true);
                       provider.toggleEditSegmentLoading(true);
                       MixpanelManager().assignedSegment('User');
-                      provider.conversation.transcriptSegments[segmentIdx].isUser = true;
-                      provider.conversation.transcriptSegments[segmentIdx].personId = null;
+                      provider.conversation.transcriptSegments[segmentIdx]
+                          .isUser = true;
+                      provider.conversation.transcriptSegments[segmentIdx]
+                          .personId = null;
                       bool result = await assignConversationTranscriptSegment(
                         provider.conversation.id,
                         segmentIdx,
                         isUser: true,
-                        useForSpeechTraining: SharedPreferencesUtil().hasSpeakerProfile,
+                        useForSpeechTraining:
+                            SharedPreferencesUtil().hasSpeakerProfile,
                       );
                       try {
                         provider.toggleEditSegmentLoading(false);
@@ -531,15 +664,21 @@ class EditSegmentWidget extends StatelessWidget {
                   for (var person in people)
                     CheckboxListTile(
                       title: Text('${person.name}\'s'),
-                      value: provider.conversation.transcriptSegments[segmentIdx].personId == person.id,
-                      checkboxShape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+                      value: provider.conversation
+                              .transcriptSegments[segmentIdx].personId ==
+                          person.id,
+                      checkboxShape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(8))),
                       onChanged: (bool? value) async {
                         if (provider.editSegmentLoading) return;
                         provider.toggleEditSegmentLoading(true);
                         MixpanelManager().assignedSegment('User Person');
-                        provider.conversation.transcriptSegments[segmentIdx].isUser = false;
-                        provider.conversation.transcriptSegments[segmentIdx].personId = person.id;
-                        bool result = await assignConversationTranscriptSegment(provider.conversation.id, segmentIdx,
+                        provider.conversation.transcriptSegments[segmentIdx]
+                            .isUser = false;
+                        provider.conversation.transcriptSegments[segmentIdx]
+                            .personId = person.id;
+                        bool result = await assignConversationTranscriptSegment(
+                            provider.conversation.id, segmentIdx,
                             personId: person.id);
                         // TODO: make this un-closable or in a way that they receive the result
                         try {
@@ -593,13 +732,18 @@ class ActionItemsTab extends StatelessWidget {
       onTap: () => FocusScope.of(context).unfocus(),
       child: Consumer<ConversationDetailProvider>(
         builder: (context, provider, child) {
-          final hasActionItems = provider.conversation.structured.actionItems.where((item) => !item.deleted).isNotEmpty;
+          final hasActionItems = provider.conversation.structured.actionItems
+              .where((item) => !item.deleted)
+              .isNotEmpty;
 
           return ListView(
             shrinkWrap: true,
             children: [
               const SizedBox(height: 24),
-              if (hasActionItems) const ActionItemsListWidget() else _buildEmptyState(context),
+              if (hasActionItems)
+                const ActionItemsListWidget()
+              else
+                _buildEmptyState(context),
               const SizedBox(height: 150)
             ],
           );

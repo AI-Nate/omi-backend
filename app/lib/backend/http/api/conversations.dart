@@ -10,6 +10,7 @@ import 'package:omi/env/env.dart';
 import 'package:http/http.dart' as http;
 import 'package:instabug_flutter/instabug_flutter.dart';
 import 'package:path/path.dart';
+import 'package:omi/backend/http/openai.dart';
 
 Future<CreateConversationResponse?> processInProgressConversation() async {
   var response = await makeApiCall(
@@ -51,8 +52,9 @@ Future<List<ServerConversation>> getConversations(
   if (response.statusCode == 200) {
     // decode body bytes to utf8 string and then parse json so as to avoid utf8 char issues
     var body = utf8.decode(response.bodyBytes);
-    var memories =
-        (jsonDecode(body) as List<dynamic>).map((conversation) => ServerConversation.fromJson(conversation)).toList();
+    var memories = (jsonDecode(body) as List<dynamic>)
+        .map((conversation) => ServerConversation.fromJson(conversation))
+        .toList();
     debugPrint('getConversations length: ${memories.length}');
     return memories;
   } else {
@@ -61,9 +63,11 @@ Future<List<ServerConversation>> getConversations(
   return [];
 }
 
-Future<ServerConversation?> reProcessConversationServer(String conversationId, {String? appId}) async {
+Future<ServerConversation?> reProcessConversationServer(String conversationId,
+    {String? appId}) async {
   var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/conversations/$conversationId/reprocess${appId != null ? '?app_id=$appId' : ''}',
+    url:
+        '${Env.apiBaseUrl}v1/conversations/$conversationId/reprocess${appId != null ? '?app_id=$appId' : ''}',
     headers: {},
     method: 'POST',
     body: '',
@@ -102,7 +106,8 @@ Future<ServerConversation?> getConversationById(String conversationId) async {
   return null;
 }
 
-Future<bool> updateConversationTitle(String conversationId, String title) async {
+Future<bool> updateConversationTitle(
+    String conversationId, String title) async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/conversations/$conversationId/title?title=$title',
     headers: {},
@@ -114,7 +119,8 @@ Future<bool> updateConversationTitle(String conversationId, String title) async 
   return response.statusCode == 200;
 }
 
-Future<List<ConversationPhoto>> getConversationPhotos(String conversationId) async {
+Future<List<ConversationPhoto>> getConversationPhotos(
+    String conversationId) async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/conversations/$conversationId/photos',
     headers: {},
@@ -124,7 +130,9 @@ Future<List<ConversationPhoto>> getConversationPhotos(String conversationId) asy
   if (response == null) return [];
   debugPrint('getConversationPhotos: ${response.body}');
   if (response.statusCode == 200) {
-    return (jsonDecode(response.body) as List<dynamic>).map((photo) => ConversationPhoto.fromJson(photo)).toList();
+    return (jsonDecode(response.body) as List<dynamic>)
+        .map((photo) => ConversationPhoto.fromJson(photo))
+        .toList();
   }
   return [];
 }
@@ -144,16 +152,24 @@ class TranscriptsResponse {
 
   factory TranscriptsResponse.fromJson(Map<String, dynamic> json) {
     return TranscriptsResponse(
-      deepgram: (json['deepgram'] as List<dynamic>).map((segment) => TranscriptSegment.fromJson(segment)).toList(),
-      soniox: (json['soniox'] as List<dynamic>).map((segment) => TranscriptSegment.fromJson(segment)).toList(),
-      whisperx: (json['whisperx'] as List<dynamic>).map((segment) => TranscriptSegment.fromJson(segment)).toList(),
-      speechmatics:
-          (json['speechmatics'] as List<dynamic>).map((segment) => TranscriptSegment.fromJson(segment)).toList(),
+      deepgram: (json['deepgram'] as List<dynamic>)
+          .map((segment) => TranscriptSegment.fromJson(segment))
+          .toList(),
+      soniox: (json['soniox'] as List<dynamic>)
+          .map((segment) => TranscriptSegment.fromJson(segment))
+          .toList(),
+      whisperx: (json['whisperx'] as List<dynamic>)
+          .map((segment) => TranscriptSegment.fromJson(segment))
+          .toList(),
+      speechmatics: (json['speechmatics'] as List<dynamic>)
+          .map((segment) => TranscriptSegment.fromJson(segment))
+          .toList(),
     );
   }
 }
 
-Future<TranscriptsResponse> getConversationTranscripts(String conversationId) async {
+Future<TranscriptsResponse> getConversationTranscripts(
+    String conversationId) async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/conversations/$conversationId/transcripts',
     headers: {},
@@ -193,7 +209,8 @@ Future<bool> assignConversationTranscriptSegment(
 }) async {
   String assignType = isUser != null ? 'is_user' : 'person_id';
   var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/conversations/$conversationId/segments/$segmentIdx/assign?value=${isUser ?? personId}'
+    url:
+        '${Env.apiBaseUrl}v1/conversations/$conversationId/segments/$segmentIdx/assign?value=${isUser ?? personId}'
         '&assign_type=$assignType&use_for_speech_training=$useForSpeechTraining',
     headers: {},
     method: 'PATCH',
@@ -225,9 +242,11 @@ Future<bool> assignConversationSpeaker(
   return response.statusCode == 200;
 }
 
-Future<bool> setConversationVisibility(String conversationId, {String visibility = 'shared'}) async {
+Future<bool> setConversationVisibility(String conversationId,
+    {String visibility = 'shared'}) async {
   var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/conversations/$conversationId/visibility?value=$visibility&visibility=$visibility',
+    url:
+        '${Env.apiBaseUrl}v1/conversations/$conversationId/visibility?value=$visibility&visibility=$visibility',
     headers: {},
     method: 'PATCH',
     body: '',
@@ -283,7 +302,8 @@ Future<bool> setConversationActionItemState(
   return response.statusCode == 200;
 }
 
-Future<bool> deleteConversationActionItem(String conversationId, ActionItem item) async {
+Future<bool> deleteConversationActionItem(
+    String conversationId, ActionItem item) async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/conversations/$conversationId/action-items',
     headers: {},
@@ -299,13 +319,15 @@ Future<bool> deleteConversationActionItem(String conversationId, ActionItem item
 }
 
 //this is expected to return complete memories
-Future<List<ServerConversation>> sendStorageToBackend(File file, String sdCardDateTimeString) async {
+Future<List<ServerConversation>> sendStorageToBackend(
+    File file, String sdCardDateTimeString) async {
   var request = http.MultipartRequest(
     'POST',
     Uri.parse('${Env.apiBaseUrl}sdcard_memory?date_time=$sdCardDateTimeString'),
   );
   request.headers.addAll({'Authorization': await getAuthHeader()});
-  request.files.add(await http.MultipartFile.fromPath('file', file.path, filename: basename(file.path)));
+  request.files.add(await http.MultipartFile.fromPath('file', file.path,
+      filename: basename(file.path)));
   try {
     var streamedResponse = await request.send();
     var response = await http.Response.fromStream(streamedResponse);
@@ -335,7 +357,8 @@ Future<SyncLocalFilesResponse> syncLocalFiles(List<File> files) async {
     Uri.parse('${Env.apiBaseUrl}v1/sync-local-files'),
   );
   for (var file in files) {
-    request.files.add(await http.MultipartFile.fromPath('files', file.path, filename: basename(file.path)));
+    request.files.add(await http.MultipartFile.fromPath('files', file.path,
+        filename: basename(file.path)));
   }
   request.headers.addAll({'Authorization': await getAuthHeader()});
 
@@ -347,8 +370,10 @@ Future<SyncLocalFilesResponse> syncLocalFiles(List<File> files) async {
       debugPrint('syncLocalFile Response body: ${jsonDecode(response.body)}');
       return SyncLocalFilesResponse.fromJson(jsonDecode(response.body));
     } else {
-      debugPrint('Failed to upload sample. Status code: ${response.statusCode}');
-      throw Exception('Failed to upload sample. Status code: ${response.statusCode}');
+      debugPrint(
+          'Failed to upload sample. Status code: ${response.statusCode}');
+      throw Exception(
+          'Failed to upload sample. Status code: ${response.statusCode}');
     }
   } catch (e) {
     debugPrint('An error occurred uploadSample: $e');
@@ -367,22 +392,28 @@ Future<(List<ServerConversation>, int, int)> searchConversationsServer(
     url: '${Env.apiBaseUrl}v1/conversations/search',
     headers: {},
     method: 'POST',
-    body:
-        jsonEncode({'query': query, 'page': page ?? 1, 'per_page': limit ?? 10, 'include_discarded': includeDiscarded}),
+    body: jsonEncode({
+      'query': query,
+      'page': page ?? 1,
+      'per_page': limit ?? 10,
+      'include_discarded': includeDiscarded
+    }),
   );
   if (response == null) return (<ServerConversation>[], 0, 0);
   if (response.statusCode == 200) {
     List<dynamic> items = (jsonDecode(response.body))['items'];
     int currentPage = (jsonDecode(response.body))['current_page'];
     int totalPages = (jsonDecode(response.body))['total_pages'];
-    var convos = items.map<ServerConversation>((item) => ServerConversation.fromJson(item)).toList();
+    var convos = items
+        .map<ServerConversation>((item) => ServerConversation.fromJson(item))
+        .toList();
     return (convos, currentPage, totalPages);
   }
   return (<ServerConversation>[], 0, 0);
 }
 
-
-Future<String> testConversationPrompt(String prompt, String conversationId) async {
+Future<String> testConversationPrompt(
+    String prompt, String conversationId) async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/conversations/$conversationId/test-prompt',
     headers: {},
@@ -392,9 +423,91 @@ Future<String> testConversationPrompt(String prompt, String conversationId) asyn
     }),
   );
   if (response == null) return '';
-  if (response.statusCode == 200){
+  if (response.statusCode == 200) {
     return jsonDecode(response.body)['summary'];
-  }else {
+  } else {
     return '';
+  }
+}
+
+Future<ServerConversation?> getEnhancedSummary(String conversationId) async {
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/conversations/$conversationId/enhanced-summary',
+    headers: {},
+    method: 'POST',
+    body: '',
+  );
+  if (response == null) return null;
+  debugPrint('getEnhancedSummary: ${response.statusCode}');
+  if (response.statusCode == 200) {
+    return ServerConversation.fromJson(jsonDecode(response.body));
+  }
+
+  // Fallback: If the enhanced summary endpoint fails or doesn't exist yet,
+  // we'll generate it client-side using OpenAI
+  var conversation = await getConversationById(conversationId);
+  if (conversation != null) {
+    // Enrich the summary locally
+    await enrichConversationSummary(conversation);
+    return conversation;
+  }
+
+  return null;
+}
+
+// Helper method to locally enrich a conversation summary
+Future<void> enrichConversationSummary(ServerConversation conversation) async {
+  // Only process if we have some transcript content
+  if (conversation.transcriptSegments.isEmpty) return;
+
+  final transcript = conversation.getTranscript(generate: true);
+
+  // Use OpenAI to generate enhanced summary components
+  try {
+    final prompt = '''
+    Based on this conversation transcript, provide:
+    1. Key Takeaways (3-5 bullet points)
+    2. Things to Improve (2-3 suggestions)
+    3. Things to Learn (1-2 topics worth exploring)
+    
+    Format your response as JSON with these keys: keyTakeaways, thingsToImprove, thingsToLearn.
+    Each key should have an array of strings.
+    
+    Transcript:
+    ${transcript.trim()}
+    ''';
+
+    // Call your API or use a local prompt
+    final response = await executeGptPrompt(prompt);
+
+    try {
+      final Map<String, dynamic> enrichmentData = jsonDecode(response);
+
+      // Update the structured data with enriched content
+      if (enrichmentData.containsKey('keyTakeaways')) {
+        conversation.structured.keyTakeaways =
+            (enrichmentData['keyTakeaways'] as List)
+                .map((item) => item.toString())
+                .toList();
+      }
+
+      if (enrichmentData.containsKey('thingsToImprove')) {
+        conversation.structured.thingsToImprove =
+            (enrichmentData['thingsToImprove'] as List)
+                .map((item) => item.toString())
+                .toList();
+      }
+
+      if (enrichmentData.containsKey('thingsToLearn')) {
+        conversation.structured.thingsToLearn =
+            (enrichmentData['thingsToLearn'] as List)
+                .map((item) => item.toString())
+                .toList();
+      }
+    } catch (e) {
+      debugPrint('Error parsing enrichment data: $e');
+    }
+  } catch (e) {
+    debugPrint('Error generating enriched summary: $e');
   }
 }

@@ -33,14 +33,17 @@ import 'maps_util.dart';
 class GetSummaryWidgets extends StatelessWidget {
   const GetSummaryWidgets({super.key});
 
-  String setTime(DateTime? startedAt, DateTime createdAt, DateTime? finishedAt) {
+  String setTime(
+      DateTime? startedAt, DateTime createdAt, DateTime? finishedAt) {
     return startedAt == null
         ? dateTimeFormat('h:mm a', createdAt)
         : '${dateTimeFormat('h:mm a', startedAt)} to ${dateTimeFormat('h:mm a', finishedAt)}';
   }
 
   String setTimeSDCard(DateTime? startedAt, DateTime createdAt) {
-    return startedAt == null ? dateTimeFormat('h:mm a', createdAt) : dateTimeFormat('h:mm a', startedAt);
+    return startedAt == null
+        ? dateTimeFormat('h:mm a', createdAt)
+        : dateTimeFormat('h:mm a', startedAt);
   }
 
   String _getDuration(ServerConversation conversation) {
@@ -54,8 +57,10 @@ class GetSummaryWidgets extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<ConversationDetailProvider, Tuple3<ServerConversation, TextEditingController?, FocusNode?>>(
-      selector: (context, provider) => Tuple3(provider.conversation, provider.titleController, provider.titleFocusNode),
+    return Selector<ConversationDetailProvider,
+        Tuple3<ServerConversation, TextEditingController?, FocusNode?>>(
+      selector: (context, provider) => Tuple3(provider.conversation,
+          provider.titleController, provider.titleFocusNode),
       builder: (context, data, child) {
         ServerConversation conversation = data.item1;
         return Column(
@@ -66,14 +71,20 @@ class GetSummaryWidgets extends StatelessWidget {
             conversation.discarded
                 ? Text(
                     'Discarded Conversation',
-                    style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 32),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge!
+                        .copyWith(fontSize: 32),
                   )
                 : GetEditTextField(
                     conversationId: conversation.id,
                     focusNode: data.item3,
                     controller: data.item2,
                     content: conversation.structured.title.decodeString,
-                    style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 32, color: Colors.white),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge!
+                        .copyWith(fontSize: 32, color: Colors.white),
                   ),
             const SizedBox(height: 16),
             Text(
@@ -97,7 +108,9 @@ class GetSummaryWidgets extends StatelessWidget {
                 ),
               ),
             const SizedBox(height: 16),
-            conversation.discarded ? const SizedBox.shrink() : const SizedBox(height: 8),
+            conversation.discarded
+                ? const SizedBox.shrink()
+                : const SizedBox(height: 8),
           ],
         );
       },
@@ -110,7 +123,8 @@ class ActionItemsListWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ConversationDetailProvider>(builder: (context, provider, child) {
+    return Consumer<ConversationDetailProvider>(
+        builder: (context, provider, child) {
       return Column(
         children: [
           provider.conversation.structured.actionItems.isNotEmpty
@@ -120,7 +134,10 @@ class ActionItemsListWidget extends StatelessWidget {
                   children: [
                     Text(
                       'Action Items',
-                      style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 26),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge!
+                          .copyWith(fontSize: 26),
                     ),
                     IconButton(
                       onPressed: () {
@@ -128,23 +145,31 @@ class ActionItemsListWidget extends StatelessWidget {
                           text:
                               '- ${provider.conversation.structured.actionItems.map((e) => e.description.decodeString).join('\n- ')}',
                         ));
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        ScaffoldMessenger.of(context)
+                            .showSnackBar(const SnackBar(
                           content: Text('Action items copied to clipboard'),
                           duration: Duration(seconds: 2),
                         ));
-                        MixpanelManager().copiedConversationDetails(provider.conversation, source: 'Action Items');
+                        MixpanelManager().copiedConversationDetails(
+                            provider.conversation,
+                            source: 'Action Items');
                       },
-                      icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.copy_rounded,
+                          color: Colors.white, size: 20),
                     )
                   ],
                 )
               : const SizedBox.shrink(),
           ListView.builder(
-            itemCount: provider.conversation.structured.actionItems.where((e) => !e.deleted).length,
+            itemCount: provider.conversation.structured.actionItems
+                .where((e) => !e.deleted)
+                .length,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemBuilder: (context, idx) {
-              var item = provider.conversation.structured.actionItems.where((e) => !e.deleted).toList()[idx];
+              var item = provider.conversation.structured.actionItems
+                  .where((e) => !e.deleted)
+                  .toList()[idx];
               return Dismissible(
                 key: Key(item.description),
                 direction: DismissDirection.endToStart,
@@ -155,14 +180,17 @@ class ActionItemsListWidget extends StatelessWidget {
                   child: const Icon(Icons.delete, color: Colors.white),
                 ),
                 onDismissed: (direction) {
-                  var tempItem = provider.conversation.structured.actionItems[idx];
+                  var tempItem =
+                      provider.conversation.structured.actionItems[idx];
                   var tempIdx = idx;
                   provider.deleteActionItem(idx);
                   ScaffoldMessenger.of(context)
                       .showSnackBar(
                         SnackBar(
-                          content: const Text('Action Item deleted successfully 🗑️'),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          content: const Text(
+                              'Action Item deleted successfully 🗑️'),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
                           action: SnackBarAction(
                             label: 'Undo',
                             textColor: Colors.white,
@@ -176,7 +204,8 @@ class ActionItemsListWidget extends StatelessWidget {
                       .then((reason) {
                     if (reason != SnackBarClosedReason.action) {
                       provider.deleteActionItemPermanently(tempItem, tempIdx);
-                      MixpanelManager().deletedActionItem(provider.conversation);
+                      MixpanelManager()
+                          .deletedActionItem(provider.conversation);
                     }
                   });
                 },
@@ -195,12 +224,17 @@ class ActionItemsListWidget extends StatelessWidget {
                             value: item.completed,
                             onChanged: (value) {
                               if (value != null) {
-                                context.read<ConversationDetailProvider>().updateActionItemState(value, idx);
-                                setConversationActionItemState(provider.conversation.id, [idx], [value]);
+                                context
+                                    .read<ConversationDetailProvider>()
+                                    .updateActionItemState(value, idx);
+                                setConversationActionItemState(
+                                    provider.conversation.id, [idx], [value]);
                                 if (value) {
-                                  MixpanelManager().checkedActionItem(provider.conversation, idx);
+                                  MixpanelManager().checkedActionItem(
+                                      provider.conversation, idx);
                                 } else {
-                                  MixpanelManager().uncheckedActionItem(provider.conversation, idx);
+                                  MixpanelManager().uncheckedActionItem(
+                                      provider.conversation, idx);
                                 }
                               }
                             },
@@ -212,7 +246,10 @@ class ActionItemsListWidget extends StatelessWidget {
                         child: SelectionArea(
                           child: Text(
                             item.description.decodeString,
-                            style: TextStyle(color: Colors.grey.shade300, fontSize: 16, height: 1.3),
+                            style: TextStyle(
+                                color: Colors.grey.shade300,
+                                fontSize: 16,
+                                height: 1.3),
                           ),
                         ),
                       ),
@@ -272,8 +309,10 @@ class ReprocessDiscardedWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ConversationDetailProvider>(builder: (context, provider, child) {
-      if (provider.loadingReprocessConversation && provider.reprocessConversationId == provider.conversation.id) {
+    return Consumer<ConversationDetailProvider>(
+        builder: (context, provider, child) {
+      if (provider.loadingReprocessConversation &&
+          provider.reprocessConversationId == provider.conversation.id) {
         return Center(
           child: Padding(
             padding: const EdgeInsets.only(top: 18.0),
@@ -300,7 +339,8 @@ class ReprocessDiscardedWidget extends StatelessWidget {
           const SizedBox(height: 32),
           Text(
             'Nothing interesting found,\nwant to retry?',
-            style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 20),
+            style:
+                Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 20),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -324,10 +364,13 @@ class ReprocessDiscardedWidget extends StatelessWidget {
                   onPressed: () async {
                     await provider.reprocessConversation();
                   },
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                   child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                      child: Text('Summarize', style: TextStyle(color: Colors.white, fontSize: 16))),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                      child: Text('Summarize',
+                          style: TextStyle(color: Colors.white, fontSize: 16))),
                 ),
               ),
             ],
@@ -374,13 +417,15 @@ class AppResultDetailWidget extends StatelessWidget {
                               context: context,
                               isScrollControlled: true,
                               backgroundColor: Colors.transparent,
-                              builder: (context) => const SummarizedAppsBottomSheet(),
+                              builder: (context) =>
+                                  const SummarizedAppsBottomSheet(),
                             );
                           },
                           child: RichText(
                             text: const TextSpan(
                                 style: TextStyle(color: Colors.grey),
-                                text: "No summary available for this app. Try another app for better results."),
+                                text:
+                                    "No summary available for this app. Try another app for better results."),
                           ),
                         ),
                       ),
@@ -419,15 +464,18 @@ class AppResultDetailWidget extends StatelessWidget {
                               return const CircleAvatar(
                                 backgroundColor: Colors.white,
                                 radius: 12,
-                                child: Icon(Icons.error_outline_rounded, size: 12),
+                                child:
+                                    Icon(Icons.error_outline_rounded, size: 12),
                               );
                             },
-                            progressIndicatorBuilder: (context, url, progress) => CircleAvatar(
+                            progressIndicatorBuilder:
+                                (context, url, progress) => CircleAvatar(
                               backgroundColor: Colors.white,
                               radius: 12,
                               child: CircularProgressIndicator(
                                 value: progress.progress,
-                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                    Colors.white),
                                 strokeWidth: 2,
                               ),
                             ),
@@ -435,10 +483,12 @@ class AppResultDetailWidget extends StatelessWidget {
                         : Container(
                             decoration: BoxDecoration(
                               image: DecorationImage(
-                                image: AssetImage(Assets.images.background.path),
+                                image:
+                                    AssetImage(Assets.images.background.path),
                                 fit: BoxFit.cover,
                               ),
-                              borderRadius: const BorderRadius.all(Radius.circular(12.0)),
+                              borderRadius:
+                                  const BorderRadius.all(Radius.circular(12.0)),
                             ),
                             height: 24,
                             width: 24,
@@ -465,7 +515,9 @@ class AppResultDetailWidget extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  app != null ? app!.name.decodeString : 'Unknown App',
+                                  app != null
+                                      ? app!.name.decodeString
+                                      : 'Unknown App',
                                   maxLines: 1,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
@@ -478,13 +530,15 @@ class AppResultDetailWidget extends StatelessWidget {
                                     app!.description.decodeString,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                    style: const TextStyle(
+                                        color: Colors.grey, fontSize: 12),
                                   ),
                               ],
                             ),
                           ),
                           const SizedBox(
-                            child: Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
+                            child: Icon(Icons.arrow_forward_ios,
+                                color: Colors.white, size: 20),
                             width: 42,
                           ),
                         ],
@@ -508,12 +562,76 @@ class GetAppsWidgets extends StatelessWidget {
     return Consumer<ConversationDetailProvider>(
       builder: (context, provider, child) {
         final summarizedApp = provider.getSummarizedApp();
+        final structured = provider.conversation.structured;
+        final hasStructuredOverview = structured.overview.trim().isNotEmpty;
+
         return Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: summarizedApp == null ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-          children: summarizedApp == null
-              ? [child!]
+          crossAxisAlignment: summarizedApp == null && !hasStructuredOverview
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          children: summarizedApp == null ||
+                  summarizedApp.content.trim().isEmpty
+              ? (hasStructuredOverview
+                  ? [
+                      // Show structured overview when no app summary is available
+                      if (!provider.conversation.discarded) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Summary',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge!
+                                  .copyWith(fontSize: 20),
+                              textAlign: TextAlign.start,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy_rounded,
+                                  color: Colors.white, size: 20),
+                              onPressed: () {
+                                final String content = structured.overview;
+                                Clipboard.setData(ClipboardData(text: content));
+                                ScaffoldMessenger.of(context)
+                                    .showSnackBar(const SnackBar(
+                                  content: Text('Summary copied to clipboard'),
+                                  duration: Duration(seconds: 1),
+                                ));
+                                MixpanelManager().copiedConversationDetails(
+                                    provider.conversation,
+                                    source: 'Structured Overview');
+                              },
+                            ),
+                          ],
+                        ),
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                child: SelectionArea(
+                                  child: Text(
+                                    structured.overview,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        height: 1.5),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8)
+                      ],
+                    ]
+                  : [child!])
               : [
                   // Show the summarized app
                   if (!provider.conversation.discarded) ...[
@@ -522,26 +640,35 @@ class GetAppsWidgets extends StatelessWidget {
                       children: [
                         Text(
                           'Summary',
-                          style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 20),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge!
+                              .copyWith(fontSize: 20),
                           textAlign: TextAlign.start,
                         ),
                         IconButton(
-                          icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                          icon: const Icon(Icons.copy_rounded,
+                              color: Colors.white, size: 20),
                           onPressed: () {
-                            final String content = summarizedApp.content.decodeString;
+                            final String content =
+                                summarizedApp.content.decodeString;
                             Clipboard.setData(ClipboardData(text: content));
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(const SnackBar(
                               content: Text('Summary copied to clipboard'),
                               duration: Duration(seconds: 1),
                             ));
-                            MixpanelManager().copiedConversationDetails(provider.conversation, source: 'App Response');
+                            MixpanelManager().copiedConversationDetails(
+                                provider.conversation,
+                                source: 'App Response');
                           },
                         ),
                       ],
                     ),
                     AppResultDetailWidget(
                       appResponse: summarizedApp,
-                      app: provider.appsList.firstWhereOrNull((element) => element.id == summarizedApp.appId),
+                      app: provider.appsList.firstWhereOrNull(
+                          (element) => element.id == summarizedApp.appId),
                       conversation: provider.conversation,
                     ),
                   ],
@@ -549,52 +676,84 @@ class GetAppsWidgets extends StatelessWidget {
                 ],
         );
       },
-      child: ListView(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          const SizedBox(height: 32),
-          Text(
-            'No summary available\nfor this conversation.',
-            style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 20),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+      child: Selector<ConversationProvider, ServerConversation?>(
+        selector: (context, conversationProvider) {
+          final detailProvider =
+              Provider.of<ConversationDetailProvider>(context, listen: false);
+          if (detailProvider.conversationIdx >= 0 &&
+              conversationProvider.groupedConversations
+                  .containsKey(detailProvider.selectedDate) &&
+              conversationProvider
+                      .groupedConversations[detailProvider.selectedDate]!
+                      .length >
+                  detailProvider.conversationIdx) {
+            return conversationProvider.groupedConversations[
+                detailProvider.selectedDate]![detailProvider.conversationIdx];
+          }
+          return null;
+        },
+        builder: (context, conversation, _) {
+          return ListView(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  border: const GradientBoxBorder(
-                    gradient: LinearGradient(colors: [
-                      Color.fromARGB(127, 208, 208, 208),
-                      Color.fromARGB(127, 188, 99, 121),
-                      Color.fromARGB(127, 86, 101, 182),
-                      Color.fromARGB(127, 126, 190, 236)
-                    ]),
-                    width: 2,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: MaterialButton(
-                  onPressed: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => const SummarizedAppsBottomSheet(),
-                    );
-                  },
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-                      child: Text('Generate Summary', style: TextStyle(color: Colors.white, fontSize: 16))),
-                ),
+              const SizedBox(height: 32),
+              Text(
+                'No summary available\nfor this conversation.',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge!
+                    .copyWith(fontSize: 20),
+                textAlign: TextAlign.center,
               ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: const GradientBoxBorder(
+                        gradient: LinearGradient(colors: [
+                          Color.fromARGB(127, 208, 208, 208),
+                          Color.fromARGB(127, 188, 99, 121),
+                          Color.fromARGB(127, 86, 101, 182),
+                          Color.fromARGB(127, 126, 190, 236)
+                        ]),
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: MaterialButton(
+                      onPressed: () async {
+                        final provider =
+                            Provider.of<ConversationDetailProvider>(context,
+                                listen: false);
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) =>
+                              const SummarizedAppsBottomSheet(),
+                        );
+                        // Trigger reprocessing after showing sheet to ensure summarizedApp is updated
+                        await provider.reprocessConversation();
+                      },
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      child: const Padding(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                          child: Text('Generate Summary',
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 16))),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 32),
             ],
-          ),
-          const SizedBox(height: 32),
-        ],
+          );
+        },
       ),
     );
   }
@@ -605,7 +764,8 @@ class GetGeolocationWidgets extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<ConversationDetailProvider, Geolocation?>(selector: (context, provider) {
+    return Selector<ConversationDetailProvider, Geolocation?>(
+        selector: (context, provider) {
       if (provider.conversation.discarded) return null;
       return provider.conversation.geolocation;
     }, builder: (context, geolocation, child) {
@@ -616,7 +776,10 @@ class GetGeolocationWidgets extends StatelessWidget {
             : [
                 Text(
                   'Taken at',
-                  style: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 20),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge!
+                      .copyWith(fontSize: 20),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -626,7 +789,8 @@ class GetGeolocationWidgets extends StatelessWidget {
                 const SizedBox(height: 8),
                 GestureDetector(
                   onTap: () async {
-                    MapsUtil.launchMap(geolocation.latitude!, geolocation.longitude!);
+                    MapsUtil.launchMap(
+                        geolocation.latitude!, geolocation.longitude!);
                   },
                   child: CachedNetworkImage(
                     imageBuilder: (context, imageProvider) {
@@ -680,12 +844,15 @@ class GetSheetTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ConversationDetailProvider>(builder: (context, provider, child) {
+    return Consumer<ConversationDetailProvider>(
+        builder: (context, provider, child) {
       return Column(
         children: [
           ListTile(
             title: Text(
-              provider.conversation.discarded ? 'Discarded Conversation' : provider.conversation.structured.title,
+              provider.conversation.discarded
+                  ? 'Discarded Conversation'
+                  : provider.conversation.structured.title,
               style: Theme.of(context).textTheme.labelLarge,
             ),
             leading: const Icon(Icons.description),
@@ -728,7 +895,8 @@ class _GetDevToolsOptionsState extends State<GetDevToolsOptions> {
   Widget build(BuildContext context) {
     return Column(children: [
       Card(
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8))),
         child: ListTile(
           title: const Text('Trigger Conversation Created Integration'),
           leading: loadingAppIntegrationTest
@@ -762,7 +930,9 @@ class _GetDevToolsOptionsState extends State<GetDevToolsOptions> {
               changeLoadingAppIntegrationTest(false);
               return;
             } else {
-              webhookOnConversationCreatedCall(widget.conversation, returnRawBody: true).then((response) {
+              webhookOnConversationCreatedCall(widget.conversation,
+                      returnRawBody: true)
+                  .then((response) {
                 showDialog(
                   context: context,
                   builder: (c) => getDialog(
@@ -782,13 +952,15 @@ class _GetDevToolsOptionsState extends State<GetDevToolsOptions> {
         ),
       ),
       Card(
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8))),
         child: ListTile(
           title: const Text('Test a Conversation Prompt'),
           leading: const Icon(Icons.chat),
           trailing: const Icon(Icons.arrow_forward_ios, size: 20),
           onTap: () {
-            routeToPage(context, TestPromptsPage(conversation: widget.conversation));
+            routeToPage(
+                context, TestPromptsPage(conversation: widget.conversation));
           },
         ),
       ),
@@ -868,21 +1040,29 @@ class _GetShareOptionsState extends State<GetShareOptions> {
     return Column(
       children: [
         Card(
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8))),
           child: ListTile(
             title: const Text('Send web url'),
-            leading: loadingShareConversationViaURL ? _getLoadingIndicator() : const Icon(Icons.link),
+            leading: loadingShareConversationViaURL
+                ? _getLoadingIndicator()
+                : const Icon(Icons.link),
             onTap: () async {
               if (loadingShareConversationViaURL) return;
               changeLoadingShareConversationViaURL(true);
-              bool shared = await setConversationVisibility(widget.conversation.id);
+              bool shared =
+                  await setConversationVisibility(widget.conversation.id);
               if (!shared) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Conversation URL could not be shared.')),
+                  const SnackBar(
+                      content: Text('Conversation URL could not be shared.')),
                 );
                 return;
               }
-              String content = '''https://h.omi.me/memories/${widget.conversation.id}'''.replaceAll('  ', '').trim();
+              String content =
+                  '''https://h.omi.me/memories/${widget.conversation.id}'''
+                      .replaceAll('  ', '')
+                      .trim();
               print(content);
               await Share.share(content);
               changeLoadingShareConversationViaURL(false);
@@ -891,12 +1071,15 @@ class _GetShareOptionsState extends State<GetShareOptions> {
         ),
         const SizedBox(height: 4),
         Card(
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8))),
           child: Column(
             children: [
               ListTile(
                 title: const Text('Send Transcript'),
-                leading: loadingShareTranscript ? _getLoadingIndicator() : const Icon(Icons.description),
+                leading: loadingShareTranscript
+                    ? _getLoadingIndicator()
+                    : const Icon(Icons.description),
                 onTap: () async {
                   if (loadingShareTranscript) return;
                   changeLoadingShareTranscript(true);
@@ -916,11 +1099,16 @@ class _GetShareOptionsState extends State<GetShareOptions> {
                   ? const SizedBox()
                   : ListTile(
                       title: const Text('Send Summary'),
-                      leading: loadingShareSummary ? _getLoadingIndicator() : const Icon(Icons.summarize),
+                      leading: loadingShareSummary
+                          ? _getLoadingIndicator()
+                          : const Icon(Icons.summarize),
                       onTap: () async {
                         if (loadingShareSummary) return;
                         changeLoadingShareSummary(true);
-                        String content = widget.conversation.structured.toString().replaceAll('  ', '').trim();
+                        String content = widget.conversation.structured
+                            .toString()
+                            .replaceAll('  ', '')
+                            .trim();
                         await Share.share(content);
                         changeLoadingShareSummary(false);
                       },
@@ -930,13 +1118,15 @@ class _GetShareOptionsState extends State<GetShareOptions> {
         ),
         const SizedBox(height: 4),
         Card(
-          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8))),
           child: Column(
             children: [
               ListTile(
                 title: const Text('Copy Transcript'),
                 leading: const Icon(Icons.copy),
-                onTap: () => _copyContent(context, widget.conversation.getTranscript(generate: true)),
+                onTap: () => _copyContent(
+                    context, widget.conversation.getTranscript(generate: true)),
               ),
               widget.conversation.discarded
                   ? const SizedBox()
@@ -963,11 +1153,13 @@ class GetSheetMainOptions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ConversationDetailProvider>(builder: (context, provider, child) {
+    return Consumer<ConversationDetailProvider>(
+        builder: (context, provider, child) {
       return Column(
         children: [
           Card(
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+            shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8))),
             child: Column(
               children: [
                 ListTile(
@@ -975,7 +1167,8 @@ class GetSheetMainOptions extends StatelessWidget {
                   leading: const Icon(Icons.share),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 20),
                   onTap: () {
-                    provider.toggleShareOptionsInSheet(!provider.displayShareOptionsInSheet);
+                    provider.toggleShareOptionsInSheet(
+                        !provider.displayShareOptionsInSheet);
                   },
                 )
               ],
@@ -1033,7 +1226,9 @@ class GetSheetMainOptions extends StatelessWidget {
                   onTap: provider.loadingReprocessConversation
                       ? null
                       : () {
-                          final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
+                          final connectivityProvider =
+                              Provider.of<ConnectivityProvider>(context,
+                                  listen: false);
                           if (connectivityProvider.isConnected) {
                             showDialog(
                               context: context,
@@ -1043,7 +1238,8 @@ class GetSheetMainOptions extends StatelessWidget {
                                 () {
                                   context
                                       .read<ConversationProvider>()
-                                      .deleteConversation(provider.conversation, provider.conversationIdx);
+                                      .deleteConversation(provider.conversation,
+                                          provider.conversationIdx);
                                   Navigator.pop(context, true);
                                   Navigator.pop(context, true);
                                   Navigator.pop(context, {'deleted': true});
@@ -1073,12 +1269,14 @@ class GetSheetMainOptions extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Card(
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+            shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8))),
             child: Column(
               children: [
                 ListTile(
                   onTap: () {
-                    provider.toggleDevToolsInSheet(!provider.displayDevToolsInSheet);
+                    provider.toggleDevToolsInSheet(
+                        !provider.displayDevToolsInSheet);
                   },
                   title: const Text('Developer Tools'),
                   leading: const Icon(
@@ -1104,10 +1302,12 @@ class ShowOptionsBottomSheet extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+        borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(16), topRight: Radius.circular(16)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Consumer<ConversationDetailProvider>(builder: (context, provider, child) {
+      child: Consumer<ConversationDetailProvider>(
+          builder: (context, provider, child) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [

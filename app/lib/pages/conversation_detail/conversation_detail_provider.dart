@@ -15,7 +15,8 @@ import 'package:omi/utils/analytics/mixpanel.dart';
 import 'package:instabug_flutter/instabug_flutter.dart';
 import 'package:tuple/tuple.dart';
 
-class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixin {
+class ConversationDetailProvider extends ChangeNotifier
+    with MessageNotifierMixin {
   AppProvider? appProvider;
   ConversationProvider? conversationProvider;
 
@@ -26,6 +27,7 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
 
   bool isLoading = false;
   bool loadingReprocessConversation = false;
+  bool loadingEnhancedSummary = false;
   String reprocessConversationId = '';
   App? selectedAppForReprocessing;
 
@@ -41,14 +43,16 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
     if (conversationProvider == null ||
         !conversationProvider!.groupedConversations.containsKey(selectedDate) ||
         conversationProvider!.groupedConversations[selectedDate] == null ||
-        conversationProvider!.groupedConversations[selectedDate]!.length <= conversationIdx) {
+        conversationProvider!.groupedConversations[selectedDate]!.length <=
+            conversationIdx) {
       // Return cached conversation if available, otherwise create an empty one
       if (_cachedConversation == null) {
         throw StateError("No conversation available");
       }
       return _cachedConversation!;
     }
-    _cachedConversation = conversationProvider!.groupedConversations[selectedDate]![conversationIdx];
+    _cachedConversation = conversationProvider!
+        .groupedConversations[selectedDate]![conversationIdx];
     return _cachedConversation!;
   }
 
@@ -108,7 +112,8 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
     notifyListeners();
   }
 
-  void setProviders(AppProvider provider, ConversationProvider conversationProvider) {
+  void setProviders(
+      AppProvider provider, ConversationProvider conversationProvider) {
     this.conversationProvider = conversationProvider;
     appProvider = provider;
     notifyListeners();
@@ -168,7 +173,8 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
   }
 
   void undoDeleteActionItem(int idx) {
-    conversation.structured.actionItems.insert(idx, deletedActionItems.removeLast());
+    conversation.structured.actionItems
+        .insert(idx, deletedActionItems.removeLast());
     notifyListeners();
   }
 
@@ -221,7 +227,8 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
     });
 
     photos = [];
-    canDisplaySeconds = TranscriptSegment.canDisplaySeconds(conversation.transcriptSegments);
+    canDisplaySeconds =
+        TranscriptSegment.canDisplaySeconds(conversation.transcriptSegments);
     if (conversation.source == ConversationSource.openglass) {
       await getConversationPhotos(conversation.id).then((value) async {
         photos = value;
@@ -234,7 +241,8 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
         notifyListeners();
         if (!hasConversationSummaryRatingSet) {
           _ratingTimer = Timer(const Duration(seconds: 15), () {
-            setConversationSummaryRating(conversation.id, -1); // set -1 to indicate is was shown
+            setConversationSummaryRating(
+                conversation.id, -1); // set -1 to indicate is was shown
             showRatingUI = true;
             notifyListeners();
           });
@@ -251,7 +259,8 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
     updateReprocessConversationLoadingState(true);
     updateReprocessConversationId(conversation.id);
     try {
-      var updatedConversation = await reProcessConversationServer(conversation.id, appId: appId);
+      var updatedConversation =
+          await reProcessConversationServer(conversation.id, appId: appId);
       MixpanelManager().reProcessConversation(conversation);
       updateReprocessConversationLoadingState(false);
       updateReprocessConversationId('');
@@ -267,7 +276,9 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
 
       // Check if the summarized app is in the apps list
       AppResponse? summaryApp = getSummarizedApp();
-      if (summaryApp != null && summaryApp.appId != null && appProvider != null) {
+      if (summaryApp != null &&
+          summaryApp.appId != null &&
+          appProvider != null) {
         String appId = summaryApp.appId!;
         bool appExists = appProvider!.apps.any((app) => app.id == appId);
         if (!appExists) {
@@ -279,11 +290,16 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
       return true;
     } catch (err, stacktrace) {
       print(err);
-      var conversationReporting = MixpanelManager().getConversationEventProperties(conversation);
-      CrashReporting.reportHandledCrash(err, stacktrace, level: NonFatalExceptionLevel.critical, userAttributes: {
-        'conversation_transcript_length': conversationReporting['transcript_length'].toString(),
-        'conversation_transcript_word_count': conversationReporting['transcript_word_count'].toString(),
-      });
+      var conversationReporting =
+          MixpanelManager().getConversationEventProperties(conversation);
+      CrashReporting.reportHandledCrash(err, stacktrace,
+          level: NonFatalExceptionLevel.critical,
+          userAttributes: {
+            'conversation_transcript_length':
+                conversationReporting['transcript_length'].toString(),
+            'conversation_transcript_word_count':
+                conversationReporting['transcript_word_count'].toString(),
+          });
       notifyError('REPROCESS_FAILED');
       updateReprocessConversationLoadingState(false);
       updateReprocessConversationId('');
@@ -292,7 +308,8 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
     }
   }
 
-  void unassignConversationTranscriptSegment(String conversationId, int segmentIdx) {
+  void unassignConversationTranscriptSegment(
+      String conversationId, int segmentIdx) {
     conversation.transcriptSegments[segmentIdx].isUser = false;
     conversation.transcriptSegments[segmentIdx].personId = null;
     assignConversationTranscriptSegment(conversationId, segmentIdx);
@@ -311,5 +328,56 @@ class ConversationDetailProvider extends ChangeNotifier with MessageNotifierMixi
   void setPreferredSummarizationApp(String appId) {
     setPreferredSummarizationAppServer(appId);
     notifyListeners();
+  }
+
+  // Method to fetch enhanced summary for a conversation
+  Future<bool> fetchEnhancedSummary() async {
+    if (loadingEnhancedSummary) return false;
+
+    loadingEnhancedSummary = true;
+    notifyListeners();
+
+    try {
+      final enhancedConversation = await getEnhancedSummary(conversation.id);
+      if (enhancedConversation != null) {
+        // Update the conversation with enhanced summary data
+        if (enhancedConversation.structured.keyTakeaways.isNotEmpty ||
+            enhancedConversation.structured.thingsToImprove.isNotEmpty ||
+            enhancedConversation.structured.thingsToLearn.isNotEmpty) {
+          // Copy enriched fields to current conversation
+          conversation.structured.keyTakeaways =
+              enhancedConversation.structured.keyTakeaways;
+          conversation.structured.thingsToImprove =
+              enhancedConversation.structured.thingsToImprove;
+          conversation.structured.thingsToLearn =
+              enhancedConversation.structured.thingsToLearn;
+
+          // Update in the provider
+          if (conversationProvider != null) {
+            conversationProvider!.updateConversation(conversation);
+          }
+
+          loadingEnhancedSummary = false;
+          notifyListeners();
+          return true;
+        }
+      }
+
+      loadingEnhancedSummary = false;
+      notifyListeners();
+      return false;
+    } catch (err) {
+      debugPrint('Error fetching enhanced summary: $err');
+      loadingEnhancedSummary = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Method to check if an enhanced summary is available
+  bool hasEnhancedSummary() {
+    return conversation.structured.keyTakeaways.isNotEmpty ||
+        conversation.structured.thingsToImprove.isNotEmpty ||
+        conversation.structured.thingsToLearn.isNotEmpty;
   }
 }
