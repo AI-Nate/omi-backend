@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 import database.conversations as conversations_db
+import database.users as users_db
 import database.redis_db as redis_db
 from database.vector_db import delete_vector
 from models.conversation import *
