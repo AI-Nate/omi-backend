@@ -499,6 +499,8 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
     Format your response as JSON with these keys: keyTakeaways, thingsToImprove, thingsToLearn.
     Each key should have an array of strings.
     
+    For thingsToImprove and thingsToLearn, provide only the content without URLs or resource links.
+    
     User Information for Personalization:
     - Name: ${userName}
     - Primary language: ${userLanguage}
@@ -513,7 +515,7 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
     
     For "Things to Learn":
     - Suggest specific topics or skills rather than broad areas
-    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Include a clear, actionable way to begin learning this topic
     - Explain briefly how this learning connects to ${userName}'s interests or needs
     - Focus on knowledge or skills that would have immediate practical value
     
@@ -538,19 +540,30 @@ Future<void> enrichConversationSummary(ServerConversation conversation) async {
                 .toList();
       }
 
+      // Add things to improve with placeholder URLs
       if (enrichmentData.containsKey('thingsToImprove')) {
-        conversation.structured.thingsToImprove =
-            (enrichmentData['thingsToImprove'] as List)
-                .map((item) => item.toString())
-                .toList();
+        final improvements = enrichmentData['thingsToImprove'] as List;
+        conversation.structured.thingsToImprove.clear();
+
+        for (var item in improvements) {
+          String content = item.toString();
+          conversation.structured.thingsToImprove.add(ResourceItem(content));
+        }
       }
 
+      // Add things to learn with placeholder URLs
       if (enrichmentData.containsKey('thingsToLearn')) {
-        conversation.structured.thingsToLearn =
-            (enrichmentData['thingsToLearn'] as List)
-                .map((item) => item.toString())
-                .toList();
+        final learning = enrichmentData['thingsToLearn'] as List;
+        conversation.structured.thingsToLearn.clear();
+
+        for (var item in learning) {
+          String content = item.toString();
+          conversation.structured.thingsToLearn.add(ResourceItem(content));
+        }
       }
+
+      // Enhance with web search URLs
+      await _enhanceWithWebSearchURLs(conversation);
     } catch (e) {
       debugPrint('Error parsing enrichment data: $e');
     }
@@ -638,6 +651,7 @@ Future<void> enrichConversationSummaryWithImage(
 
     final transcript = conversation.getTranscript(generate: true);
 
+    // Call the GPT-4o API for enhanced summary
     final prompt = '''
     Based on this conversation transcript and image description, provide an updated:
     1. Overview (a concise summary integrating the image content)
@@ -647,6 +661,8 @@ Future<void> enrichConversationSummaryWithImage(
     
     Format your response as JSON with these keys: overview, keyTakeaways, thingsToImprove, thingsToLearn.
     Each of keyTakeaways, thingsToImprove, thingsToLearn should have an array of strings.
+    
+    For thingsToImprove and thingsToLearn, provide only the content without URLs or resource links.
     
     User Information for Personalization:
     - Name: ${userName}
@@ -661,7 +677,7 @@ Future<void> enrichConversationSummaryWithImage(
     
     For "Things to Learn":
     - Suggest specific topics or skills rather than broad areas
-    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Include a clear, actionable way to begin learning this topic
     - Explain briefly how this learning connects to ${userName}'s interests or needs
     - Focus on knowledge or skills that would have immediate practical value
     
@@ -674,7 +690,7 @@ Future<void> enrichConversationSummaryWithImage(
     ${imageDescription.trim()}
     ''';
 
-    // Call the GPT-4o API
+    // Use ChatGPT-4o for enhanced summary then find resource URLs with web search
     final response = await executeGptPrompt(prompt);
 
     try {
@@ -692,24 +708,109 @@ Future<void> enrichConversationSummaryWithImage(
                 .toList();
       }
 
+      // For things to improve, add URLs using web search
       if (enrichmentData.containsKey('thingsToImprove')) {
-        conversation.structured.thingsToImprove =
-            (enrichmentData['thingsToImprove'] as List)
-                .map((item) => item.toString())
-                .toList();
+        final improvements = enrichmentData['thingsToImprove'] as List;
+        conversation.structured.thingsToImprove.clear();
+
+        for (var item in improvements) {
+          String content = item.toString();
+
+          // We'll use OpenAI web search to find resources later
+          // For now, add the item without URL
+          conversation.structured.thingsToImprove.add(
+            ResourceItem(
+              content,
+              url: '', // Will be fetched from backend
+              title: '',
+            ),
+          );
+
+          // Note: In a production app, you would make an API call to your backend to fetch the URLs
+          // The backend would then use the web search functionality we implemented
+        }
       }
 
+      // For things to learn, add URLs using web search
       if (enrichmentData.containsKey('thingsToLearn')) {
-        conversation.structured.thingsToLearn =
-            (enrichmentData['thingsToLearn'] as List)
-                .map((item) => item.toString())
-                .toList();
+        final learning = enrichmentData['thingsToLearn'] as List;
+        conversation.structured.thingsToLearn.clear();
+
+        for (var item in learning) {
+          String content = item.toString();
+
+          // We'll use OpenAI web search to find resources later
+          // For now, add the item without URL
+          conversation.structured.thingsToLearn.add(
+            ResourceItem(
+              content,
+              url: '', // Will be fetched from backend
+              title: '',
+            ),
+          );
+
+          // Note: In a production app, you would make an API call to your backend to fetch the URLs
+          // The backend would then use the web search functionality we implemented
+        }
       }
+
+      // Enhance with web search URLs - in a real application, you would call
+      // your backend API to do this search, not implement it client-side
+      await _enhanceWithWebSearchURLs(conversation);
     } catch (e) {
       debugPrint('Error parsing image enrichment data: $e');
     }
   } catch (e) {
     debugPrint('Error generating image-enriched summary: $e');
+  }
+}
+
+// Helper method to add web search URLs - in a production app this would be an API call
+Future<void> _enhanceWithWebSearchURLs(ServerConversation conversation) async {
+  // This is just a placeholder - in a real app you'd make an API call to your backend
+  // which would use the OpenAI web search we implemented
+  //
+  // Example API call structure:
+  //
+  // final response = await makeApiCall(
+  //   url: '${Env.apiBaseUrl}v1/conversations/${conversation.id}/enhance-with-urls',
+  //   method: 'POST',
+  //   body: jsonEncode({
+  //     'improve_items': conversation.structured.thingsToImprove.map((i) => i.content).toList(),
+  //     'learn_items': conversation.structured.thingsToLearn.map((i) => i.content).toList(),
+  //   }),
+  // );
+  //
+  // if (response != null && response.statusCode == 200) {
+  //   final data = jsonDecode(response.body);
+  //   // Update resources with URLs
+  // }
+
+  try {
+    // For now, we'll use placeholder URLs for demonstration
+    for (int i = 0; i < conversation.structured.thingsToImprove.length; i++) {
+      final item = conversation.structured.thingsToImprove[i];
+      // In production, these would come from the OpenAI web search API via your backend
+      conversation.structured.thingsToImprove[i] = ResourceItem(
+        item.content,
+        url:
+            'https://example.com/improve/${Uri.encodeComponent(item.content.toLowerCase().replaceAll(' ', '-'))}',
+        title: 'Resource for ${item.content}',
+      );
+    }
+
+    for (int i = 0; i < conversation.structured.thingsToLearn.length; i++) {
+      final item = conversation.structured.thingsToLearn[i];
+      // In production, these would come from the OpenAI web search API via your backend
+      conversation.structured.thingsToLearn[i] = ResourceItem(
+        item.content,
+        url:
+            'https://example.com/learn/${Uri.encodeComponent(item.content.toLowerCase().replaceAll(' ', '-'))}',
+        title: 'Learn about ${item.content}',
+      );
+    }
+  } catch (e) {
+    debugPrint('Error enhancing with web search URLs: $e');
   }
 }
 
@@ -742,6 +843,8 @@ Future<void> enrichConversationSummaryWithMultipleImages(
     Format your response as JSON with these keys: overview, keyTakeaways, thingsToImprove, thingsToLearn.
     Each of keyTakeaways, thingsToImprove, thingsToLearn should have an array of strings.
     
+    For thingsToImprove and thingsToLearn, provide only the content without URLs or resource links.
+    
     User Information for Personalization:
     - Name: ${userName}
     - Primary language: ${userLanguage}
@@ -755,7 +858,7 @@ Future<void> enrichConversationSummaryWithMultipleImages(
     
     For "Things to Learn":
     - Suggest specific topics or skills rather than broad areas
-    - Include a clear, actionable way to begin learning this topic (specific resource, course, or practice method)
+    - Include a clear, actionable way to begin learning this topic
     - Explain briefly how this learning connects to ${userName}'s interests or needs
     - Focus on knowledge or skills that would have immediate practical value
     
@@ -788,20 +891,34 @@ Future<void> enrichConversationSummaryWithMultipleImages(
         }
       }
 
-      // Helper function to merge lists without duplicates
-      void mergeLists(List<String> existingList, List<dynamic> newItems) {
+      // Helper function to merge lists without duplicates - updated for ResourceItems
+      void mergeLists(List<ResourceItem> existingList, List<dynamic> newItems) {
         for (var item in newItems) {
+          String itemContent = item.toString();
+
           if (!existingList.any((existing) =>
-              existing.toLowerCase().contains(item.toString().toLowerCase()) ||
-              item.toString().toLowerCase().contains(existing.toLowerCase()))) {
-            existingList.add(item.toString());
+              existing.content
+                  .toLowerCase()
+                  .contains(itemContent.toLowerCase()) ||
+              itemContent
+                  .toLowerCase()
+                  .contains(existing.content.toLowerCase()))) {
+            existingList.add(ResourceItem(itemContent));
           }
         }
       }
 
       if (enrichmentData.containsKey('keyTakeaways')) {
-        mergeLists(conversation.structured.keyTakeaways,
-            enrichmentData['keyTakeaways'] as List);
+        conversation.structured.keyTakeaways = [
+          ...conversation.structured.keyTakeaways,
+          ...(enrichmentData['keyTakeaways'] as List)
+              .map((item) => item.toString())
+              .where((newItem) => !conversation.structured.keyTakeaways.any(
+                  (existing) =>
+                      existing.toLowerCase().contains(newItem.toLowerCase()) ||
+                      newItem.toLowerCase().contains(existing.toLowerCase())))
+              .toList()
+        ];
       }
 
       if (enrichmentData.containsKey('thingsToImprove')) {
@@ -813,6 +930,9 @@ Future<void> enrichConversationSummaryWithMultipleImages(
         mergeLists(conversation.structured.thingsToLearn,
             enrichmentData['thingsToLearn'] as List);
       }
+
+      // Enhance with web search URLs
+      await _enhanceWithWebSearchURLs(conversation);
     } catch (e) {
       debugPrint('Error parsing image enrichment data: $e');
     }

@@ -127,6 +127,12 @@ class SummaryOutput(BaseModel):
     summary: str = Field(description="The extracted content, maximum 500 words.")
 
 
+class ResourceItem(BaseModel):
+    content: str = Field(description="The content of the improvement or learning item")
+    url: str = Field(description="URL to a resource related to this item", default="")
+    title: str = Field(description="Title of the resource", default="")
+
+
 class EnhancedSummaryOutput(BaseModel):
     title: str = Field(description="A title/name for this conversation", default='')
     overview: str = Field(
@@ -142,12 +148,12 @@ class EnhancedSummaryOutput(BaseModel):
         description="3-5 key takeaways from the conversation",
         default=[],
     )
-    things_to_improve: List[str] = Field(
-        description="2-3 things that could be improved based on the conversation",
+    things_to_improve: List[ResourceItem] = Field(
+        description="2-3 things that could be improved based on the conversation, with resource URLs",
         default=[],
     )
-    things_to_learn: List[str] = Field(
-        description="1-2 things worth learning more about based on the conversation",
+    things_to_learn: List[ResourceItem] = Field(
+        description="1-2 things worth learning more about based on the conversation, with resource URLs",
         default=[],
     )
     action_items: List[str] = Field(description="A list of action items from the conversation", default=[])
@@ -243,8 +249,56 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
 
         # Add enhanced fields
         structured.key_takeaways = response.key_takeaways
-        structured.things_to_improve = response.things_to_improve
-        structured.things_to_learn = response.things_to_learn
+        
+        # Process improvement items with web search
+        for item in response.things_to_improve:
+            content = item.content if hasattr(item, 'content') else item
+            
+            # Use web search to find relevant resources
+            search_query = f"How to {content.lower()}"
+            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+            
+            resource_url = ""
+            resource_title = ""
+            
+            # Get the first URL if available
+            if url_mapping:
+                first_url = next(iter(url_mapping.keys()), "")
+                resource_url = first_url
+                resource_title = url_mapping.get(first_url, "")
+            
+            # Create resource item
+            resource_item = ResourceItem(
+                content=content,
+                url=resource_url,
+                title=resource_title
+            )
+            structured.things_to_improve.append(resource_item)
+        
+        # Process learning items with web search
+        for item in response.things_to_learn:
+            content = item.content if hasattr(item, 'content') else item
+            
+            # Use web search to find relevant resources
+            search_query = f"Best resources to learn about {content.lower()}"
+            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+            
+            resource_url = ""
+            resource_title = ""
+            
+            # Get the first URL if available
+            if url_mapping:
+                first_url = next(iter(url_mapping.keys()), "")
+                resource_url = first_url
+                resource_title = url_mapping.get(first_url, "")
+            
+            # Create resource item
+            resource_item = ResourceItem(
+                content=content,
+                url=resource_url,
+                title=resource_title
+            )
+            structured.things_to_learn.append(resource_item)
 
         # Process action items and events
         for item in response.action_items:
@@ -378,8 +432,56 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
 
         # Add enhanced fields
         structured.key_takeaways = response.key_takeaways
-        structured.things_to_improve = response.things_to_improve
-        structured.things_to_learn = response.things_to_learn
+        
+        # Process improvement items with web search
+        for item in response.things_to_improve:
+            content = item.content if hasattr(item, 'content') else item
+            
+            # Use web search to find relevant resources
+            search_query = f"How to {content.lower()}"
+            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+            
+            resource_url = ""
+            resource_title = ""
+            
+            # Get the first URL if available
+            if url_mapping:
+                first_url = next(iter(url_mapping.keys()), "")
+                resource_url = first_url
+                resource_title = url_mapping.get(first_url, "")
+            
+            # Create resource item
+            resource_item = ResourceItem(
+                content=content,
+                url=resource_url,
+                title=resource_title
+            )
+            structured.things_to_improve.append(resource_item)
+        
+        # Process learning items with web search
+        for item in response.things_to_learn:
+            content = item.content if hasattr(item, 'content') else item
+            
+            # Use web search to find relevant resources
+            search_query = f"Best resources to learn about {content.lower()}"
+            search_results, annotations, url_mapping = perform_web_search(search_query, search_context_size="medium")
+            
+            resource_url = ""
+            resource_title = ""
+            
+            # Get the first URL if available
+            if url_mapping:
+                first_url = next(iter(url_mapping.keys()), "")
+                resource_url = first_url
+                resource_title = url_mapping.get(first_url, "")
+            
+            # Create resource item
+            resource_item = ResourceItem(
+                content=content,
+                url=resource_url,
+                title=resource_title
+            )
+            structured.things_to_learn.append(resource_item)
 
         # Process action items and events
         for item in response.action_items:
@@ -560,6 +662,51 @@ def get_conversation_summary(uid: str, memories: List[Conversation]) -> str:
 
 def generate_embedding(content: str) -> List[float]:
     return embeddings.embed_documents([content])[0]
+
+
+def perform_web_search(query: str, search_context_size: str = "medium") -> tuple[str, list, dict]:
+    """
+    Performs a web search using OpenAI's web search models to find relevant information.
+    
+    Args:
+        query: The search query
+        search_context_size: Size of search context (low, medium, high)
+        
+    Returns:
+        Tuple containing: 
+        - String with search results
+        - List of annotations
+        - Dict mapping URLs to titles for easy access
+    """
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        completion = client.chat.completions.create(
+            model="gpt-4o-search-preview",
+            web_search_options={
+                "search_context_size": search_context_size,
+            },
+            messages=[
+                {
+                    "role": "user",
+                    "content": query,
+                }
+            ],
+        )
+        
+        # Extract URLs and titles from annotations
+        url_mapping = {}
+        annotations = completion.choices[0].message.annotations
+        if annotations:
+            for annotation in annotations:
+                if annotation.type == "url_citation":
+                    citation = annotation.url_citation
+                    url_mapping[citation.url] = citation.title
+        
+        return completion.choices[0].message.content, annotations, url_mapping
+    except Exception as e:
+        print(f"Error performing web search: {e}")
+        return "", [], {}
 
 
 # ****************************************
