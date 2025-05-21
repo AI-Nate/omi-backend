@@ -87,7 +87,7 @@ dependencies:
   cached_network_image: 3.4.1
   map_launcher: ^3.3.1
   internet_connection_checker_plus: ^2.5.0
-  geolocator:
+  geolocator: ^14.0.0
   version: ^3.0.2
   webview_flutter: ^4.8.0
   flutter_sound: ^9.10.0
@@ -111,6 +111,7 @@ dependency_overrides:
   uuid: ^4.4.0
   js: ^0.7.1
   google_sign_in_ios: 5.8.1
+  geolocator_android: ^5.0.0
   opus_flutter_ios:
     git:
       url: https://github.com/mdmohsin7/opus_flutter.git

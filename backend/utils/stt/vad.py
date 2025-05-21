@@ -1,4 +1,6 @@
 import os
+import sys
+import urllib.error
 from enum import Enum
 
 import numpy as np
@@ -11,7 +13,37 @@ from database import redis_db
 
 torch.set_num_threads(1)
 torch.hub.set_dir('pretrained_models')
-model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
+
+# Try to load the model locally first, if it fails with a GitHub authentication error,
+# use the GitHub token from the environment variables
+try:
+    model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad', force_reload=False, trust_repo=True)
+except urllib.error.HTTPError as e:
+    if e.code == 401:  # Unauthorized
+        # Check if we have a GitHub token in the environment
+        github_token = os.getenv('GITHUB_TOKEN')
+        if github_token:
+            # Set the token for torch hub
+            os.environ['GITHUB_TOKEN'] = github_token
+            # Try again with the token
+            model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad', force_reload=False, trust_repo=True)
+        else:
+            # Try loading from local cache without accessing GitHub
+            try:
+                # Check if the model exists in the pretrained_models directory
+                model_dir = os.path.join('pretrained_models', 'hub', 'snakers4_silero-vad')
+                if os.path.exists(model_dir):
+                    model, utils = torch.hub.load(repo_or_dir=model_dir, model='silero_vad', force_reload=False, source='local', trust_repo=True)
+                else:
+                    print("Error: Cannot download silero-vad model. Add a GITHUB_TOKEN to .env or download the model manually.")
+                    sys.exit(1)
+            except Exception as ex:
+                print(f"Failed to load model locally: {ex}")
+                sys.exit(1)
+    else:
+        # Re-raise the exception if it's not an authentication error
+        raise
+
 (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
 
 

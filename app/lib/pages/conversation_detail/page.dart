@@ -425,6 +425,7 @@ class SummaryTab extends StatelessWidget {
             children: [
               ListView(
                 shrinkWrap: true,
+                controller: provider.summaryScrollController,
                 children: [
                   const GetSummaryWidgets(),
 
@@ -433,9 +434,14 @@ class SummaryTab extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: EnhancedSummarySection(
-                        structured: provider.conversation.structured,
+                        conversation: provider.conversation,
+                        enhancedByImage: provider.hasImageEnhancedSummary,
+                        imageDataList: provider.summaryImageDataList,
+                        imageDescriptions: provider.summaryImageDescriptions,
                       ),
                     ),
+                    // Add space at the bottom but do not show the basic summary
+                    const SizedBox(height: 150)
                   ] else if (!data.item1 &&
                       !provider.loadingEnhancedSummary &&
                       provider.conversation.structured.overview.isNotEmpty) ...[
@@ -478,6 +484,11 @@ class SummaryTab extends StatelessWidget {
                         ),
                       ),
                     ),
+                    // Show the basic summary below the generate button
+                    data.item1
+                        ? const ReprocessDiscardedWidget()
+                        : const GetAppsWidgets(),
+                    const SizedBox(height: 150)
                   ] else if (!data.item1 &&
                       provider.loadingEnhancedSummary) ...[
                     const SizedBox(height: 32),
@@ -493,13 +504,14 @@ class SummaryTab extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 150)
+                  ] else ...[
+                    // For discarded conversations or if no summary exists at all
+                    data.item1
+                        ? const ReprocessDiscardedWidget()
+                        : const GetAppsWidgets(),
+                    const SizedBox(height: 150)
                   ],
-
-                  data.item1
-                      ? const ReprocessDiscardedWidget()
-                      : const GetAppsWidgets(),
-                  //const GetGeolocationWidgets(),
-                  const SizedBox(height: 150)
                 ],
               ),
             ],

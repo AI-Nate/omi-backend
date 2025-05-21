@@ -27,7 +27,9 @@ class OmiDeviceConnection extends DeviceConnection {
   get deviceId => device.id;
 
   @override
-  Future<void> connect({Function(String deviceId, DeviceConnectionState state)? onConnectionStateChanged}) async {
+  Future<void> connect(
+      {Function(String deviceId, DeviceConnectionState state)?
+          onConnectionStateChanged}) async {
     await super.connect(onConnectionStateChanged: onConnectionStateChanged);
 
     // Services
@@ -76,7 +78,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return -1;
     }
 
-    var batteryLevelCharacteristic = getCharacteristic(_batteryService!, batteryLevelCharacteristicUuid);
+    var batteryLevelCharacteristic =
+        getCharacteristic(_batteryService!, batteryLevelCharacteristicUuid);
     if (batteryLevelCharacteristic == null) {
       logCharacteristicNotFoundError('Battery level', deviceId);
       return -1;
@@ -96,7 +99,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return null;
     }
 
-    var batteryLevelCharacteristic = getCharacteristic(_batteryService!, batteryLevelCharacteristicUuid);
+    var batteryLevelCharacteristic =
+        getCharacteristic(_batteryService!, batteryLevelCharacteristicUuid);
     if (batteryLevelCharacteristic == null) {
       logCharacteristicNotFoundError('Battery level', deviceId);
       return null;
@@ -136,7 +140,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return Future.value(<int>[]);
     }
 
-    var buttonStateCharacteristic = getCharacteristic(_buttonService!, buttonTriggerCharacteristicUuid);
+    var buttonStateCharacteristic =
+        getCharacteristic(_buttonService!, buttonTriggerCharacteristicUuid);
     if (buttonStateCharacteristic == null) {
       logCharacteristicNotFoundError('Button state', deviceId);
       return Future.value(<int>[]);
@@ -154,7 +159,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return null;
     }
 
-    var buttonDataStreamCharacteristic = getCharacteristic(_buttonService!, buttonTriggerCharacteristicUuid);
+    var buttonDataStreamCharacteristic =
+        getCharacteristic(_buttonService!, buttonTriggerCharacteristicUuid);
     if (buttonDataStreamCharacteristic == null) {
       logCharacteristicNotFoundError('Button data stream', deviceId);
       return null;
@@ -171,13 +177,17 @@ class OmiDeviceConnection extends DeviceConnection {
         }
         if (device.isConnected) {
           try {
-            await buttonDataStreamCharacteristic.setNotifyValue(true); // device could be disconnected here.
+            await buttonDataStreamCharacteristic
+                .setNotifyValue(true); // device could be disconnected here.
           } on PlatformException catch (e) {
             Logger.error('Error setting notify value for audio data stream $e');
           }
         } else {
-          Logger.handle(Exception('Device disconnected before setting notify value'), StackTrace.current,
-              message: 'Device is disconnected. Please reconnect and try again');
+          Logger.handle(
+              Exception('Device disconnected before setting notify value'),
+              StackTrace.current,
+              message:
+                  'Device is disconnected. Please reconnect and try again');
         }
       }
     } catch (e, stackTrace) {
@@ -186,7 +196,8 @@ class OmiDeviceConnection extends DeviceConnection {
     }
 
     debugPrint('Subscribed to button stream from Omi Device');
-    var listener = buttonDataStreamCharacteristic.lastValueStream.listen((value) {
+    var listener =
+        buttonDataStreamCharacteristic.lastValueStream.listen((value) {
       debugPrint("new button value ${value}");
       if (value.isNotEmpty) onButtonReceived(value);
     });
@@ -211,7 +222,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return null;
     }
 
-    var audioDataStreamCharacteristic = getCharacteristic(_omiService!, audioDataStreamCharacteristicUuid);
+    var audioDataStreamCharacteristic =
+        getCharacteristic(_omiService!, audioDataStreamCharacteristicUuid);
     if (audioDataStreamCharacteristic == null) {
       logCharacteristicNotFoundError('Audio data stream', deviceId);
       return null;
@@ -228,13 +240,17 @@ class OmiDeviceConnection extends DeviceConnection {
         }
         if (device.isConnected) {
           try {
-            await audioDataStreamCharacteristic.setNotifyValue(true); // device could be disconnected here.
+            await audioDataStreamCharacteristic
+                .setNotifyValue(true); // device could be disconnected here.
           } on PlatformException catch (e) {
             Logger.error('Error setting notify value for audio data stream $e');
           }
         } else {
-          Logger.handle(Exception('Device disconnected before setting notify value'), StackTrace.current,
-              message: 'Device is disconnected. Please reconnect and try again');
+          Logger.handle(
+              Exception('Device disconnected before setting notify value'),
+              StackTrace.current,
+              message:
+                  'Device is disconnected. Please reconnect and try again');
         }
       }
     } catch (e, stackTrace) {
@@ -243,7 +259,8 @@ class OmiDeviceConnection extends DeviceConnection {
     }
 
     debugPrint('Subscribed to audioBytes stream from Omi Device');
-    var listener = audioDataStreamCharacteristic.lastValueStream.listen((value) {
+    var listener =
+        audioDataStreamCharacteristic.lastValueStream.listen((value) {
       if (value.isNotEmpty) onAudioBytesReceived(value);
     });
 
@@ -265,7 +282,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return BleAudioCodec.pcm8;
     }
 
-    var audioCodecCharacteristic = getCharacteristic(_omiService!, audioCodecCharacteristicUuid);
+    var audioCodecCharacteristic =
+        getCharacteristic(_omiService!, audioCodecCharacteristicUuid);
     if (audioCodecCharacteristic == null) {
       logCharacteristicNotFoundError('Audio codec', deviceId);
       return BleAudioCodec.pcm8;
@@ -323,7 +341,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return Future.value(<int>[]);
     }
 
-    var storageListCharacteristic = getCharacteristic(_storageService!, storageReadControlCharacteristicUuid);
+    var storageListCharacteristic = getCharacteristic(
+        _storageService!, storageReadControlCharacteristicUuid);
     if (storageListCharacteristic == null) {
       logCharacteristicNotFoundError('Storage List', deviceId);
       return Future.value(<int>[]);
@@ -353,7 +372,8 @@ class OmiDeviceConnection extends DeviceConnection {
       }
     }
     debugPrint('storage list finished');
-    debugPrint('Storage lengths: ${storageLengths.length} items: ${storageLengths.join(', ')}');
+    debugPrint(
+        'Storage lengths: ${storageLengths.length} items: ${storageLengths.join(', ')}');
     return storageLengths;
   }
 
@@ -366,21 +386,24 @@ class OmiDeviceConnection extends DeviceConnection {
       return null;
     }
 
-    var storageDataStreamCharacteristic = getCharacteristic(_storageService!, storageDataStreamCharacteristicUuid);
+    var storageDataStreamCharacteristic = getCharacteristic(
+        _storageService!, storageDataStreamCharacteristicUuid);
     if (storageDataStreamCharacteristic == null) {
       logCharacteristicNotFoundError('Storage data stream', deviceId);
       return null;
     }
 
     try {
-      await storageDataStreamCharacteristic.setNotifyValue(true); // device could be disconnected here.
+      await storageDataStreamCharacteristic
+          .setNotifyValue(true); // device could be disconnected here.
     } catch (e, stackTrace) {
       logSubscribeError('Storage data stream', deviceId, e, stackTrace);
       return null;
     }
 
     debugPrint('Subscribed to StorageBytes stream from Omi Device');
-    var listener = storageDataStreamCharacteristic.lastValueStream.listen((value) {
+    var listener =
+        storageDataStreamCharacteristic.lastValueStream.listen((value) {
       if (value.isNotEmpty) onStorageBytesReceived(value);
     });
 
@@ -408,7 +431,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return false;
     }
 
-    var speakerDataStreamCharacteristic = getCharacteristic(_speakerService!, speakerDataStreamCharacteristicUuid);
+    var speakerDataStreamCharacteristic = getCharacteristic(
+        _speakerService!, speakerDataStreamCharacteristicUuid);
     if (speakerDataStreamCharacteristic == null) {
       logCharacteristicNotFoundError('Speaker data stream', deviceId);
       return false;
@@ -419,13 +443,15 @@ class OmiDeviceConnection extends DeviceConnection {
   }
 
   @override
-  Future<bool> performWriteToStorage(int numFile, int command, int offset) async {
+  Future<bool> performWriteToStorage(
+      int numFile, int command, int offset) async {
     if (_storageService == null) {
       logServiceNotFoundError('Storage Write', deviceId);
       return false;
     }
 
-    var storageDataStreamCharacteristic = getCharacteristic(_storageService!, storageDataStreamCharacteristicUuid);
+    var storageDataStreamCharacteristic = getCharacteristic(
+        _storageService!, storageDataStreamCharacteristicUuid);
     if (storageDataStreamCharacteristic == null) {
       logCharacteristicNotFoundError('Storage data stream', deviceId);
       return false;
@@ -441,8 +467,14 @@ class OmiDeviceConnection extends DeviceConnection {
       offset & 0xFF,
     ];
 
-    await storageDataStreamCharacteristic
-        .write([command & 0xFF, numFile & 0xFF, offsetBytes[0], offsetBytes[1], offsetBytes[2], offsetBytes[3]]);
+    await storageDataStreamCharacteristic.write([
+      command & 0xFF,
+      numFile & 0xFF,
+      offsetBytes[0],
+      offsetBytes[1],
+      offsetBytes[2],
+      offsetBytes[3]
+    ]);
     return true;
   }
   // Future<List<int>> performGetStorageList();
@@ -454,7 +486,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return;
     }
 
-    var imageCaptureControlCharacteristic = getCharacteristic(_omiService!, imageCaptureControlCharacteristicUuid);
+    var imageCaptureControlCharacteristic =
+        getCharacteristic(_omiService!, imageCaptureControlCharacteristicUuid);
     if (imageCaptureControlCharacteristic == null) {
       logCharacteristicNotFoundError('Image capture control', deviceId);
       return;
@@ -473,7 +506,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return;
     }
 
-    var imageCaptureControlCharacteristic = getCharacteristic(_omiService!, imageCaptureControlCharacteristicUuid);
+    var imageCaptureControlCharacteristic =
+        getCharacteristic(_omiService!, imageCaptureControlCharacteristicUuid);
     if (imageCaptureControlCharacteristic == null) {
       logCharacteristicNotFoundError('Image capture control', deviceId);
       return;
@@ -490,7 +524,8 @@ class OmiDeviceConnection extends DeviceConnection {
       logServiceNotFoundError('Omi', deviceId);
       return false;
     }
-    var imageCaptureControlCharacteristic = getCharacteristic(_omiService!, imageDataStreamCharacteristicUuid);
+    var imageCaptureControlCharacteristic =
+        getCharacteristic(_omiService!, imageDataStreamCharacteristicUuid);
     return imageCaptureControlCharacteristic != null;
   }
 
@@ -502,14 +537,16 @@ class OmiDeviceConnection extends DeviceConnection {
       return null;
     }
 
-    var imageStreamCharacteristic = getCharacteristic(_omiService!, imageDataStreamCharacteristicUuid);
+    var imageStreamCharacteristic =
+        getCharacteristic(_omiService!, imageDataStreamCharacteristicUuid);
     if (imageStreamCharacteristic == null) {
       logCharacteristicNotFoundError('Image data stream', deviceId);
       return null;
     }
 
     try {
-      await imageStreamCharacteristic.setNotifyValue(true); // device could be disconnected here.
+      await imageStreamCharacteristic
+          .setNotifyValue(true); // device could be disconnected here.
     } catch (e, stackTrace) {
       logSubscribeError('Image data stream', deviceId, e, stackTrace);
       return null;
@@ -568,7 +605,8 @@ class OmiDeviceConnection extends DeviceConnection {
       return null;
     }
 
-    var accelCharacteristic = getCharacteristic(_accelService!, accelDataStreamCharacteristicUuid);
+    var accelCharacteristic =
+        getCharacteristic(_accelService!, accelDataStreamCharacteristicUuid);
     if (accelCharacteristic == null) {
       logCharacteristicNotFoundError('Accelerometer', deviceId);
       return null;
@@ -623,8 +661,9 @@ class OmiDeviceConnection extends DeviceConnection {
           debugPrint('Accelerometer z direction: ${accelerometerData[2]}');
           debugPrint('Gyroscope z direction: ${accelerometerData[5]}\n');
           //simple threshold fall calcaultor
-          var fall_number =
-              sqrt(pow(accelerometerData[0], 2) + pow(accelerometerData[1], 2) + pow(accelerometerData[2], 2));
+          var fall_number = sqrt(pow(accelerometerData[0], 2) +
+              pow(accelerometerData[1], 2) +
+              pow(accelerometerData[2], 2));
           if (fall_number > 30.0) {
             AwesomeNotifications().createNotification(
               content: NotificationContent(

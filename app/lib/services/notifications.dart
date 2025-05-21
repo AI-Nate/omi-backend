@@ -95,7 +95,8 @@ class NotificationService {
   Future<bool> requestNotificationPermissions() async {
     bool isAllowed = await _awesomeNotifications.isNotificationAllowed();
     if (!isAllowed) {
-      isAllowed = await _awesomeNotifications.requestPermissionToSendNotifications();
+      isAllowed =
+          await _awesomeNotifications.requestPermissionToSendNotifications();
       register();
     }
     return isAllowed;
@@ -109,7 +110,8 @@ class NotificationService {
         'setNotificationOnKillService',
         {
           'title': "Your Omi Device Disconnected",
-          'description': "Please keep your app opened to continue using your Omi.",
+          'description':
+              "Please keep your app opened to continue using your Omi.",
         },
       );
     } catch (e) {
@@ -154,7 +156,12 @@ class NotificationService {
     debugPrint('createNotification: $allowed');
     if (!allowed) return;
     debugPrint('createNotification ~ Creating notification: $title');
-    showNotification(id: notificationId, title: title, body: body, wakeUpScreen: true, payload: payload);
+    showNotification(
+        id: notificationId,
+        title: title,
+        body: body,
+        wakeUpScreen: true,
+        payload: payload);
   }
 
   clearNotification(int id) => _awesomeNotifications.cancel(id);
@@ -178,34 +185,45 @@ class NotificationService {
 
         // plugin, daily summary
         final notificationType = data['notification_type'];
-        if (notificationType == 'plugin' || notificationType == 'daily_summary') {
+        if (notificationType == 'plugin' ||
+            notificationType == 'daily_summary') {
           data['from_integration'] = data['from_integration'] == 'true';
           _serverMessageStreamController.add(ServerMessage.fromJson(data));
         }
-        if (noti != null && _shouldShowForegroundNotificationOnFCMMessageReceived()) {
+        if (noti != null &&
+            _shouldShowForegroundNotificationOnFCMMessageReceived()) {
           _showForegroundNotification(noti: noti, payload: payload);
         }
         return;
       }
 
       // Announcement likes
-      if (noti != null && _shouldShowForegroundNotificationOnFCMMessageReceived()) {
-        _showForegroundNotification(noti: noti, layout: NotificationLayout.BigText);
+      if (noti != null &&
+          _shouldShowForegroundNotificationOnFCMMessageReceived()) {
+        _showForegroundNotification(
+            noti: noti, layout: NotificationLayout.BigText);
         return;
       }
     });
   }
 
-  final _serverMessageStreamController = StreamController<ServerMessage>.broadcast();
+  final _serverMessageStreamController =
+      StreamController<ServerMessage>.broadcast();
 
-  Stream<ServerMessage> get listenForServerMessages => _serverMessageStreamController.stream;
+  Stream<ServerMessage> get listenForServerMessages =>
+      _serverMessageStreamController.stream;
 
   Future<void> _showForegroundNotification(
       {required RemoteNotification noti,
       NotificationLayout layout = NotificationLayout.Default,
       Map<String, String?>? payload}) async {
     final id = Random().nextInt(10000);
-    showNotification(id: id, title: noti.title!, body: noti.body!, layout: layout, payload: payload);
+    showNotification(
+        id: id,
+        title: noti.title!,
+        body: noti.body!,
+        layout: layout,
+        payload: payload);
   }
 }
 
@@ -214,7 +232,8 @@ class NotificationUtil {
 
   static Future<void> initializeNotificationsEventListeners() async {
     // Only after at least the action method is set, the notification events are delivered
-    AwesomeNotifications().setListeners(onActionReceivedMethod: NotificationUtil.onActionReceivedMethod);
+    AwesomeNotifications().setListeners(
+        onActionReceivedMethod: NotificationUtil.onActionReceivedMethod);
   }
 
   static Future<void> initializeIsolateReceivePort() async {
@@ -225,28 +244,33 @@ class NotificationUtil {
     });
 
     // This initialization only happens on main isolate
-    IsolateNameServer.registerPortWithName(receivePort!.sendPort, 'notification_action_port');
+    IsolateNameServer.registerPortWithName(
+        receivePort!.sendPort, 'notification_action_port');
   }
 
   /// Use this method to detect when the user taps on a notification or action button
   @pragma("vm:entry-point")
-  static Future<void> onActionReceivedMethod(ReceivedAction receivedAction) async {
+  static Future<void> onActionReceivedMethod(
+      ReceivedAction receivedAction) async {
     if (receivePort != null) {
       await onActionReceivedMethodImpl(receivedAction);
     } else {
       print(
           'onActionReceivedMethod was called inside a parallel dart isolate, where receivePort was never initialized.');
-      SendPort? sendPort = IsolateNameServer.lookupPortByName('notification_action_port');
+      SendPort? sendPort =
+          IsolateNameServer.lookupPortByName('notification_action_port');
 
       if (sendPort != null) {
-        print('Redirecting the execution to main isolate process in listening...');
+        print(
+            'Redirecting the execution to main isolate process in listening...');
         dynamic serializedData = receivedAction.toMap();
         sendPort.send(serializedData);
       }
     }
   }
 
-  static Future<void> onActionReceivedMethodImpl(ReceivedAction receivedAction) async {
+  static Future<void> onActionReceivedMethodImpl(
+      ReceivedAction receivedAction) async {
     if (receivedAction.payload == null || receivedAction.payload!.isEmpty) {
       return;
     }
@@ -267,7 +291,7 @@ class NotificationUtil {
       return;
     }
 
-    MyApp.navigatorKey.currentState
-        ?.pushReplacement(MaterialPageRoute(builder: (context) => HomePageWrapper(navigateToRoute: navigateTo)));
+    MyApp.navigatorKey.currentState?.pushReplacement(MaterialPageRoute(
+        builder: (context) => HomePageWrapper(navigateToRoute: navigateTo)));
   }
 }

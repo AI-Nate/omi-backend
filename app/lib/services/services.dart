@@ -188,7 +188,8 @@ class BackgroundService {
     Function()? onStop,
     Function()? onInitializing,
   }) {
-    StreamSubscription? recordAudioByteStream = _service.on('recorder.ui.audioBytes').listen((event) {
+    StreamSubscription? recordAudioByteStream =
+        _service.on('recorder.ui.audioBytes').listen((event) {
       Uint8List bytes = Uint8List.fromList(event!['data'].cast<int>());
       onByteReceived(bytes);
     });
@@ -298,7 +299,8 @@ class MicRecorderService implements IMicRecorderService {
     Function()? onInitializing,
   }) async {
     if (_status == RecorderServiceStatus.recording) {
-      throw Exception("Recorder is recording, please stop it before start new recording.");
+      throw Exception(
+          "Recorder is recording, please stop it before start new recording.");
     }
     if (_status == RecorderServiceStatus.initialising) {
       throw Exception("Recorder is initialising");

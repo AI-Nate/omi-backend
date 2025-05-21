@@ -124,7 +124,9 @@ class _AppsList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final availableApps = provider.appsList.where((app) => app.worksWithMemories() && app.enabled).toList();
+    final availableApps = provider.appsList
+        .where((app) => app.worksWithMemories() && app.enabled)
+        .toList();
 
     return ListView(
       children: [
@@ -133,7 +135,8 @@ class _AppsList extends StatelessWidget {
           app: null,
           isSelected: false,
           onTap: () => _handleAutoAppTap(context),
-          trailingIcon: const Icon(Icons.autorenew, color: Colors.white, size: 20),
+          trailingIcon:
+              const Icon(Icons.autorenew, color: Colors.white, size: 20),
         ),
 
         // List of installed apps
@@ -162,7 +165,18 @@ class _AppsList extends StatelessWidget {
     );
 
     provider.clearSelectedAppForReprocessing();
-    await provider.reprocessConversation();
+    final success = await provider.reprocessConversation();
+
+    // Ensure conversation data is refreshed to show updated content
+    if (success && provider.conversationProvider != null) {
+      await provider.conversationProvider!.updateSearchedConvoDetails(
+          provider.conversation.id,
+          provider.selectedDate,
+          provider.conversationIdx);
+      provider.updateConversation(
+          provider.conversationIdx, provider.selectedDate);
+      provider.notifyListeners();
+    }
     return;
   }
 
@@ -182,7 +196,18 @@ class _AppsList extends StatelessWidget {
       Navigator.pop(context);
       provider.setSelectedAppForReprocessing(app);
       provider.setPreferredSummarizationApp(app.id);
-      await provider.reprocessConversation(appId: app.id);
+      final success = await provider.reprocessConversation(appId: app.id);
+
+      // Ensure conversation data is refreshed to show updated content
+      if (success && provider.conversationProvider != null) {
+        await provider.conversationProvider!.updateSearchedConvoDetails(
+            provider.conversation.id,
+            provider.selectedDate,
+            provider.conversationIdx);
+        provider.updateConversation(
+            provider.conversationIdx, provider.selectedDate);
+        provider.notifyListeners();
+      }
       return;
     }
   }
@@ -222,7 +247,9 @@ class _AppListItem extends StatelessWidget {
               style: const TextStyle(color: Colors.grey, fontSize: 12),
             )
           : null,
-      trailing: isSelected ? const Icon(Icons.check, color: Colors.white, size: 20) : trailingIcon,
+      trailing: isSelected
+          ? const Icon(Icons.check, color: Colors.white, size: 20)
+          : trailingIcon,
       selected: isSelected,
       onTap: onTap,
     );
@@ -298,12 +325,15 @@ class _EnableAppsListItem extends StatelessWidget {
           fontSize: 16,
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+      trailing:
+          const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
       onTap: () {
         Navigator.pop(context);
-        final conversationId = context.read<ConversationDetailProvider>().conversation?.id;
+        final conversationId =
+            context.read<ConversationDetailProvider>().conversation?.id;
         if (conversationId != null) {
-          MixpanelManager().summarizedAppEnableAppsClicked(conversationId: conversationId);
+          MixpanelManager()
+              .summarizedAppEnableAppsClicked(conversationId: conversationId);
         }
         routeToPage(context, const AppsPage(showAppBar: true));
         MixpanelManager().pageOpened('Detail Apps');

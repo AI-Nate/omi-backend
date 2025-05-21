@@ -564,6 +564,8 @@ class GetAppsWidgets extends StatelessWidget {
         final summarizedApp = provider.getSummarizedApp();
         final structured = provider.conversation.structured;
         final hasStructuredOverview = structured.overview.trim().isNotEmpty;
+        final isProcessingImage = provider.loadingImageAnalysis;
+        final hasImageEnhancement = provider.hasImageEnhancedSummary;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -580,13 +582,73 @@ class GetAppsWidgets extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Summary',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge!
-                                  .copyWith(fontSize: 20),
-                              textAlign: TextAlign.start,
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Summary',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge!
+                                        .copyWith(fontSize: 20),
+                                    textAlign: TextAlign.start,
+                                  ),
+                                  if (isProcessingImage) ...[
+                                    const SizedBox(width: 8),
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                                Colors.white),
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Enhancing with image...',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ] else if (hasImageEnhancement) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color:
+                                                Colors.purple.withOpacity(0.5)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.image,
+                                            size: 12,
+                                            color: Colors.purple,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          const Text(
+                                            'Image Enhanced',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.purple,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                             IconButton(
                               icon: const Icon(Icons.copy_rounded,
@@ -1175,6 +1237,42 @@ class GetSheetMainOptions extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
+          Card(
+            shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8))),
+            child: Column(
+              children: [
+                ListTile(
+                  title: const Text('Add Image to Summary'),
+                  leading: provider.loadingImageAnalysis
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.add_photo_alternate),
+                  subtitle: provider.loadingImageAnalysis
+                      ? const Text(
+                          'Enhancing summary with image content...',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        )
+                      : null,
+                  onTap: provider.loadingImageAnalysis
+                      ? null
+                      : () async {
+                          Navigator.pop(context);
+                          provider.addImageToSummary(context);
+                        },
+                )
+              ],
+            ),
+          ),
           const SizedBox(height: 4),
           Card(
             shape: const RoundedRectangleBorder(
@@ -1182,42 +1280,6 @@ class GetSheetMainOptions extends StatelessWidget {
             ),
             child: Column(
               children: [
-                //ListTile(
-                //  title: Text(provider.conversation.discarded ? 'Summarize' : 'Re-summarize'),
-                //  leading: provider.loadingReprocessConversation
-                //      ? const SizedBox(
-                //          width: 24,
-                //          height: 24,
-                //          child: CircularProgressIndicator(
-                //            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                //          ),
-                //        )
-                //      : const Icon(Icons.refresh),
-                //  onTap: provider.loadingReprocessConversation
-                //      ? null
-                //      : () async {
-                //          final connectivityProvider = Provider.of<ConnectivityProvider>(context, listen: false);
-                //          if (connectivityProvider.isConnected) {
-                //            await provider.reprocessConversation();
-                //            if (context.mounted) {
-                //              Navigator.pop(context);
-                //            }
-                //          } else {
-                //            showDialog(
-                //              builder: (c) => getDialog(
-                //                context,
-                //                () => Navigator.pop(context),
-                //                () => Navigator.pop(context),
-                //                'Unable to Re-summarize Conversation',
-                //                'Please check your internet connection and try again.',
-                //                singleButton: true,
-                //                okButtonText: 'OK',
-                //              ),
-                //              context: context,
-                //            );
-                //          }
-                //        },
-                //),
                 ListTile(
                   title: const Text('Delete'),
                   leading: const Icon(
