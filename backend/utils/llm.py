@@ -1851,13 +1851,46 @@ def identify_category_for_memory(memory: str, categories: List) -> str:
 
 
 def generate_summary_with_prompt(conversation_text: str, prompt: str) -> str:
-    prompt = f"""
-    Your task is: {prompt}
-
-    The conversation is:
+    full_prompt = f"""
+    {prompt}
+    
+    Conversation text:
     {conversation_text}
-
-    You must output only the summary, no other text. Make sure to be concise and clear.
     """
-    response = llm_mini.invoke(prompt)
+    response = llm_medium.invoke(full_prompt)
     return response.content
+
+
+def process_prompt(pydantic_object, prompt_text, model_name="gpt-4o", temperature=0.1):
+    """
+    Process a prompt using a specified model and return structured output.
+    
+    Args:
+        pydantic_object: The Pydantic model class to parse the output into
+        prompt_text: The prompt text to send to the model
+        model_name: The name of the model to use (default: "gpt-4o")
+        temperature: The temperature to use for generation (default: 0.1)
+        
+    Returns:
+        An instance of the specified Pydantic model
+    """
+    # Select the appropriate model based on the model_name
+    if model_name == "gpt-4o-mini":
+        model = llm_mini
+    elif model_name == "gpt-4o":
+        model = llm_medium
+    elif model_name == "o1-preview":
+        model = llm_large
+    else:
+        # Default to medium model if unspecified
+        model = llm_medium
+    
+    # Create model with structured output
+    with_parser = model.with_structured_output(pydantic_object)
+    
+    # Override temperature if needed
+    if temperature != 0.1:
+        with_parser = with_parser.bind(temperature=temperature)
+    
+    # Process the prompt and return structured output
+    return with_parser.invoke(prompt_text)
