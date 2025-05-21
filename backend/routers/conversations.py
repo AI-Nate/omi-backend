@@ -439,65 +439,173 @@ def process_image_summary(
     uid: str = Depends(auth.get_current_user_uid)
 ):
     """
-    Process an image description and update the conversation summary with insights from the image.
+    Process one or more image descriptions and update the conversation summary with insights from the images.
+    Handles both single image descriptions and an array of image descriptions.
     """
     # Get the existing conversation
     conversation = _get_conversation_by_id(uid, conversation_id)
     
-    # Extract image description from request body
+    # Check if we're receiving a single image description or multiple
     image_description = image_data.get("image_description", "")
-    if not image_description:
+    image_descriptions = image_data.get("image_descriptions", [])
+    
+    # Handle both single image and multiple images cases
+    if not image_description and not image_descriptions:
         raise HTTPException(status_code=400, detail="Image description is required")
-
+    
+    # If we have a single image description, add it to the list
+    if image_description:
+        image_descriptions.append(image_description)
+    
     # Get user language preference (or use English as default)
     user_language = users_db.get_user_language_preference(uid) or 'English'
     # Since we don't have a direct function to get the user's name, we'll use a default
     user_name = 'User'
     
-    # Create a prompt to analyze the image and update the summary
-    prompt = f"""
-    Based on this conversation transcript and image description, provide an updated:
-    1. Overview (a concise summary integrating the image content)
-    2. Key Takeaways (3-5 bullet points, including insights from the image)
-    3. Things to Improve (2-3 practical suggestions personalized for {user_name}, incorporating image insights)
-    4. Things to Learn (1-2 topics worth exploring tailored to {user_name}'s interests, related to the image content)
+    # Get existing transcript
+    transcript = get_conversation_transcript(conversation)
     
-    User Information for Personalization:
-    - Name: {user_name}
-    - Primary language: {user_language}
+    # If this is the first image analysis for this conversation, we'll do a complete analysis
+    # For subsequent images, we'll do an incremental analysis to avoid overwriting previous insights
+    is_first_analysis = not conversation.get('structured', {}).get('key_takeaways', [])
     
-    Make all sections highly personalized, actionable, and relevant based on both the conversation and the image content.
-    
-    Transcript:
-    {get_conversation_transcript(conversation)}
-    
-    Image Description:
-    {image_description.strip()}
-    """
-    
-    # Process the prompt with the LLM
-    result = process_prompt(
-        EnhancedSummaryOutput,
-        prompt,
-        model_name="gpt-4o",
-        temperature=0.1
-    )
-    
-    # Update the structured data with the enhanced summary
-    if 'structured' not in conversation:
-        conversation['structured'] = {}
-    
-    structured = conversation['structured']
-    structured['overview'] = result.overview
-    structured['key_takeaways'] = result.key_takeaways
-    structured['things_to_improve'] = result.things_to_improve
-    structured['things_to_learn'] = result.things_to_learn
+    if is_first_analysis:
+        # Create a prompt to analyze the images and generate a new summary
+        images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
+        prompt = f"""
+        Based on this conversation transcript and the following image descriptions, provide a comprehensive:
+        1. Overview (a concise summary integrating the image content)
+        2. Key Takeaways (3-5 bullet points, including insights from the images)
+        3. Things to Improve (2-3 practical suggestions personalized for {user_name}, incorporating image insights)
+        4. Things to Learn (1-2 topics worth exploring tailored to {user_name}'s interests, related to the image content)
+        
+        User Information for Personalization:
+        - Name: {user_name}
+        - Primary language: {user_language}
+        
+        Make all sections highly personalized, actionable, and relevant based on both the conversation and the image content.
+        
+        Transcript:
+        {transcript}
+        
+        Images Descriptions:
+        {images_text}
+        """
+        
+        # Process the prompt with the LLM
+        result = process_prompt(
+            EnhancedSummaryOutput,
+            prompt,
+            model_name="gpt-4o",
+            temperature=0.1
+        )
+        
+        # Update the structured data with the enhanced summary
+        if 'structured' not in conversation:
+            conversation['structured'] = {}
+        
+        structured = conversation['structured']
+        structured['overview'] = result.overview
+        structured['key_takeaways'] = result.key_takeaways
+        structured['things_to_improve'] = result.things_to_improve
+        structured['things_to_learn'] = result.things_to_learn
+    else:
+        # For incremental updates, we'll analyze only the new images and merge insights
+        # with the existing summary
+        existing_structured = conversation.get('structured', {})
+        existing_overview = existing_structured.get('overview', "")
+        existing_takeaways = existing_structured.get('key_takeaways', [])
+        existing_improvements = existing_structured.get('things_to_improve', [])
+        existing_learnings = existing_structured.get('things_to_learn', [])
+        
+        # Create a prompt to analyze the images and provide incremental insights
+        images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
+        prompt = f"""
+        Based on this conversation transcript, the existing summary, and the new image descriptions, provide additional insights to enhance the current summary.
+        
+        User Information for Personalization:
+        - Name: {user_name}
+        - Primary language: {user_language}
+        
+        Transcript:
+        {transcript}
+        
+        Existing Summary Overview:
+        {existing_overview}
+        
+        Existing Key Takeaways:
+        {", ".join(existing_takeaways)}
+        
+        Existing Things to Improve:
+        {", ".join(existing_improvements)}
+        
+        Existing Things to Learn:
+        {", ".join(existing_learnings)}
+        
+        New Image Descriptions:
+        {images_text}
+        
+        Please provide:
+        1. Updated Overview (integrate new insights from the images with the existing overview)
+        2. Additional Key Takeaways (new points not covered in existing takeaways)
+        3. Additional Things to Improve (new suggestions based on image content)
+        4. Additional Things to Learn (new topics related to the image content)
+        
+        Make all additions highly personalized, actionable, and relevant based on both the conversation and the new image content.
+        Avoid repeating existing points.
+        """
+        
+        # Process the prompt with the LLM
+        result = process_prompt(
+            EnhancedSummaryOutput,
+            prompt,
+            model_name="gpt-4o",
+            temperature=0.1
+        )
+        
+        # Merge the new insights with the existing structured data
+        structured = conversation.get('structured', {})
+        
+        # Update overview by appending new insights if they don't already exist
+        if not structured.get('overview'):
+            structured['overview'] = result.overview
+        else:
+            # Check if the new overview contains significant new content to add
+            if not _contains_similar_content(structured['overview'], result.overview):
+                structured['overview'] = f"{structured['overview']}\n\nAdditional insights from new images: {result.overview}"
+        
+        # Update lists by adding new unique items
+        existing_takeaways = structured.get('key_takeaways', [])
+        for takeaway in result.key_takeaways:
+            if not _contains_similar_item(existing_takeaways, takeaway):
+                existing_takeaways.append(takeaway)
+        structured['key_takeaways'] = existing_takeaways
+        
+        existing_improvements = structured.get('things_to_improve', [])
+        for improvement in result.things_to_improve:
+            if not _contains_similar_item(existing_improvements, improvement):
+                existing_improvements.append(improvement)
+        structured['things_to_improve'] = existing_improvements
+        
+        existing_learnings = structured.get('things_to_learn', [])
+        for learning in result.things_to_learn:
+            if not _contains_similar_item(existing_learnings, learning):
+                existing_learnings.append(learning)
+        structured['things_to_learn'] = existing_learnings
     
     # Update the conversation in the database
     conversations_db.upsert_conversation(uid, conversation)
     
     return Conversation(**conversation)
 
+# Helper function to check if a list already contains a similar item
+def _contains_similar_item(items, new_item):
+    return any(item.lower() in new_item.lower() or new_item.lower() in item.lower() for item in items)
+
+# Helper function to check if text already contains similar content
+def _contains_similar_content(existing_text, new_text):
+    # Simple check - can be made more sophisticated if needed
+    return existing_text.lower() in new_text.lower() or new_text.lower() in existing_text.lower()
 
 @router.post("/v1/conversations/{conversation_id}/enhanced-summary", response_model=Conversation,
             tags=['conversations'])
