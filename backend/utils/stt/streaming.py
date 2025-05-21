@@ -19,6 +19,10 @@ DEEPGRAM_LOCK = asyncio.Lock()
 NOVA3_LOCK = asyncio.Lock()
 NOVA3_IN_USE = False
 
+# Environment flag to completely disable nova-3 due to rate limiting issues
+NOVA3_ENABLED = os.getenv('DEEPGRAM_ENABLE_NOVA3', '').lower() in ('true', '1', 'yes')
+print(f"Nova-3 is {'enabled' if NOVA3_ENABLED else 'disabled'} based on environment setting")
+
 class STTService(str, Enum):
     deepgram = "deepgram"
     soniox = "soniox"
@@ -44,10 +48,15 @@ deepgram_nova2_multi_languages = ['multi', 'en', 'es']
 deepgram_multi_languages = ["multi", "en", "en-US", "en-AU", "en-GB", "en-NZ", "en-IN", "es", "es-419", "fr", "fr-CA", "de", "hi", "ru", "pt", "pt-BR", "pt-PT", "ja", "it", "nl", "nl-BE"]
 
 def get_stt_service_for_language(language: str):
-    # Check if nova-3 is available - if not, we'll use nova-2
-    nova3_available = not NOVA3_IN_USE
+    # Check if nova-3 is available and enabled - if not, we'll use nova-2
+    nova3_available = NOVA3_ENABLED and not NOVA3_IN_USE
+    
+    if not NOVA3_ENABLED:
+        print("Using nova-2-general because nova-3 is disabled by configuration")
+    elif NOVA3_IN_USE:
+        print("Using nova-2-general because nova-3 is already in use")
 
-    # Deepgram's 'multi', nova-3 (when available)
+    # Deepgram's 'multi', nova-3 (when available and enabled)
     if nova3_available and language in deepgram_multi_languages:
         return STTService.deepgram, 'multi', 'nova-3'
 
@@ -139,20 +148,26 @@ async def process_audio_dg(
 ):
     print('process_audio_dg', language, sample_rate, channels, preseconds)
 
-    # Special handling for nova-3 which only allows one concurrent connection
-    global NOVA3_IN_USE
-    is_nova3 = model == "nova-3"
-    
-    # If trying to use nova-3 and it's already in use, fall back to nova-2
-    if is_nova3:
-        async with NOVA3_LOCK:
-            if NOVA3_IN_USE:
-                print("nova-3 is already in use, falling back to nova-2-general")
-                model = "nova-2-general"
-                is_nova3 = False
-            else:
-                NOVA3_IN_USE = True
-                print("Acquired exclusive lock for nova-3")
+    # If nova-3 is disabled by config and we're trying to use it, fall back immediately
+    if model == "nova-3" and not NOVA3_ENABLED:
+        print("Nova-3 is disabled by configuration, falling back to nova-2-general")
+        model = "nova-2-general"
+        is_nova3 = False
+    else:
+        # Special handling for nova-3 which only allows one connection at a time
+        global NOVA3_IN_USE
+        is_nova3 = model == "nova-3"
+        
+        # If trying to use nova-3 and it's already in use, fall back to nova-2
+        if is_nova3:
+            async with NOVA3_LOCK:
+                if NOVA3_IN_USE:
+                    print("nova-3 is already in use, falling back to nova-2-general")
+                    model = "nova-2-general"
+                    is_nova3 = False
+                else:
+                    NOVA3_IN_USE = True
+                    print("Acquired exclusive lock for nova-3")
 
     def on_message(self, result, **kwargs):
         # print(f"Received message from Deepgram")  # Log when message is received
@@ -210,7 +225,10 @@ async def process_audio_dg(
             asyncio.create_task(release_nova3())
 
     # Attempt to connect with max_retries and backoff strategy
-    max_retries = int(os.getenv('DEEPGRAM_MAX_RETRIES', '5'))
+    max_retries = int(os.getenv('DEEPGRAM_MAX_RETRIES', '3'))
+    
+    # Track if we've already attempted to fall back to nova-2
+    tried_fallback = False
     
     try:
         for attempt in range(max_retries):
@@ -226,6 +244,18 @@ async def process_audio_dg(
                     
                 print(f"Connecting to Deepgram (attempt {attempt+1}/{max_retries})")
                 
+                # Add a guard against rate limits - if we're on attempt > 1 and still using nova-3, try nova-2
+                if attempt > 0 and is_nova3 and not tried_fallback:
+                    print("Failed with nova-3, falling back to nova-2-general for better reliability")
+                    # Release nova-3 lock
+                    async with NOVA3_LOCK:
+                        NOVA3_IN_USE = False
+                        print("Released exclusive lock for nova-3 for fallback to nova-2")
+                    # Switch to nova-2
+                    model = "nova-2-general"
+                    is_nova3 = False
+                    tried_fallback = True
+                
                 # Use a global lock to prevent concurrent connection attempts
                 async with DEEPGRAM_LOCK:
                     # Add forced delay between connection attempts (from env or default to 5s)
@@ -239,7 +269,7 @@ async def process_audio_dg(
                     client = create_deepgram_client(is_beta=is_beta)
                     
                     # Set up connection
-                    print(f"Setting up connection with {'beta' if is_beta else 'standard'} client")
+                    print(f"Setting up connection with {'beta' if is_beta else 'standard'} client for {model}")
                     dg_connection = client.listen.websocket.v("1")
                     
                     # Register event handlers
@@ -291,24 +321,22 @@ async def process_audio_dg(
                     # Start the connection with options
                     try:
                         result = dg_connection.start(options)
-                        print('Deepgram connection started:', result)
+                        print(f'Deepgram connection started with {model}:', result)
                         return dg_connection
                     except websockets.exceptions.WebSocketException as e:
                         if "HTTP 429" in str(e):
                             print(f"Rate limit exceeded (HTTP 429) when starting connection")
                             # If using nova-3 and getting rate limited, try with nova-2 instead
-                            if is_nova3 and attempt == max_retries - 1:
+                            if is_nova3 and not tried_fallback:
                                 print("Falling back to nova-2-general due to rate limits with nova-3")
                                 # Release nova-3 lock
                                 async with NOVA3_LOCK:
                                     NOVA3_IN_USE = False
                                     print("Released exclusive lock for nova-3 due to rate limit")
-                                # Retry with nova-2
-                                return await process_audio_dg(
-                                    stream_transcript, language, sample_rate, channels, 
-                                    preseconds=preseconds, model="nova-2-general", 
-                                    websocket_active_check=websocket_active_check
-                                )
+                                # Retry with nova-2 on the next iteration
+                                model = "nova-2-general"
+                                is_nova3 = False
+                                tried_fallback = True
                             # Let the outer try/except handle the backoff
                             raise
                         elif "HTTP 403" in str(e):
@@ -324,6 +352,19 @@ async def process_audio_dg(
                 
                 # Handle rate limits with longer backoff times
                 if "HTTP 429" in str(e) or "Rate limit exceeded" in str(e):
+                    if is_nova3 and not tried_fallback:
+                        # If nova-3 rate limited, immediately try nova-2
+                        print("Rate limited with nova-3, immediately falling back to nova-2-general")
+                        # Release nova-3 lock
+                        async with NOVA3_LOCK:
+                            NOVA3_IN_USE = False
+                            print("Released exclusive lock for nova-3 due to rate limit exception")
+                        # Switch to nova-2 for the next attempt
+                        model = "nova-2-general"
+                        is_nova3 = False
+                        tried_fallback = True
+                        continue  # Skip the backoff and retry immediately with nova-2
+                        
                     if attempt < max_retries - 1:  # If not the last attempt
                         # Use an aggressive backoff for rate limits
                         backoff_delay = calculate_backoff_with_jitter(
@@ -333,21 +374,13 @@ async def process_audio_dg(
                         )
                         print(f"Rate limit exceeded. Waiting {backoff_delay:.0f}ms before retry...")
                         await asyncio.sleep(backoff_delay / 1000)
-                    elif is_nova3:
-                        # If we're using nova-3 and can't connect after max retries, fall back to nova-2
-                        print("Maximum nova-3 retry attempts reached. Falling back to nova-2-general")
-                        # Release nova-3 lock
-                        async with NOVA3_LOCK:
-                            NOVA3_IN_USE = False
-                            print("Released exclusive lock for nova-3 due to max retries")
-                        # Retry with nova-2
-                        return await process_audio_dg(
-                            stream_transcript, language, sample_rate, channels, 
-                            preseconds=preseconds, model="nova-2-general", 
-                            websocket_active_check=websocket_active_check
-                        )
                     else:
                         print(f"Maximum retry attempts reached for rate limit. Giving up.")
+                        # Release nova-3 lock if we were using it
+                        if is_nova3:
+                            async with NOVA3_LOCK:
+                                NOVA3_IN_USE = False
+                                print("Released exclusive lock for nova-3 due to max retries")
                         raise Exception("Maximum retry attempts reached for Deepgram rate limit")
                 elif "Client disconnected" in str(e):
                     # Don't retry if the client has disconnected
