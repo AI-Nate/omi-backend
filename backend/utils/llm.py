@@ -751,6 +751,8 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
             # Configure a special ChatOpenAI instance for web search
             search_llm = ChatOpenAI(
                 model="gpt-4o-search-preview",
+                temperature=None,  # Disable temperature parameter
+                n=None,  # Disable n parameter
                 extra_body={
                     "web_search_options": {
                         "search_context_size": search_context_size,
