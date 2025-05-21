@@ -1,8 +1,8 @@
 import json
 import re
 import os
-from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Tuple, Dict
 
 import tiktoken
 from langchain.schema import (
@@ -14,6 +14,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from pydantic import BaseModel, Field, ValidationError
+import pytz
 
 from database.redis_db import add_filter_category_item
 from models.app import App
@@ -122,72 +123,167 @@ def should_discard_conversation(transcript: str) -> bool:
         return False
 
 
+class SummaryOutput(BaseModel):
+    summary: str = Field(description="The extracted content, maximum 500 words.")
+
+
+class EnhancedSummaryOutput(BaseModel):
+    title: str = Field(description="A title/name for this conversation", default='')
+    overview: str = Field(
+        description="A brief overview of the conversation, highlighting the key details from it",
+        default='',
+    )
+    emoji: str = Field(description="An emoji to represent the conversation", default='🧠')
+    category: str = Field(description="A category for this conversation", default='other')
+    key_takeaways: List[str] = Field(
+        description="3-5 key takeaways from the conversation",
+        default=[],
+    )
+    things_to_improve: List[str] = Field(
+        description="2-3 things that could be improved based on the conversation",
+        default=[],
+    )
+    things_to_learn: List[str] = Field(
+        description="1-2 things worth learning more about based on the conversation",
+        default=[],
+    )
+    action_items: List[str] = Field(description="A list of action items from the conversation", default=[])
+    events: List[Dict] = Field(
+        description="A list of events extracted from the conversation, that the user must have on his calendar.",
+        default=[],
+    )
+
+
 def get_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str) -> Structured:
-    prompt_text = '''You are an expert conversation analyzer. Your task is to analyze the conversation and provide structure and clarity to the recording transcription of a conversation.
-    The conversation language is {language_code}. Use the same language {language_code} for your response.
+    if len(transcript) == 0:
+        return Structured(title='', overview='')
 
-    For the title, use the main topic of the conversation.
-    For the overview, condense the conversation into a summary with the main topics discussed, make sure to capture the key points and important details from the conversation.
-    For the emoji, select a single emoji that vividly reflects the core subject, mood, or outcome of the conversation. Strive for an emoji that is specific and evocative, rather than generic (e.g., prefer 🎉 for a celebration over 👍 for general agreement, or 💡 for a new idea over 🧠 for general thought).
-    For the action items, include a list of commitments, specific tasks or actionable steps from the conversation that the user is planning to do or has to do on that specific day or in future. Remember the speaker is busy so this has to be very efficient and concise, otherwise they might miss some critical tasks. Specify which speaker is responsible for each action item.
-    For the category, classify the conversation into one of the available categories.
-    For Calendar Events, include a list of events extracted from the conversation, that the user must have on his calendar. For date context, this conversation happened on {started_at}. {tz} is the user's timezone, convert it to UTC and respond in UTC.
+    prompt = f'''
+    You will be given a finished conversation transcript.
+    
+    Your task is to create an enhanced summary of this conversation, including:
+    1. A descriptive title that captures the essence of the conversation
+    2. A concise overview of what was discussed (1-2 paragraphs)
+    3. 3-5 key takeaways from the conversation
+    4. 2-3 things that could be improved based on the conversation
+    5. 1-2 topics worth learning more about based on the conversation
+    6. Any action items that need to be done
+    7. Any calendar events mentioned that should be scheduled
+    
+    For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
+    Be thorough but concise. Prioritize the most important information.
 
-    Transcript: ```{transcript}```
+    Finished Conversation:
+    {transcript}
+    '''.replace('    ', '').strip()
 
-    {format_instructions}'''.replace('    ', '').strip()
+    with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
+    response: EnhancedSummaryOutput = with_parser.invoke(prompt)
 
-    prompt = ChatPromptTemplate.from_messages([('system', prompt_text)])
-    chain = prompt | llm_mini | parser
+    structured = Structured(
+        title=response.title,
+        overview=response.overview,
+        emoji=response.emoji,
+        category=response.category,
+    )
 
-    response = chain.invoke({
-        'transcript': transcript.strip(),
-        'format_instructions': parser.get_format_instructions(),
-        'language_code': language_code,
-        'started_at': started_at.isoformat(),
-        'tz': tz,
-    })
+    # Add enhanced fields
+    structured.keyTakeaways = response.key_takeaways
+    structured.thingsToImprove = response.things_to_improve
+    structured.thingsToLearn = response.things_to_learn
 
-    for event in (response.events or []):
-        if event.duration > 180:
-            event.duration = 180
-        event.created = False
-    return response
+    # Process action items and events
+    for item in response.action_items:
+        structured.action_items.append(ActionItem(description=item))
+
+    for event in response.events:
+        description = event.get('description', '')
+        title = event.get('title', '')
+        # Process the start time
+        starts_at = None
+        try:
+            starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
+        except:
+            starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
+
+        duration = event.get('duration', 30)  # default 30 minutes
+
+        structured.events.append(Event(
+            title=title,
+            starts_at=starts_at,
+            duration=duration,
+            description=description,
+        ))
+
+    return structured
 
 
 def get_reprocess_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str,
                                        title: str) -> Structured:
-    prompt_text = '''You are an expert conversation analyzer. Your task is to analyze the conversation and provide structure and clarity to the recording transcription of a conversation.
-    The conversation language is {language_code}. Use the same language {language_code} for your response.
+    if len(transcript) == 0:
+        return Structured(title='', overview='')
 
-    For the title, use ```{title}```, if it is empty, use the main topic of the conversation.
-    For the overview, condense the conversation into a summary with the main topics discussed, make sure to capture the key points and important details from the conversation.
-    For the emoji, select a single emoji that vividly reflects the core subject, mood, or outcome of the conversation. Strive for an emoji that is specific and evocative, rather than generic (e.g., prefer 🎉 for a celebration over 👍 for general agreement, or 💡 for a new idea over 🧠 for general thought).
-    For the action items, include a list of commitments, specific tasks or actionable steps from the conversation that the user is planning to do or has to do on that specific day or in future. Remember the speaker is busy so this has to be very efficient and concise, otherwise they might miss some critical tasks. Specify which speaker is responsible for each action item.
-    For the category, classify the conversation into one of the available categories.
-    For Calendar Events, include a list of events extracted from the conversation, that the user must have on his calendar. For date context, this conversation happened on {started_at}. {tz} is the user's timezone, convert it to UTC and respond in UTC.
+    prompt = f'''
+    You will be given a finished conversation transcript.
+    
+    Your task is to create an enhanced summary of this conversation, including:
+    1. A descriptive title (unless provided - use the existing title if given)
+    2. A concise overview of what was discussed (1-2 paragraphs)
+    3. 3-5 key takeaways from the conversation
+    4. 2-3 things that could be improved based on the conversation
+    5. 1-2 topics worth learning more about based on the conversation 
+    6. Any action items that need to be done
+    7. Any calendar events mentioned that should be scheduled
+    
+    For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
+    Be thorough but concise. Prioritize the most important information.
+    
+    Existing Title: {title}
+    
+    Finished Conversation:
+    {transcript}
+    '''.replace('    ', '').strip()
 
-    Transcript: ```{transcript}```
+    with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
+    response: EnhancedSummaryOutput = with_parser.invoke(prompt)
 
-    {format_instructions}'''.replace('    ', '').strip()
+    # Use existing title if provided, otherwise use generated title
+    structured = Structured(
+        title=title if title else response.title,
+        overview=response.overview,
+        emoji=response.emoji,
+        category=response.category,
+    )
 
-    prompt = ChatPromptTemplate.from_messages([('system', prompt_text)])
-    chain = prompt | llm_mini | parser
+    # Add enhanced fields
+    structured.keyTakeaways = response.key_takeaways
+    structured.thingsToImprove = response.things_to_improve
+    structured.thingsToLearn = response.things_to_learn
 
-    response = chain.invoke({
-        'transcript': transcript.strip(),
-        'title': title,
-        'format_instructions': parser.get_format_instructions(),
-        'language_code': language_code,
-        'started_at': started_at.isoformat(),
-        'tz': tz,
-    })
+    # Process action items and events
+    for item in response.action_items:
+        structured.action_items.append(ActionItem(description=item))
 
-    for event in (response.events or []):
-        if event.duration > 180:
-            event.duration = 180
-        event.created = False
-    return response
+    for event in response.events:
+        description = event.get('description', '')
+        title = event.get('title', '')
+        # Process the start time
+        starts_at = None
+        try:
+            starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
+        except:
+            starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
+
+        duration = event.get('duration', 30)  # default 30 minutes
+
+        structured.events.append(Event(
+            title=title,
+            starts_at=starts_at,
+            duration=duration,
+            description=description,
+        ))
+
+    return structured
 
 
 def get_app_result(transcript: str, app: App) -> str:
@@ -493,10 +589,6 @@ def retrieve_context_dates_by_question(question: str, tz: str) -> List[datetime]
     with_parser = llm_mini.with_structured_output(DatesContext)
     response: DatesContext = with_parser.invoke(prompt)
     return response.dates_range
-
-
-class SummaryOutput(BaseModel):
-    summary: str = Field(description="The extracted content, maximum 500 words.")
 
 
 def chunk_extraction(segments: List[TranscriptSegment], topics: List[str]) -> str:

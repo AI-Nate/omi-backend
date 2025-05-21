@@ -105,6 +105,18 @@ class Structured(BaseModel):
     )
     emoji: str = Field(description="An emoji to represent the conversation", default='🧠')
     category: CategoryEnum = Field(description="A category for this conversation", default=CategoryEnum.other)
+    key_takeaways: List[str] = Field(
+        description="3-5 key takeaways from the conversation",
+        default=[],
+    )
+    things_to_improve: List[str] = Field(
+        description="2-3 things that could be improved based on the conversation",
+        default=[],
+    )
+    things_to_learn: List[str] = Field(
+        description="1-2 things worth learning more about based on the conversation",
+        default=[],
+    )
     action_items: List[ActionItem] = Field(description="A list of action items from the conversation", default=[])
     events: List[Event] = Field(
         description="A list of events extracted from the conversation, that the user must have on his calendar.",
@@ -114,6 +126,24 @@ class Structured(BaseModel):
     def __str__(self):
         result = (f"{str(self.title).capitalize()} ({str(self.category.value).capitalize()})\n"
                   f"{str(self.overview).capitalize()}\n")
+
+        if self.key_takeaways:
+            result += "Key Takeaways:\n"
+            for takeaway in self.key_takeaways:
+                result += f"- {takeaway}\n"
+            result += "\n"
+
+        if self.things_to_improve:
+            result += "Things to Improve:\n"
+            for item in self.things_to_improve:
+                result += f"- {item}\n"
+            result += "\n"
+
+        if self.things_to_learn:
+            result += "Things to Learn:\n"
+            for item in self.things_to_learn:
+                result += f"- {item}\n"
+            result += "\n"
 
         if self.action_items:
             result += f"Action Items:\n{ActionItem.actions_to_string(self.action_items)}\n"
@@ -222,6 +252,24 @@ class Conversation(BaseModel):
                           f"{formatted_date} ({str(conversation.structured.category.value).capitalize()})\n"
                           f"{str(conversation.structured.title).capitalize()}\n"
                           f"{str(conversation.structured.overview).capitalize()}\n")
+
+            if conversation.structured.key_takeaways:
+                conversation_str += "Key Takeaways:\n"
+                for takeaway in conversation.structured.key_takeaways:
+                    conversation_str += f"- {takeaway}\n"
+                conversation_str += "\n"
+
+            if conversation.structured.things_to_improve:
+                conversation_str += "Things to Improve:\n"
+                for item in conversation.structured.things_to_improve:
+                    conversation_str += f"- {item}\n"
+                conversation_str += "\n"
+
+            if conversation.structured.things_to_learn:
+                conversation_str += "Things to Learn:\n"
+                for item in conversation.structured.things_to_learn:
+                    conversation_str += f"- {item}\n"
+                conversation_str += "\n"
 
             if conversation.structured.action_items:
                 conversation_str += "Action Items:\n"
