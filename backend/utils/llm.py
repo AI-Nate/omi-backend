@@ -134,7 +134,10 @@ class EnhancedSummaryOutput(BaseModel):
         default='',
     )
     emoji: str = Field(description="An emoji to represent the conversation", default='🧠')
-    category: str = Field(description="A category for this conversation", default='other')
+    category: CategoryEnum = Field(
+        description="A category for this conversation (must be one of the valid categories)",
+        default=CategoryEnum.other
+    )
     key_takeaways: List[str] = Field(
         description="3-5 key takeaways from the conversation",
         default=[],
@@ -158,6 +161,10 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     if len(transcript) == 0:
         return Structured(title='', overview='')
 
+    # Define valid categories
+    valid_categories = [cat.value for cat in CategoryEnum]
+    valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+    
     prompt = f'''
     You will be given a finished conversation transcript.
     
@@ -170,6 +177,9 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     6. Any action items that need to be done
     7. Any calendar events mentioned that should be scheduled
     
+    For the category field, you MUST choose one of the following values EXACTLY as written:
+    {valid_categories_str}
+    
     For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
     Be thorough but concise. Prioritize the most important information.
 
@@ -177,45 +187,62 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     {transcript}
     '''.replace('    ', '').strip()
 
-    with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
-    response: EnhancedSummaryOutput = with_parser.invoke(prompt)
+    try:
+        with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
+        response: EnhancedSummaryOutput = with_parser.invoke(prompt)
+        
+        structured = Structured(
+            title=response.title,
+            overview=response.overview,
+            emoji=response.emoji,
+            category=response.category,
+        )
 
-    structured = Structured(
-        title=response.title,
-        overview=response.overview,
-        emoji=response.emoji,
-        category=response.category,
-    )
+        # Add enhanced fields
+        structured.keyTakeaways = response.key_takeaways
+        structured.thingsToImprove = response.things_to_improve
+        structured.thingsToLearn = response.things_to_learn
 
-    # Add enhanced fields
-    structured.keyTakeaways = response.key_takeaways
-    structured.thingsToImprove = response.things_to_improve
-    structured.thingsToLearn = response.things_to_learn
+        # Process action items and events
+        for item in response.action_items:
+            structured.action_items.append(ActionItem(description=item))
 
-    # Process action items and events
-    for item in response.action_items:
-        structured.action_items.append(ActionItem(description=item))
+        for event in response.events:
+            description = event.get('description', '')
+            title = event.get('title', '')
+            # Process the start time
+            starts_at = None
+            try:
+                starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
+            except:
+                starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
 
-    for event in response.events:
-        description = event.get('description', '')
-        title = event.get('title', '')
-        # Process the start time
-        starts_at = None
-        try:
-            starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
-        except:
-            starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
+            duration = event.get('duration', 30)  # default 30 minutes
 
-        duration = event.get('duration', 30)  # default 30 minutes
+            structured.events.append(Event(
+                title=title,
+                starts_at=starts_at,
+                duration=duration,
+                description=description,
+            ))
 
-        structured.events.append(Event(
-            title=title,
-            starts_at=starts_at,
-            duration=duration,
-            description=description,
-        ))
-
-    return structured
+        return structured
+    except ValidationError as e:
+        print(f"Validation error in get_transcript_structure: {e}")
+        # Fallback to a basic structured output
+        return Structured(
+            title="Conversation Summary", 
+            overview="This conversation could not be summarized properly.",
+            category=CategoryEnum.other
+        )
+    except Exception as e:
+        print(f"Error in get_transcript_structure: {e}")
+        # Fallback to a basic structured output
+        return Structured(
+            title="Conversation Summary", 
+            overview="This conversation could not be summarized properly.",
+            category=CategoryEnum.other
+        )
 
 
 def get_reprocess_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str,
@@ -223,6 +250,10 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     if len(transcript) == 0:
         return Structured(title='', overview='')
 
+    # Define valid categories
+    valid_categories = [cat.value for cat in CategoryEnum]
+    valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+    
     prompt = f'''
     You will be given a finished conversation transcript.
     
@@ -235,6 +266,9 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     6. Any action items that need to be done
     7. Any calendar events mentioned that should be scheduled
     
+    For the category field, you MUST choose one of the following values EXACTLY as written:
+    {valid_categories_str}
+    
     For context, the conversation started at {started_at.astimezone(pytz.timezone(tz)).strftime("%A, %B %d at %I:%M %p")} ({tz}).
     Be thorough but concise. Prioritize the most important information.
     
@@ -244,46 +278,63 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     {transcript}
     '''.replace('    ', '').strip()
 
-    with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
-    response: EnhancedSummaryOutput = with_parser.invoke(prompt)
+    try:
+        with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
+        response: EnhancedSummaryOutput = with_parser.invoke(prompt)
 
-    # Use existing title if provided, otherwise use generated title
-    structured = Structured(
-        title=title if title else response.title,
-        overview=response.overview,
-        emoji=response.emoji,
-        category=response.category,
-    )
+        # Use existing title if provided, otherwise use generated title
+        structured = Structured(
+            title=title if title else response.title,
+            overview=response.overview,
+            emoji=response.emoji,
+            category=response.category,
+        )
 
-    # Add enhanced fields
-    structured.keyTakeaways = response.key_takeaways
-    structured.thingsToImprove = response.things_to_improve
-    structured.thingsToLearn = response.things_to_learn
+        # Add enhanced fields
+        structured.keyTakeaways = response.key_takeaways
+        structured.thingsToImprove = response.things_to_improve
+        structured.thingsToLearn = response.things_to_learn
 
-    # Process action items and events
-    for item in response.action_items:
-        structured.action_items.append(ActionItem(description=item))
+        # Process action items and events
+        for item in response.action_items:
+            structured.action_items.append(ActionItem(description=item))
 
-    for event in response.events:
-        description = event.get('description', '')
-        title = event.get('title', '')
-        # Process the start time
-        starts_at = None
-        try:
-            starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
-        except:
-            starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
+        for event in response.events:
+            description = event.get('description', '')
+            title = event.get('title', '')
+            # Process the start time
+            starts_at = None
+            try:
+                starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
+            except:
+                starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
 
-        duration = event.get('duration', 30)  # default 30 minutes
+            duration = event.get('duration', 30)  # default 30 minutes
 
-        structured.events.append(Event(
-            title=title,
-            starts_at=starts_at,
-            duration=duration,
-            description=description,
-        ))
+            structured.events.append(Event(
+                title=title,
+                starts_at=starts_at,
+                duration=duration,
+                description=description,
+            ))
 
-    return structured
+        return structured
+    except ValidationError as e:
+        print(f"Validation error in get_reprocess_transcript_structure: {e}")
+        # Fallback to a basic structured output with the provided title
+        return Structured(
+            title=title if title else "Conversation Summary", 
+            overview="This conversation could not be summarized properly.",
+            category=CategoryEnum.other
+        )
+    except Exception as e:
+        print(f"Error in get_reprocess_transcript_structure: {e}")
+        # Fallback to a basic structured output with the provided title
+        return Structured(
+            title=title if title else "Conversation Summary", 
+            overview="This conversation could not be summarized properly.",
+            category=CategoryEnum.other
+        )
 
 
 def get_app_result(transcript: str, app: App) -> str:

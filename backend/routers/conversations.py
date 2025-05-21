@@ -11,7 +11,7 @@ from models.conversation import SearchRequest
 
 from utils.conversations.process_conversation import process_conversation, retrieve_in_progress_conversation
 from utils.conversations.search import search_conversations
-from utils.llm import generate_summary_with_prompt
+from utils.llm import generate_summary_with_prompt, get_transcript_structure
 from utils.other import endpoints as auth
 from utils.other.storage import get_conversation_recording_if_exists
 from utils.app_integrations import trigger_external_integrations
@@ -391,3 +391,42 @@ def test_prompt(conversation_id: str, request: TestPromptRequest, uid: str = Dep
     summary = generate_summary_with_prompt(full_transcript, request.prompt)
 
     return {"summary": summary}
+
+
+@router.post("/v1/conversations/{conversation_id}/enhanced-summary", response_model=Conversation, tags=['conversations'])
+def generate_enhanced_summary(
+        conversation_id: str, uid: str = Depends(auth.get_current_user_uid)
+):
+    """
+    Generate an enhanced summary for a conversation, including key takeaways, things to improve, and things to learn.
+    
+    :param conversation_id: The ID of the conversation to generate an enhanced summary for
+    :return: The updated conversation with enhanced summary fields
+    """
+    conversation_data = _get_conversation_by_id(uid, conversation_id)
+    conversation = Conversation(**conversation_data)
+    
+    # Get the full transcript
+    full_transcript = "\n".join([seg.text for seg in conversation.transcript_segments if seg.text])
+    
+    if not full_transcript:
+        raise HTTPException(status_code=400, detail="Conversation has no text content to summarize.")
+    
+    # Get user's timezone (using UTC as fallback)
+    tz = "UTC"
+    
+    # Generate enhanced structured data
+    enhanced_structured = get_transcript_structure(
+        full_transcript, 
+        conversation.started_at or conversation.created_at,
+        conversation.language or 'en',
+        tz
+    )
+    
+    # Update the conversation with enhanced structured data
+    conversation.structured = enhanced_structured
+    
+    # Save the updated conversation
+    conversations_db.update_conversation_structured(uid, conversation_id, enhanced_structured.dict())
+    
+    return conversation

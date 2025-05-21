@@ -78,6 +78,19 @@ def update_conversation_title(uid: str, conversation_id: str, title: str):
     conversation_ref.update({'structured.title': title})
 
 
+def update_conversation_structured(uid: str, conversation_id: str, structured_data: dict):
+    """
+    Update the structured data of a conversation.
+    
+    :param uid: User ID
+    :param conversation_id: Conversation ID
+    :param structured_data: The new structured data
+    """
+    user_ref = db.collection('users').document(uid)
+    conversation_ref = user_ref.collection(conversations_collection).document(conversation_id)
+    conversation_ref.update({'structured': structured_data})
+
+
 def delete_conversation(uid, conversation_id):
     user_ref = db.collection('users').document(uid)
     conversation_ref = user_ref.collection(conversations_collection).document(conversation_id)
