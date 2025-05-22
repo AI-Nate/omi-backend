@@ -742,25 +742,41 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
         - Dict mapping URLs to titles for easy access
     """
     try:
-        from openai import OpenAI
-        client = OpenAI()
-        print(f"OpenAI client created with default settings, attempting web search for: {query}")
+        import openai
+        import os
+        
+        # Create client with explicit API key to ensure it's properly loaded
+        client = openai.OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        print(f"OpenAI client created with API key, attempting web search for: {query}")
         
         try:
-            # Use the search-preview model with web search options
-            completion = client.chat.completions.create(
-                model="gpt-4o-search-preview",
-                web_search_options={
-                    "search_context_size": search_context_size
-                },
-                messages=[
-                    {
-                        "role": "user",
-                        "content": query,
-                    }
-                ],
-            )
-            print("Web search completed successfully")
+            # Check if search preview models are available
+            if "gpt-4o-search-preview" in [model.id for model in client.models.list()]:
+                print("Using gpt-4o-search-preview model")
+                # Make a direct API call with web search
+                completion = client.chat.completions.create(
+                    model="gpt-4o-search-preview",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": query,
+                        }
+                    ],
+                    web_search_options={"search_context_size": search_context_size}
+                )
+                print("Web search completed successfully")
+            else:
+                # Fallback if search models aren't available
+                print("Search models not available, using regular gpt-4o model")
+                completion = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"Provide a brief response to: {query}",
+                        }
+                    ]
+                )
             
             # Extract URLs and titles from annotations
             url_mapping = {}
@@ -792,7 +808,7 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
                         "role": "user",
                         "content": f"Provide a brief response to: {query}",
                     }
-                ],
+                ]
             )
             return completion.choices[0].message.content, [], {}
             
