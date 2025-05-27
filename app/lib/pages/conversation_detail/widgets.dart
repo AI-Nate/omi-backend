@@ -1390,3 +1390,94 @@ class ShowOptionsBottomSheet extends StatelessWidget {
     );
   }
 }
+
+class ConversationRatingWidget extends StatelessWidget {
+  final Function(int) setConversationRating;
+
+  const ConversationRatingWidget({
+    super.key,
+    required this.setConversationRating,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade900,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade700),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Was this summary helpful?',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade300,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              IconButton(
+                onPressed: () {
+                  try {
+                    setConversationRating(0); // Thumbs down
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Thank you for your feedback!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  } catch (e) {
+                    debugPrint('Error rating conversation: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Failed to submit rating. Please try again.'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.thumb_down_alt_outlined,
+                    size: 24, color: Colors.grey),
+                tooltip: 'Not helpful',
+              ),
+              IconButton(
+                onPressed: () {
+                  try {
+                    setConversationRating(1); // Thumbs up
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Thank you for your feedback!'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  } catch (e) {
+                    debugPrint('Error rating conversation: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content:
+                            Text('Failed to submit rating. Please try again.'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.thumb_up_alt_outlined,
+                    size: 24, color: Colors.grey),
+                tooltip: 'Helpful',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

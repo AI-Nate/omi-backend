@@ -512,6 +512,13 @@ class SummaryTab extends StatelessWidget {
                         : const GetAppsWidgets(),
                     const SizedBox(height: 150)
                   ],
+
+                  // Show rating UI when needed
+                  if (data.item2) // data.item2 is showRatingUI
+                    ConversationRatingWidget(
+                      setConversationRating: data
+                          .item3, // data.item3 is setConversationRating function
+                    ),
                 ],
               ),
             ],

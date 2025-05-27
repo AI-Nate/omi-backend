@@ -19,10 +19,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:omi/backend/http/openai.dart'; // For getPhotoDescription
 import 'package:omi/backend/http/api/apps.dart';
 
-
-
-
-
 class ConversationDetailProvider extends ChangeNotifier
     with MessageNotifierMixin {
   AppProvider? appProvider;
@@ -216,9 +212,18 @@ class ConversationDetailProvider extends ChangeNotifier
   }
 
   void setConversationRating(int value) {
-    setConversationSummaryRating(conversation.id, value);
-    hasConversationSummaryRatingSet = true;
-    setShowRatingUi(false);
+    try {
+      debugPrint(
+          'setConversationRating called with value: $value for conversation: ${conversation.id}');
+      setConversationSummaryRating(conversation.id, value);
+      hasConversationSummaryRatingSet = true;
+      setShowRatingUi(false);
+      debugPrint('setConversationRating completed successfully');
+    } catch (e, stackTrace) {
+      debugPrint('Error in setConversationRating: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   Future initConversation() async {

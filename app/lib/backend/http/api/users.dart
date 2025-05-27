@@ -26,7 +26,8 @@ Future<bool> updateUserGeolocation({required Geolocation geolocation}) async {
   return false;
 }
 
-Future<bool> setUserWebhookUrl({required String type, required String url}) async {
+Future<bool> setUserWebhookUrl(
+    {required String type, required String url}) async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/users/developer/webhook/$type',
     headers: {},
@@ -160,9 +161,11 @@ Future<Person?> createPerson(String name) async {
   return null;
 }
 
-Future<Person?> getSinglePerson(String personId, {bool includeSpeechSamples = false}) async {
+Future<Person?> getSinglePerson(String personId,
+    {bool includeSpeechSamples = false}) async {
   var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/users/people/$personId?include_speech_samples=$includeSpeechSamples',
+    url:
+        '${Env.apiBaseUrl}v1/users/people/$personId?include_speech_samples=$includeSpeechSamples',
     headers: {},
     method: 'GET',
     body: '',
@@ -177,7 +180,8 @@ Future<Person?> getSinglePerson(String personId, {bool includeSpeechSamples = fa
 
 Future<List<Person>> getAllPeople({bool includeSpeechSamples = true}) async {
   var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/users/people?include_speech_samples=$includeSpeechSamples',
+    url:
+        '${Env.apiBaseUrl}v1/users/people?include_speech_samples=$includeSpeechSamples',
     headers: {},
     method: 'GET',
     body: '',
@@ -239,21 +243,43 @@ Future<String> getFollowUpQuestion({String conversationId = '0'}) async {
 
 /*Analytics*/
 
-Future<bool> setConversationSummaryRating(String conversationId, int value, {String? reason}) async {
-  var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/users/analytics/memory_summary?memory_id=$conversationId&value=$value&reason=$reason',
-    headers: {},
-    method: 'POST',
-    body: '',
-  );
-  if (response == null) return false;
-  debugPrint('setConversationSummaryRating response: ${response.body}');
-  return response.statusCode == 200;
+Future<bool> setConversationSummaryRating(String conversationId, int value,
+    {String? reason}) async {
+  try {
+    debugPrint(
+        'setConversationSummaryRating: Starting API call for conversation $conversationId with value $value');
+
+    var response = await makeApiCall(
+      url:
+          '${Env.apiBaseUrl}v1/users/analytics/memory_summary?memory_id=$conversationId&value=$value&reason=$reason',
+      headers: {},
+      method: 'POST',
+      body: '',
+    );
+
+    if (response == null) {
+      debugPrint('setConversationSummaryRating: API response is null');
+      return false;
+    }
+
+    debugPrint('setConversationSummaryRating response: ${response.body}');
+    debugPrint(
+        'setConversationSummaryRating status code: ${response.statusCode}');
+
+    bool success = response.statusCode == 200;
+    debugPrint('setConversationSummaryRating: Returning $success');
+    return success;
+  } catch (e, stackTrace) {
+    debugPrint('Error in setConversationSummaryRating: $e');
+    debugPrint('Stack trace: $stackTrace');
+    return false;
+  }
 }
 
 Future<bool> setMessageResponseRating(String messageId, int value) async {
   var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/users/analytics/chat_message?message_id=$messageId&value=$value',
+    url:
+        '${Env.apiBaseUrl}v1/users/analytics/chat_message?message_id=$messageId&value=$value',
     headers: {},
     method: 'POST',
     body: '',
@@ -265,7 +291,8 @@ Future<bool> setMessageResponseRating(String messageId, int value) async {
 
 Future<bool> getHasConversationSummaryRating(String conversationId) async {
   var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/users/analytics/memory_summary?memory_id=$conversationId',
+    url:
+        '${Env.apiBaseUrl}v1/users/analytics/memory_summary?memory_id=$conversationId',
     headers: {},
     method: 'GET',
     body: '',
