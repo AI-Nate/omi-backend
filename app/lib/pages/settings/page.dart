@@ -78,7 +78,8 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             );
           },
-          icon: const Icon(Icons.bluetooth_connected_sharp, color: Colors.white, size: 22),
+          icon: const Icon(Icons.bluetooth_connected_sharp,
+              color: Colors.white, size: 22),
         ),
         const SizedBox(height: 12),
 
@@ -99,7 +100,8 @@ class _SettingsPageState extends State<SettingsPage> {
           () async {
             await Intercom.instance.displayHelpCenter();
           },
-          icon: const Icon(Icons.help_outline_outlined, color: Colors.white, size: 22),
+          icon: const Icon(Icons.help_outline_outlined,
+              color: Colors.white, size: 22),
         ),
         const SizedBox(height: 12),
         getItemAddOn2(
@@ -130,7 +132,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Navigator.of(context).pop();
                 }, () async {
                   await SharedPreferencesUtil().clearUserPreferences();
-                  Provider.of<PersonaProvider>(context, listen: false).setRouting(PersonaProfileRouting.no_device);
+                  Provider.of<PersonaProvider>(context, listen: false)
+                      .setRouting(PersonaProfileRouting.no_device);
                   await signOut();
                   Navigator.of(context).pop();
                   routeToPage(context, const DeciderWidget(), replace: true);
@@ -149,7 +152,8 @@ class _SettingsPageState extends State<SettingsPage> {
             alignment: Alignment.center,
             child: Text(
               'Version: $version+$buildVersion',
-              style: const TextStyle(color: Color.fromARGB(255, 150, 150, 150), fontSize: 14),
+              style: const TextStyle(
+                  color: Color.fromARGB(255, 150, 150, 150), fontSize: 14),
             ),
           ),
         ),
@@ -183,7 +187,8 @@ class _SettingsPageState extends State<SettingsPage> {
               }, () async {
                 SharedPreferencesUtil().hasOmiDevice = null;
                 SharedPreferencesUtil().verifiedPersonaId = null;
-                Provider.of<PersonaProvider>(context, listen: false).setRouting(PersonaProfileRouting.no_device);
+                Provider.of<PersonaProvider>(context, listen: false)
+                    .setRouting(PersonaProfileRouting.no_device);
                 await signOut();
                 Navigator.of(context).pop();
                 routeToPage(context, const DeciderWidget(), replace: true);
@@ -200,7 +205,8 @@ class _SettingsPageState extends State<SettingsPage> {
             alignment: Alignment.center,
             child: Text(
               'Version: $version+$buildVersion',
-              style: const TextStyle(color: Color.fromARGB(255, 150, 150, 150), fontSize: 14),
+              style: const TextStyle(
+                  color: Color.fromARGB(255, 150, 150, 150), fontSize: 14),
             ),
           ),
         ),
@@ -236,7 +242,9 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: widget.mode == SettingsMode.omi ? _buildOmiModeContent(context) : _buildNoDeviceModeContent(context),
+            child: widget.mode == SettingsMode.omi
+                ? _buildOmiModeContent(context)
+                : _buildNoDeviceModeContent(context),
           ),
         ));
   }

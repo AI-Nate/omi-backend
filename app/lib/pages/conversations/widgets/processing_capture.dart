@@ -18,17 +18,20 @@ class ConversationCaptureWidget extends StatefulWidget {
   const ConversationCaptureWidget({super.key});
 
   @override
-  State<ConversationCaptureWidget> createState() => _ConversationCaptureWidgetState();
+  State<ConversationCaptureWidget> createState() =>
+      _ConversationCaptureWidgetState();
 }
 
 class _ConversationCaptureWidgetState extends State<ConversationCaptureWidget> {
   @override
   Widget build(BuildContext context) {
     return Consumer3<CaptureProvider, DeviceProvider, ConnectivityProvider>(
-        builder: (context, provider, deviceProvider, connectivityProvider, child) {
-      var topConvoId = (provider.conversationProvider?.conversations ?? []).isNotEmpty
-          ? provider.conversationProvider!.conversations.first.id
-          : null;
+        builder:
+            (context, provider, deviceProvider, connectivityProvider, child) {
+      var topConvoId =
+          (provider.conversationProvider?.conversations ?? []).isNotEmpty
+              ? provider.conversationProvider!.conversations.first.id
+              : null;
 
       var header = _getConversationHeader(context);
       if (header == null) {
@@ -38,7 +41,8 @@ class _ConversationCaptureWidgetState extends State<ConversationCaptureWidget> {
       return GestureDetector(
         onTap: () async {
           if (provider.segments.isEmpty) return;
-          routeToPage(context, ConversationCapturingPage(topConversationId: topConvoId));
+          routeToPage(context,
+              ConversationCapturingPage(topConversationId: topConvoId));
         },
         child: Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -109,9 +113,10 @@ class _ConversationCaptureWidgetState extends State<ConversationCaptureWidget> {
     bool isHavingDesireDevice = SharedPreferencesUtil().btDevice.id.isNotEmpty;
     bool isHavingRecordingDevice = captureProvider.havingRecordingDevice;
 
-    bool isUsingPhoneMic = captureProvider.recordingState == RecordingState.record ||
-        captureProvider.recordingState == RecordingState.initialising ||
-        captureProvider.recordingState == RecordingState.pause;
+    bool isUsingPhoneMic =
+        captureProvider.recordingState == RecordingState.record ||
+            captureProvider.recordingState == RecordingState.initialising ||
+            captureProvider.recordingState == RecordingState.pause;
 
     // Left
     Widget? left;
@@ -123,7 +128,10 @@ class _ConversationCaptureWidgetState extends State<ConversationCaptureWidget> {
           captureProvider.recordingState,
         ),
       );
-    } else if (!deviceServiceStateOk && !transcriptServiceStateOk && !isHavingTranscript && !isHavingDesireDevice) {
+    } else if (!deviceServiceStateOk &&
+        !transcriptServiceStateOk &&
+        !isHavingTranscript &&
+        !isHavingDesireDevice) {
       return null; // not using phone mic, not ready
     } else if (!deviceServiceStateOk) {
       left = Row(
@@ -138,7 +146,10 @@ class _ConversationCaptureWidgetState extends State<ConversationCaptureWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Text(
               'Waiting for device...',
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(color: Colors.white),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium!
+                  .copyWith(color: Colors.white),
               maxLines: 1,
             ),
           ),
@@ -157,7 +168,10 @@ class _ConversationCaptureWidgetState extends State<ConversationCaptureWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             child: Text(
               isHavingTranscript ? 'In progress...' : 'Say something...',
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(color: Colors.white),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium!
+                  .copyWith(color: Colors.white),
               maxLines: 1,
             ),
           ),
@@ -170,14 +184,18 @@ class _ConversationCaptureWidgetState extends State<ConversationCaptureWidget> {
     var stateText = "";
     if (!isHavingRecordingDevice && !isUsingPhoneMic) {
       stateText = "";
-    } else if (transcriptServiceStateOk && (isUsingPhoneMic || isHavingRecordingDevice)) {
+    } else if (transcriptServiceStateOk &&
+        (isUsingPhoneMic || isHavingRecordingDevice)) {
       var lastEvent = captureProvider.transcriptionServiceStatuses.lastOrNull;
       if (lastEvent?.status == "ready") {
         stateText = "Listening";
         statusIndicator = const RecordingStatusIndicator();
       } else {
-        bool transcriptionDiagnosticEnabled = SharedPreferencesUtil().transcriptionDiagnosticEnabled;
-        stateText = transcriptionDiagnosticEnabled ? (lastEvent?.statusText ?? "") : "Connecting";
+        bool transcriptionDiagnosticEnabled =
+            SharedPreferencesUtil().transcriptionDiagnosticEnabled;
+        stateText = transcriptionDiagnosticEnabled
+            ? (lastEvent?.statusText ?? "")
+            : "Connecting";
       }
     } else if (!internetConnectionStateOk) {
       stateText = "Waiting for network";
@@ -224,10 +242,12 @@ class RecordingStatusIndicator extends StatefulWidget {
   const RecordingStatusIndicator({super.key});
 
   @override
-  State<RecordingStatusIndicator> createState() => _RecordingStatusIndicatorState();
+  State<RecordingStatusIndicator> createState() =>
+      _RecordingStatusIndicatorState();
 }
 
-class _RecordingStatusIndicatorState extends State<RecordingStatusIndicator> with SingleTickerProviderStateMixin {
+class _RecordingStatusIndicatorState extends State<RecordingStatusIndicator>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _opacityAnim;
 
@@ -251,13 +271,16 @@ class _RecordingStatusIndicatorState extends State<RecordingStatusIndicator> wit
   Widget build(BuildContext context) {
     return FadeTransition(
       opacity: _opacityAnim,
-      child: const Icon(Icons.fiber_manual_record, color: Colors.red, size: 16.0),
+      child:
+          const Icon(Icons.fiber_manual_record, color: Colors.red, size: 16.0),
     );
   }
 }
 
-getPhoneMicRecordingButton(BuildContext context, toggleRecording, RecordingState state) {
-  if (SharedPreferencesUtil().btDevice.id.isNotEmpty) return const SizedBox.shrink();
+getPhoneMicRecordingButton(
+    BuildContext context, toggleRecording, RecordingState state) {
+  if (SharedPreferencesUtil().btDevice.id.isNotEmpty)
+    return const SizedBox.shrink();
   return MaterialButton(
     onPressed: state == RecordingState.initialising ? null : toggleRecording,
     child: Row(
@@ -281,8 +304,13 @@ getPhoneMicRecordingButton(BuildContext context, toggleRecording, RecordingState
         Text(
           state == RecordingState.initialising
               ? 'Initialising Recorder'
-              : (state == RecordingState.record ? 'Stop Recording' : 'Try With Phone Mic'),
-          style: Theme.of(context).textTheme.bodyMedium!.copyWith(color: Colors.white, fontWeight: FontWeight.w500),
+              : (state == RecordingState.record
+                  ? 'Stop Recording'
+                  : 'Try With Phone Mic'),
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium!
+              .copyWith(color: Colors.white, fontWeight: FontWeight.w500),
         ),
         const SizedBox(width: 4),
       ],
@@ -290,7 +318,8 @@ getPhoneMicRecordingButton(BuildContext context, toggleRecording, RecordingState
   );
 }
 
-Widget getProcessingConversationsWidget(List<ServerConversation> conversations) {
+Widget getProcessingConversationsWidget(
+    List<ServerConversation> conversations) {
   // FIXME, this has to be a single one always, and also a conversation obj
   if (conversations.isEmpty) {
     return const SliverToBoxAdapter(child: SizedBox.shrink());
@@ -320,14 +349,17 @@ class ProcessingConversationWidget extends StatefulWidget {
   });
 
   @override
-  State<ProcessingConversationWidget> createState() => _ProcessingConversationWidgetState();
+  State<ProcessingConversationWidget> createState() =>
+      _ProcessingConversationWidgetState();
 }
 
-class _ProcessingConversationWidgetState extends State<ProcessingConversationWidget> {
+class _ProcessingConversationWidgetState
+    extends State<ProcessingConversationWidget> {
   @override
   Widget build(BuildContext context) {
     return Consumer3<CaptureProvider, DeviceProvider, ConnectivityProvider>(
-        builder: (context, provider, deviceProvider, connectivityProvider, child) {
+        builder:
+            (context, provider, deviceProvider, connectivityProvider, child) {
       return GestureDetector(
           onTap: () async {
             if (widget.conversation.transcriptSegments.isEmpty) return;
@@ -392,10 +424,14 @@ class _ProcessingConversationWidgetState extends State<ProcessingConversationWid
                   color: Colors.grey.shade800,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: Text(
                   'Processing',
-                  style: Theme.of(context).textTheme.bodyMedium!.copyWith(color: Colors.white),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium!
+                      .copyWith(color: Colors.white),
                   maxLines: 1,
                 ),
               ),

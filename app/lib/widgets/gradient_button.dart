@@ -4,7 +4,8 @@ import 'package:gradient_borders/gradient_borders.dart';
 class GradientButton extends StatelessWidget {
   final String title;
   final VoidCallback onPressed;
-  const GradientButton({super.key, required this.title, required this.onPressed});
+  const GradientButton(
+      {super.key, required this.title, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {

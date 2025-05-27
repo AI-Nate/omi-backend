@@ -36,18 +36,23 @@ class SpeechProfileCardWidget extends StatelessWidget {
                     GestureDetector(
                       onTap: () async {
                         MixpanelManager().pageOpened('Speech Profile Memories');
-                        bool hasSpeakerProfile = SharedPreferencesUtil().hasSpeakerProfile;
+                        bool hasSpeakerProfile =
+                            SharedPreferencesUtil().hasSpeakerProfile;
                         await routeToPage(context, const SpeechProfilePage());
-                        if (hasSpeakerProfile != SharedPreferencesUtil().hasSpeakerProfile) {
+                        if (hasSpeakerProfile !=
+                            SharedPreferencesUtil().hasSpeakerProfile) {
                           if (context.mounted) {
-                            context.read<CaptureProvider>().onRecordProfileSettingChanged();
+                            context
+                                .read<CaptureProvider>()
+                                .onRecordProfileSettingChanged();
                           }
                         }
                       },
                       child: Container(
                         decoration: BoxDecoration(
                           color: Colors.grey.shade900,
-                          borderRadius: const BorderRadius.all(Radius.circular(12)),
+                          borderRadius:
+                              const BorderRadius.all(Radius.circular(12)),
                         ),
                         margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         padding: const EdgeInsets.all(16),
@@ -61,12 +66,14 @@ class SpeechProfileCardWidget extends StatelessWidget {
                                   SizedBox(width: 16),
                                   Text(
                                     'Teach Omi your voice',
-                                    style: TextStyle(color: Colors.white, fontSize: 16),
+                                    style: TextStyle(
+                                        color: Colors.white, fontSize: 16),
                                   ),
                                 ],
                               ),
                             ),
-                            Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                            Icon(Icons.arrow_forward_ios,
+                                color: Colors.white, size: 16),
                           ],
                         ),
                       ),
@@ -74,7 +81,8 @@ class SpeechProfileCardWidget extends StatelessWidget {
                     const Positioned(
                       top: 6,
                       right: 24,
-                      child: Icon(Icons.fiber_manual_record, color: Colors.red, size: 16.0),
+                      child: Icon(Icons.fiber_manual_record,
+                          color: Colors.red, size: 16.0),
                     ),
                   ],
                 );
@@ -98,12 +106,14 @@ class UpdateFirmwareCardWidget extends StatelessWidget {
                   GestureDetector(
                     onTap: () {
                       MixpanelManager().pageOpened('Update Firmware Memories');
-                      routeToPage(context, FirmwareUpdate(device: provider.pairedDevice));
+                      routeToPage(context,
+                          FirmwareUpdate(device: provider.pairedDevice));
                     },
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.grey.shade900,
-                        borderRadius: const BorderRadius.all(Radius.circular(12)),
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(12)),
                       ),
                       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       padding: const EdgeInsets.all(16),
@@ -117,12 +127,14 @@ class UpdateFirmwareCardWidget extends StatelessWidget {
                                 SizedBox(width: 16),
                                 Text(
                                   'Update omi firmware',
-                                  style: TextStyle(color: Colors.white, fontSize: 16),
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 16),
                                 ),
                               ],
                             ),
                           ),
-                          Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                          Icon(Icons.arrow_forward_ios,
+                              color: Colors.white, size: 16),
                         ],
                       ),
                     ),
@@ -186,8 +198,10 @@ getLiteTranscriptWidget(
   );
 }
 
-getPhoneMicRecordingButton(VoidCallback recordingToggled, RecordingState state) {
-  if (SharedPreferencesUtil().btDevice.id.isNotEmpty) return const SizedBox.shrink();
+getPhoneMicRecordingButton(
+    VoidCallback recordingToggled, RecordingState state) {
+  if (SharedPreferencesUtil().btDevice.id.isNotEmpty)
+    return const SizedBox.shrink();
   return Visibility(
     visible: true,
     child: Padding(
@@ -199,7 +213,8 @@ getPhoneMicRecordingButton(VoidCallback recordingToggled, RecordingState state) 
             borderRadius: BorderRadius.circular(12),
             // side: BorderSide(color: state == RecordState.record ? Colors.red : Colors.white),
           ),
-          onPressed: state == RecordingState.initialising ? null : recordingToggled,
+          onPressed:
+              state == RecordingState.initialising ? null : recordingToggled,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
             child: Row(
@@ -222,7 +237,9 @@ getPhoneMicRecordingButton(VoidCallback recordingToggled, RecordingState state) 
                 Text(
                   state == RecordingState.initialising
                       ? 'Initialising Recorder'
-                      : (state == RecordingState.record ? 'Stop Recording' : 'Try With Phone Mic'),
+                      : (state == RecordingState.record
+                          ? 'Stop Recording'
+                          : 'Try With Phone Mic'),
                   style: const TextStyle(fontSize: 14),
                 ),
                 const SizedBox(width: 4),

@@ -36,7 +36,8 @@ class _SearchWidgetState extends State<SearchWidget> {
               controller: searchController,
               focusNode: context.read<HomeProvider>().convoSearchFieldFocusNode,
               onChanged: (value) {
-                var provider = Provider.of<ConversationProvider>(context, listen: false);
+                var provider =
+                    Provider.of<ConversationProvider>(context, listen: false);
                 _debouncer.run(() async {
                   await provider.searchConversations(value);
                 });
@@ -63,7 +64,9 @@ class _SearchWidgetState extends State<SearchWidget> {
                 suffixIcon: showClearButton
                     ? GestureDetector(
                         onTap: () async {
-                          var provider = Provider.of<ConversationProvider>(context, listen: false);
+                          var provider = Provider.of<ConversationProvider>(
+                              context,
+                              listen: false);
                           await provider.searchConversations(""); // clear
                           searchController.clear();
                           setShowClearButton();
@@ -82,8 +85,8 @@ class _SearchWidgetState extends State<SearchWidget> {
           const SizedBox(
             width: 12,
           ),
-          Consumer<ConversationProvider>(
-              builder: (BuildContext context, ConversationProvider convoProvider, Widget? child) {
+          Consumer<ConversationProvider>(builder: (BuildContext context,
+              ConversationProvider convoProvider, Widget? child) {
             return Container(
               decoration: BoxDecoration(
                 color: Colors.grey.shade900,
@@ -92,7 +95,9 @@ class _SearchWidgetState extends State<SearchWidget> {
               child: IconButton(
                 onPressed: convoProvider.toggleDiscardConversations,
                 icon: Icon(
-                  convoProvider.showDiscardedConversations ? Icons.filter_alt_off_sharp : Icons.filter_alt_sharp,
+                  convoProvider.showDiscardedConversations
+                      ? Icons.filter_alt_off_sharp
+                      : Icons.filter_alt_sharp,
                   color: Colors.white,
                   size: 20,
                 ),
