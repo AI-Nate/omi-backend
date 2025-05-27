@@ -5,15 +5,30 @@ from typing import List
 
 from google.cloud import storage
 from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials as OAuth2Credentials
 from google.cloud.storage import transfer_manager
 
 from database.redis_db import cache_signed_url, get_cached_signed_url
 
 if os.environ.get('SERVICE_ACCOUNT_JSON'):
     service_account_info = json.loads(os.environ["SERVICE_ACCOUNT_JSON"])
-    credentials = service_account.Credentials.from_service_account_info(service_account_info)
-    project_id = os.environ.get('GOOGLE_CLOUD_PROJECT') or service_account_info.get('project_id')
-    storage_client = storage.Client(project=project_id, credentials=credentials)
+    project_id = os.environ.get('GOOGLE_CLOUD_PROJECT') or service_account_info.get('project_id', service_account_info.get('quota_project_id'))
+    
+    # Handle both service account and OAuth2 credentials
+    if service_account_info.get('type') == 'service_account':
+        credentials = service_account.Credentials.from_service_account_info(service_account_info)
+        storage_client = storage.Client(project=project_id, credentials=credentials)
+    else:
+        # OAuth2 credentials (authorized_user type)
+        print("Warning: Using OAuth2 credentials - signed URLs may not work. Consider using service account credentials.")
+        credentials = OAuth2Credentials(
+            token=None,
+            refresh_token=service_account_info.get('refresh_token'),
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=service_account_info.get('client_id'),
+            client_secret=service_account_info.get('client_secret')
+        )
+        storage_client = storage.Client(project=project_id, credentials=credentials)
 else:
     project_id = os.environ.get('GOOGLE_CLOUD_PROJECT')
     storage_client = storage.Client(project=project_id)
@@ -52,7 +67,15 @@ def get_profile_audio_if_exists(uid: str, download: bool = True) -> str:
             file_path = f'_temp/{uid}_speech_profile.wav'
             blob.download_to_filename(file_path)
             return file_path
-        return _get_signed_url(blob, 60)
+        
+        try:
+            return _get_signed_url(blob, 60)
+        except Exception as e:
+            print(f"Failed to get signed URL for speech profile, falling back to download: {e}")
+            # Force download if signed URL fails
+            file_path = f'_temp/{uid}_speech_profile.wav'
+            blob.download_to_filename(file_path)
+            return file_path
 
     return None
 
@@ -236,9 +259,24 @@ def _get_signed_url(blob, minutes):
     if cached := get_cached_signed_url(blob.name):
         return cached
 
-    signed_url = blob.generate_signed_url(version="v4", expiration=datetime.timedelta(minutes=minutes), method="GET")
-    cache_signed_url(blob.name, signed_url, minutes * 60)
-    return signed_url
+    try:
+        # Try to generate signed URL (requires service account with private key)
+        signed_url = blob.generate_signed_url(version="v4", expiration=datetime.timedelta(minutes=minutes), method="GET")
+        cache_signed_url(blob.name, signed_url, minutes * 60)
+        return signed_url
+    except AttributeError as e:
+        if "private key" in str(e).lower():
+            print(f"Warning: Cannot generate signed URL - using public URL fallback. Error: {e}")
+            # Fallback to public URL (only works if bucket/blob is publicly accessible)
+            public_url = f"https://storage.googleapis.com/{blob.bucket.name}/{blob.name}"
+            return public_url
+        else:
+            raise e
+    except Exception as e:
+        print(f"Error generating signed URL: {e}")
+        # Fallback to public URL
+        public_url = f"https://storage.googleapis.com/{blob.bucket.name}/{blob.name}"
+        return public_url
 
 
 def upload_plugin_logo(file_path: str, plugin_id: str):
