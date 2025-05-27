@@ -91,7 +91,7 @@ def is_audio_empty(file_path, sample_rate=8000):
 
 
 def vad_is_empty(file_path, return_segments: bool = False, cache: bool = False):
-    """Uses vad_modal/vad.py deployment (Best quality)"""
+    """Uses vad_modal/vad.py deployment (Best quality) with local fallback"""
     caching_key = f'vad_is_empty:{file_path}'
     if cache:
         if exists := redis_db.get_generic_cache(caching_key):
@@ -99,21 +99,58 @@ def vad_is_empty(file_path, return_segments: bool = False, cache: bool = False):
                 return exists
             return len(exists) == 0
 
+    vad_api_url = os.getenv('HOSTED_VAD_API_URL', '').strip()
+    print(f'VAD API URL: "{vad_api_url}" (length: {len(vad_api_url)})')
+    
+    # Try hosted VAD API if available
+    if vad_api_url and vad_api_url.lower() not in ['none', 'null', '']:
+        try:
+            # file_duration = AudioSegment.from_wav(file_path).duration_seconds
+            # print('vad_is_empty file duration:', file_duration)
+            with open(file_path, 'rb') as file:
+                files = {'file': (file_path.split('/')[-1], file, 'audio/wav')}
+                response = requests.post(vad_api_url, files=files)
+                segments = response.json()
+                if cache:
+                    redis_db.set_generic_cache(caching_key, segments, ttl=60 * 60 * 24)
+                if return_segments:
+                    return segments
+                print('vad_is_empty', len(segments) == 0)  # compute % of empty files in someway
+                return len(segments) == 0  # but also check likelyhood of silence if only 1 segment?
+        except Exception as e:
+            print('vad_is_empty hosted API failed, falling back to local:', e)
+    else:
+        print('No hosted VAD API configured, using local VAD')
+    
+    # Fallback to local VAD when hosted API is not available
     try:
-        # file_duration = AudioSegment.from_wav(file_path).duration_seconds
-        # print('vad_is_empty file duration:', file_duration)
-        with open(file_path, 'rb') as file:
-            files = {'file': (file_path.split('/')[-1], file, 'audio/wav')}
-            response = requests.post(os.getenv('HOSTED_VAD_API_URL'), files=files)
-            segments = response.json()
+        print('Using local VAD fallback for', file_path)
+        wav = read_audio(file_path)
+        timestamps = get_speech_timestamps(wav, model, sampling_rate=16000)
+        
+        if return_segments:
+            # Convert timestamps to segments format
+            segments = []
+            for ts in timestamps:
+                segments.append({
+                    'start': ts['start'] / 1000.0,  # Convert to seconds
+                    'end': ts['end'] / 1000.0
+                })
             if cache:
                 redis_db.set_generic_cache(caching_key, segments, ttl=60 * 60 * 24)
-            if return_segments:
-                return segments
-            print('vad_is_empty', len(segments) == 0)  # compute % of empty files in someway
-            return len(segments) == 0  # but also check likelyhood of silence if only 1 segment?
+            return segments
+        
+        # Check if audio is empty
+        is_empty = len(timestamps) == 0
+        if len(timestamps) == 1:
+            duration = (timestamps[0]['end'] - timestamps[0]['start']) / 1000.0
+            is_empty = duration < 1
+        
+        print('vad_is_empty (local):', is_empty)
+        return is_empty
+        
     except Exception as e:
-        print('vad_is_empty', e)
+        print('vad_is_empty local fallback failed:', e)
         if return_segments:
             return []
         return False
