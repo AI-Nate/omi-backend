@@ -675,20 +675,51 @@ async def upload_and_process_conversation_images(
         print(f"DEBUG: No files provided")
         raise HTTPException(status_code=400, detail="No files provided")
     
+    def detect_image_type_from_content(content: bytes) -> str:
+        """
+        Detect image type using magic bytes (file signatures)
+        Returns the detected MIME type or None if not an image
+        """
+        if len(content) < 12:
+            return None
+            
+        # JPEG signature
+        if content[:2] == b'\xff\xd8':
+            return 'image/jpeg'
+            
+        # PNG signature 
+        if content[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
+            return 'image/png'
+            
+        # GIF signature
+        if content[:6] in (b'GIF87a', b'GIF89a'):
+            return 'image/gif'
+            
+        # WEBP signature
+        if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+            return 'image/webp'
+            
+        # BMP signature
+        if content[:2] == b'BM':
+            return 'image/bmp'
+            
+        # TIFF signature (little-endian and big-endian)
+        if content[:4] in (b'II*\x00', b'MM\x00*'):
+            return 'image/tiff'
+            
+        return None
+    
     print(f"DEBUG: Starting file validation")
-    # Check file types and sizes
+    # Check file types and sizes using magic bytes detection
     for i, file in enumerate(files):
         print(f"DEBUG: Validating file {i}: {file.filename}, content_type: {file.content_type}")
         print(f"DEBUG: File headers: {getattr(file, 'headers', 'None')}")
         print(f"DEBUG: File size: {file.size}")
         print(f"DEBUG: Available file attributes: {dir(file)}")
         
-        if not file.content_type.startswith('image/'):
-            print(f"DEBUG: File {file.filename} is not an image: {file.content_type}")
-            raise HTTPException(status_code=400, detail=f"File {file.filename} is not an image")
-        
-        # Check file size (limit to 10MB per image)
+        # Read file content to check magic bytes
         file_size = 0
+        content = None
         try:
             content = await file.read()
             file_size = len(content)
@@ -698,9 +729,26 @@ async def upload_and_process_conversation_images(
             print(f"DEBUG: Error reading file {file.filename}: {e}")
             raise HTTPException(status_code=400, detail=f"Error reading file {file.filename}")
         
+        # Detect actual image type using magic bytes
+        detected_mime_type = detect_image_type_from_content(content)
+        print(f"DEBUG: File {file.filename} detected MIME type from content: {detected_mime_type}")
+        print(f"DEBUG: File {file.filename} reported content type: {file.content_type}")
+        
+        # Use detected MIME type for validation instead of HTTP content type
+        if not detected_mime_type:
+            print(f"DEBUG: File {file.filename} is not a valid image based on content analysis")
+            # Show first few bytes for debugging
+            if content:
+                hex_preview = ' '.join(f'{b:02x}' for b in content[:16])
+                print(f"DEBUG: First 16 bytes: {hex_preview}")
+            raise HTTPException(status_code=400, detail=f"File {file.filename} is not a valid image format")
+        
+        # Check file size (limit to 10MB per image)
         if file_size > 10 * 1024 * 1024:  # 10MB limit
             print(f"DEBUG: File {file.filename} is too large: {file_size}")
             raise HTTPException(status_code=400, detail=f"File {file.filename} is too large (max 10MB)")
+        
+        print(f"DEBUG: File {file.filename} validation passed - detected as {detected_mime_type}")
     
     print(f"DEBUG: File validation completed successfully")
     

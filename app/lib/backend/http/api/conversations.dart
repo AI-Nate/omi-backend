@@ -952,6 +952,92 @@ Future<void> enrichConversationSummaryWithMultipleImages(
 Future<ServerConversation?> uploadAndProcessConversationImages(
     String conversationId, List<Uint8List> imagesData) async {
   try {
+    debugPrint(
+        'DEBUG CLIENT: Starting upload for conversation $conversationId');
+    debugPrint('DEBUG CLIENT: Number of images: ${imagesData.length}');
+
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse(
+          '${Env.apiBaseUrl}v1/conversations/$conversationId/upload-images'),
+    );
+
+    // Add authorization header
+    request.headers.addAll({'Authorization': await getAuthHeader()});
+    debugPrint('DEBUG CLIENT: Authorization header added');
+
+    // Add image files to the request
+    for (int i = 0; i < imagesData.length; i++) {
+      debugPrint(
+          'DEBUG CLIENT: Processing image $i, size: ${imagesData[i].length} bytes');
+
+      // Check if image data starts with valid image headers
+      String dataType = 'unknown';
+      if (imagesData[i].length > 4) {
+        if (imagesData[i][0] == 0xFF && imagesData[i][1] == 0xD8) {
+          dataType = 'JPEG';
+        } else if (imagesData[i][0] == 0x89 &&
+            imagesData[i][1] == 0x50 &&
+            imagesData[i][2] == 0x4E &&
+            imagesData[i][3] == 0x47) {
+          dataType = 'PNG';
+        }
+      }
+      debugPrint('DEBUG CLIENT: Image $i detected type: $dataType');
+
+      var multipartFile = http.MultipartFile.fromBytes(
+        'files',
+        imagesData[i],
+        filename: 'image_$i.jpg',
+        contentType: MediaType.parse('image/jpeg'),
+      );
+
+      debugPrint('DEBUG CLIENT: MultipartFile created for image $i');
+      debugPrint('DEBUG CLIENT: - filename: ${multipartFile.filename}');
+      debugPrint('DEBUG CLIENT: - contentType: ${multipartFile.contentType}');
+      debugPrint('DEBUG CLIENT: - field: ${multipartFile.field}');
+      debugPrint('DEBUG CLIENT: - length: ${multipartFile.length}');
+
+      request.files.add(multipartFile);
+    }
+
+    debugPrint('DEBUG CLIENT: All files added to request');
+    debugPrint('DEBUG CLIENT: Request headers: ${request.headers}');
+    debugPrint('DEBUG CLIENT: Request fields: ${request.fields}');
+    debugPrint('DEBUG CLIENT: Request files count: ${request.files.length}');
+
+    // Send the request
+    debugPrint('DEBUG CLIENT: Sending request...');
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    debugPrint('DEBUG CLIENT: Response received');
+    debugPrint('DEBUG CLIENT: Status code: ${response.statusCode}');
+    debugPrint('DEBUG CLIENT: Response headers: ${response.headers}');
+    debugPrint('DEBUG CLIENT: Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return ServerConversation.fromJson(jsonDecode(response.body));
+    } else {
+      debugPrint(
+          'ERROR CLIENT: Upload failed with ${response.statusCode}: ${response.body}');
+      return null;
+    }
+  } catch (e) {
+    debugPrint('ERROR CLIENT: Exception during upload: $e');
+    debugPrint('ERROR CLIENT: Stack trace: ${StackTrace.current}');
+    return null;
+  }
+}
+
+// Alternative function to upload images with different content type handling
+Future<ServerConversation?> uploadAndProcessConversationImagesAlternative(
+    String conversationId, List<Uint8List> imagesData) async {
+  try {
+    debugPrint(
+        'DEBUG CLIENT ALT: Starting alternative upload for conversation $conversationId');
+    debugPrint('DEBUG CLIENT ALT: Number of images: ${imagesData.length}');
+
     var request = http.MultipartRequest(
       'POST',
       Uri.parse(
@@ -961,31 +1047,185 @@ Future<ServerConversation?> uploadAndProcessConversationImages(
     // Add authorization header
     request.headers.addAll({'Authorization': await getAuthHeader()});
 
-    // Add image files to the request
+    // Explicitly set content type for the entire request
+    request.headers['Content-Type'] = 'multipart/form-data';
+    debugPrint('DEBUG CLIENT ALT: Headers set: ${request.headers}');
+
+    // Add image files to the request with explicit content type handling
     for (int i = 0; i < imagesData.length; i++) {
+      debugPrint(
+          'DEBUG CLIENT ALT: Processing image $i, size: ${imagesData[i].length} bytes');
+
+      // Detect image type from magic bytes
+      String detectedType = 'jpeg'; // default
+      String mimeType = 'image/jpeg'; // default
+
+      if (imagesData[i].length > 8) {
+        // Check for JPEG
+        if (imagesData[i][0] == 0xFF && imagesData[i][1] == 0xD8) {
+          detectedType = 'jpeg';
+          mimeType = 'image/jpeg';
+        }
+        // Check for PNG
+        else if (imagesData[i][0] == 0x89 &&
+            imagesData[i][1] == 0x50 &&
+            imagesData[i][2] == 0x4E &&
+            imagesData[i][3] == 0x47) {
+          detectedType = 'png';
+          mimeType = 'image/png';
+        }
+      }
+
+      debugPrint(
+          'DEBUG CLIENT ALT: Image $i detected as $detectedType, using MIME type: $mimeType');
+
+      // Try using http.MultipartFile.fromBytes with explicit MediaType construction
+      var mediaType =
+          MediaType('image', detectedType == 'png' ? 'png' : 'jpeg');
+
       var multipartFile = http.MultipartFile.fromBytes(
         'files',
         imagesData[i],
-        filename: 'image_$i.jpg',
-        contentType: MediaType.parse('image/jpeg'),
+        filename: 'image_$i.$detectedType',
+        contentType: mediaType,
       );
+
+      debugPrint('DEBUG CLIENT ALT: MultipartFile created for image $i');
+      debugPrint('DEBUG CLIENT ALT: - filename: ${multipartFile.filename}');
+      debugPrint(
+          'DEBUG CLIENT ALT: - contentType: ${multipartFile.contentType}');
+      debugPrint(
+          'DEBUG CLIENT ALT: - contentType toString: ${multipartFile.contentType.toString()}');
+      debugPrint('DEBUG CLIENT ALT: - field: ${multipartFile.field}');
+      debugPrint('DEBUG CLIENT ALT: - length: ${multipartFile.length}');
+
       request.files.add(multipartFile);
     }
+
+    debugPrint('DEBUG CLIENT ALT: All files added, sending request...');
 
     // Send the request
     var streamedResponse = await request.send();
     var response = await http.Response.fromStream(streamedResponse);
 
-    debugPrint('uploadAndProcessConversationImages: ${response.statusCode}');
+    debugPrint('DEBUG CLIENT ALT: Response received');
+    debugPrint('DEBUG CLIENT ALT: Status code: ${response.statusCode}');
+    debugPrint('DEBUG CLIENT ALT: Response body: ${response.body}');
 
     if (response.statusCode == 200) {
       return ServerConversation.fromJson(jsonDecode(response.body));
     } else {
-      debugPrint('Error uploading images: ${response.body}');
+      debugPrint(
+          'ERROR CLIENT ALT: Upload failed with ${response.statusCode}: ${response.body}');
       return null;
     }
   } catch (e) {
-    debugPrint('Error uploading and processing images: $e');
+    debugPrint('ERROR CLIENT ALT: Exception during upload: $e');
+    debugPrint('ERROR CLIENT ALT: Stack trace: ${StackTrace.current}');
     return null;
   }
+}
+
+// Test function to help debug image upload issues
+Future<Map<String, dynamic>> testImageUploadMethods(
+    String conversationId, List<Uint8List> imagesData) async {
+  debugPrint('=== STARTING IMAGE UPLOAD DEBUG TEST ===');
+
+  Map<String, dynamic> results = {
+    'primary_method': {'success': false, 'error': null, 'details': {}},
+    'alternative_method': {'success': false, 'error': null, 'details': {}},
+    'recommendations': []
+  };
+
+  // Test primary method
+  debugPrint('\n--- Testing Primary Upload Method ---');
+  try {
+    var primaryResult =
+        await uploadAndProcessConversationImages(conversationId, imagesData);
+    if (primaryResult != null) {
+      results['primary_method']['success'] = true;
+      results['primary_method']
+          ['details'] = {'result': 'Success - conversation returned'};
+      debugPrint('✅ Primary method succeeded');
+    } else {
+      results['primary_method']['error'] = 'Method returned null';
+      debugPrint('❌ Primary method failed - returned null');
+    }
+  } catch (e) {
+    results['primary_method']['error'] = e.toString();
+    debugPrint('❌ Primary method failed with exception: $e');
+  }
+
+  // Test alternative method
+  debugPrint('\n--- Testing Alternative Upload Method ---');
+  try {
+    var altResult = await uploadAndProcessConversationImagesAlternative(
+        conversationId, imagesData);
+    if (altResult != null) {
+      results['alternative_method']['success'] = true;
+      results['alternative_method']
+          ['details'] = {'result': 'Success - conversation returned'};
+      debugPrint('✅ Alternative method succeeded');
+    } else {
+      results['alternative_method']['error'] = 'Method returned null';
+      debugPrint('❌ Alternative method failed - returned null');
+    }
+  } catch (e) {
+    results['alternative_method']['error'] = e.toString();
+    debugPrint('❌ Alternative method failed with exception: $e');
+  }
+
+  // Generate recommendations
+  List<String> recommendations = [];
+
+  if (results['primary_method']['success'] &&
+      results['alternative_method']['success']) {
+    recommendations.add(
+        'Both methods work! Use the primary method as it\'s the main implementation.');
+  } else if (results['primary_method']['success']) {
+    recommendations.add(
+        'Primary method works! The server-side magic byte detection fix resolved the issue.');
+  } else if (results['alternative_method']['success']) {
+    recommendations.add(
+        'Alternative method works! Consider using this as the main method or investigate why primary method fails.');
+  } else {
+    recommendations.add(
+        'Both methods failed. Check server logs and network connectivity.');
+    recommendations
+        .add('Verify the conversation ID exists and the user has permissions.');
+    recommendations.add('Check if the image data is valid and not corrupted.');
+  }
+
+  // Add technical recommendations based on errors
+  String primaryError = results['primary_method']['error']?.toString() ?? '';
+  String altError = results['alternative_method']['error']?.toString() ?? '';
+
+  if (primaryError.contains('400') || altError.contains('400')) {
+    recommendations
+        .add('HTTP 400 error detected - check file validation on server side.');
+  }
+
+  if (primaryError.contains('401') || altError.contains('401')) {
+    recommendations
+        .add('HTTP 401 error detected - check authentication token.');
+  }
+
+  if (primaryError.contains('404') || altError.contains('404')) {
+    recommendations.add(
+        'HTTP 404 error detected - verify conversation ID and endpoint URL.');
+  }
+
+  results['recommendations'] = recommendations;
+
+  debugPrint('\n=== TEST RESULTS SUMMARY ===');
+  debugPrint('Primary method success: ${results['primary_method']['success']}');
+  debugPrint(
+      'Alternative method success: ${results['alternative_method']['success']}');
+  debugPrint('Recommendations:');
+  for (var rec in recommendations) {
+    debugPrint('  • $rec');
+  }
+  debugPrint('=== END DEBUG TEST ===\n');
+
+  return results;
 }
