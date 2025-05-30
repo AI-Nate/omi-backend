@@ -658,6 +658,8 @@ async def upload_and_process_conversation_images(
     """
     print(f"DEBUG: Starting upload_and_process_conversation_images for conversation {conversation_id}, user {uid}")
     print(f"DEBUG: Received {len(files)} files")
+    print(f"DEBUG: Files parameter type: {type(files)}")
+    print(f"DEBUG: First file type: {type(files[0]) if files else 'No files'}")
     
     # Get the existing conversation
     try:
@@ -677,6 +679,10 @@ async def upload_and_process_conversation_images(
     # Check file types and sizes
     for i, file in enumerate(files):
         print(f"DEBUG: Validating file {i}: {file.filename}, content_type: {file.content_type}")
+        print(f"DEBUG: File headers: {getattr(file, 'headers', 'None')}")
+        print(f"DEBUG: File size: {file.size}")
+        print(f"DEBUG: Available file attributes: {dir(file)}")
+        
         if not file.content_type.startswith('image/'):
             print(f"DEBUG: File {file.filename} is not an image: {file.content_type}")
             raise HTTPException(status_code=400, detail=f"File {file.filename} is not an image")
