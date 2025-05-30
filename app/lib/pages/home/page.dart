@@ -16,6 +16,7 @@ import 'package:omi/pages/apps/page.dart';
 import 'package:omi/pages/chat/page.dart';
 import 'package:omi/pages/conversations/conversations_page.dart';
 import 'package:omi/pages/memories/page.dart';
+import 'package:omi/pages/timeline/timeline_page.dart';
 import 'package:omi/pages/home/widgets/chat_apps_dropdown_widget.dart';
 import 'package:omi/pages/persona/persona_profile.dart';
 import 'package:omi/pages/home/widgets/speech_language_sheet.dart';
@@ -198,13 +199,16 @@ class _HomePageState extends State<HomePage>
         case "memories":
           homePageIdx = 0;
           break;
-        case "chat":
+        case "timeline":
           homePageIdx = 1;
-        case "memoriesPage":
+          break;
+        case "chat":
           homePageIdx = 2;
+        case "memoriesPage":
+          homePageIdx = 3;
           break;
         case "apps":
-          homePageIdx = 3;
+          homePageIdx = 4;
           break;
       }
     }
@@ -405,7 +409,7 @@ class _HomePageState extends State<HomePage>
                   ? null
                   : _buildAppBar(context),
               body: DefaultTabController(
-                length: 4,
+                length: 5,
                 initialIndex: _controller?.initialPage ?? 0,
                 child: GestureDetector(
                   onTap: () {
@@ -421,6 +425,7 @@ class _HomePageState extends State<HomePage>
                           physics: const NeverScrollableScrollPhysics(),
                           children: const [
                             ConversationsPage(),
+                            TimelinePage(),
                             ChatPage(isPivotBottom: false),
                             MemoriesPage(),
                             AppsPage(),
@@ -465,6 +470,7 @@ class _HomePageState extends State<HomePage>
                                     MixpanelManager()
                                         .bottomNavigationTabClicked([
                                       'Memories',
+                                      'Timeline',
                                       'Chat',
                                       'Facts',
                                       'Explore'
@@ -510,7 +516,7 @@ class _HomePageState extends State<HomePage>
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(
-                                            FontAwesomeIcons.solidMessage,
+                                            FontAwesomeIcons.chartGantt,
                                             color: home.selectedIndex == 1
                                                 ? Colors.white
                                                 : Colors.grey,
@@ -518,7 +524,7 @@ class _HomePageState extends State<HomePage>
                                           ),
                                           const SizedBox(height: 6),
                                           Text(
-                                            'Chat',
+                                            'Timeline',
                                             style: TextStyle(
                                               color: home.selectedIndex == 1
                                                   ? Colors.white
@@ -534,7 +540,7 @@ class _HomePageState extends State<HomePage>
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(
-                                            FontAwesomeIcons.brain,
+                                            FontAwesomeIcons.solidMessage,
                                             color: home.selectedIndex == 2
                                                 ? Colors.white
                                                 : Colors.grey,
@@ -542,7 +548,7 @@ class _HomePageState extends State<HomePage>
                                           ),
                                           const SizedBox(height: 6),
                                           Text(
-                                            'Memories',
+                                            'Chat',
                                             style: TextStyle(
                                               color: home.selectedIndex == 2
                                                   ? Colors.white
@@ -558,8 +564,32 @@ class _HomePageState extends State<HomePage>
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(
-                                            FontAwesomeIcons.search,
+                                            FontAwesomeIcons.brain,
                                             color: home.selectedIndex == 3
+                                                ? Colors.white
+                                                : Colors.grey,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            'Memories',
+                                            style: TextStyle(
+                                              color: home.selectedIndex == 3
+                                                  ? Colors.white
+                                                  : Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Tab(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            FontAwesomeIcons.search,
+                                            color: home.selectedIndex == 4
                                                 ? Colors.white
                                                 : Colors.grey,
                                             size: 18,
@@ -568,7 +598,7 @@ class _HomePageState extends State<HomePage>
                                           Text(
                                             'Explore',
                                             style: TextStyle(
-                                              color: home.selectedIndex == 3
+                                              color: home.selectedIndex == 4
                                                   ? Colors.white
                                                   : Colors.grey,
                                               fontSize: 12,
@@ -630,10 +660,23 @@ class _HomePageState extends State<HomePage>
           Consumer<HomeProvider>(
             builder: (context, provider, child) {
               if (provider.selectedIndex == 1) {
+                return Center(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                        right: MediaQuery.sizeOf(context).width * 0.10),
+                    child: const Text('Timeline',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                        )),
+                  ),
+                );
+              } else if (provider.selectedIndex == 2) {
                 return ChatAppsDropdownWidget(
                   controller: _controller!,
                 );
-              } else if (provider.selectedIndex == 2) {
+              } else if (provider.selectedIndex == 3) {
                 return Center(
                   child: Padding(
                     padding: EdgeInsets.only(
@@ -646,7 +689,7 @@ class _HomePageState extends State<HomePage>
                         )),
                   ),
                 );
-              } else if (provider.selectedIndex == 3) {
+              } else if (provider.selectedIndex == 4) {
                 return Center(
                   child: Padding(
                     padding: EdgeInsets.only(

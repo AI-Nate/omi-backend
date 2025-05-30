@@ -2,26 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:omi/backend/schema/structured.dart';
 import 'package:omi/backend/preferences.dart';
 import 'package:omi/backend/schema/conversation.dart';
-import 'dart:typed_data';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class EnhancedSummarySection extends StatelessWidget {
   final ServerConversation conversation;
   final bool enhancedByImage;
-  final List<Uint8List>? imageDataList;
-  final List<String>? imageDescriptions;
 
   const EnhancedSummarySection({
     super.key,
     required this.conversation,
     this.enhancedByImage = false,
-    this.imageDataList,
-    this.imageDescriptions,
   });
 
   @override
   Widget build(BuildContext context) {
-    final structured = conversation.structured;
     final userName = SharedPreferencesUtil().givenName.isEmpty
         ? 'You'
         : SharedPreferencesUtil().givenName;
@@ -40,8 +35,7 @@ class EnhancedSummarySection extends StatelessWidget {
                   ),
             ),
             if (enhancedByImage &&
-                imageDataList != null &&
-                imageDataList!.isNotEmpty) ...[
+                conversation.structured.imageUrls.isNotEmpty) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -60,8 +54,8 @@ class EnhancedSummarySection extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      imageDataList!.length > 1
-                          ? '${imageDataList!.length} Images'
+                      conversation.structured.imageUrls.length > 1
+                          ? '${conversation.structured.imageUrls.length} Images'
                           : 'Image Enhanced',
                       style: const TextStyle(
                         fontSize: 12,
@@ -92,7 +86,7 @@ class EnhancedSummarySection extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      structured.getEmoji(),
+                      conversation.structured.getEmoji(),
                       style: const TextStyle(fontSize: 20),
                     ),
                   ),
@@ -108,7 +102,7 @@ class EnhancedSummarySection extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                structured.overview,
+                conversation.structured.overview,
                 style: const TextStyle(
                   fontSize: 16,
                   height: 1.5,
@@ -120,31 +114,33 @@ class EnhancedSummarySection extends StatelessWidget {
         ),
 
         // Key Takeaways Section
-        if (structured.keyTakeaways.isNotEmpty) ...[
+        if (conversation.structured.keyTakeaways.isNotEmpty) ...[
           _buildSectionHeader(
               context, 'Key Takeaways', Icons.lightbulb_outline),
-          _buildBulletPointList(structured.keyTakeaways),
+          _buildBulletPointList(conversation.structured.keyTakeaways),
           const SizedBox(height: 24),
         ],
 
         // Things to Improve Section
-        if (structured.thingsToImprove.isNotEmpty) ...[
+        if (conversation.structured.thingsToImprove.isNotEmpty) ...[
           _buildPersonalizedSectionHeader(
               context, 'Things to Improve for $userName', Icons.trending_up),
-          _buildPersonalizedBulletPointList(structured.thingsToImprove),
+          _buildPersonalizedBulletPointList(
+              conversation.structured.thingsToImprove),
           const SizedBox(height: 24),
         ],
 
         // Things to Learn Section
-        if (structured.thingsToLearn.isNotEmpty) ...[
+        if (conversation.structured.thingsToLearn.isNotEmpty) ...[
           _buildPersonalizedSectionHeader(
               context, 'Things for $userName to Learn', Icons.school_outlined),
-          _buildPersonalizedBulletPointList(structured.thingsToLearn),
+          _buildPersonalizedBulletPointList(
+              conversation.structured.thingsToLearn),
           const SizedBox(height: 24),
         ],
 
         // Add image gallery at the bottom if available
-        if (imageDataList != null && imageDataList!.isNotEmpty) ...[
+        if (conversation.structured.imageUrls.isNotEmpty) ...[
           const SizedBox(height: 24),
           _buildImagesSection(context),
         ],
@@ -387,7 +383,9 @@ class EnhancedSummarySection extends StatelessWidget {
         // Section header
         _buildSectionHeader(
             context,
-            imageDataList!.length > 1 ? 'Source Images' : 'Source Image',
+            conversation.structured.imageUrls.length > 1
+                ? 'Source Images'
+                : 'Source Image',
             Icons.photo_library),
 
         // Image gallery
@@ -400,7 +398,7 @@ class EnhancedSummarySection extends StatelessWidget {
             mainAxisSpacing: 10,
             childAspectRatio: 1.0,
           ),
-          itemCount: imageDataList!.length,
+          itemCount: conversation.structured.imageUrls.length,
           itemBuilder: (context, index) {
             return _buildImageCard(context, index);
           },
@@ -419,44 +417,25 @@ class EnhancedSummarySection extends StatelessWidget {
       color: Colors.black.withOpacity(0.3),
       child: InkWell(
         onTap: () {
-          // Show full-screen image with description when tapped
+          // Show full-screen image when tapped
           _showFullScreenImage(context, index);
         },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Image takes most of the card space
-            Expanded(
-              flex: 4,
-              child: Image.memory(
-                imageDataList![index],
-                fit: BoxFit.cover,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: CachedNetworkImage(
+            imageUrl: conversation.structured.imageUrls[index],
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              color: Colors.grey.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(),
               ),
             ),
-
-            // Description preview (if available)
-            if (imageDescriptions != null &&
-                index < imageDescriptions!.length &&
-                imageDescriptions![index].isNotEmpty)
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                  ),
-                  child: Text(
-                    _truncateDescription(imageDescriptions![index]),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: Colors.white70,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-          ],
+            errorWidget: (context, url, error) => Container(
+              color: Colors.grey.withOpacity(0.3),
+              child: const Icon(Icons.error, color: Colors.white),
+            ),
+          ),
         ),
       ),
     );
@@ -483,7 +462,7 @@ class EnhancedSummarySection extends StatelessWidget {
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     Text(
-                      'Image ${index + 1}/${imageDataList!.length}',
+                      'Image ${index + 1}/${conversation.structured.imageUrls.length}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 18,
@@ -500,54 +479,27 @@ class EnhancedSummarySection extends StatelessWidget {
                   minScale: 0.5,
                   maxScale: 4.0,
                   child: Center(
-                    child: Image.memory(
-                      imageDataList![index],
+                    child: CachedNetworkImage(
+                      imageUrl: conversation.structured.imageUrls[index],
                       fit: BoxFit.contain,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey.withOpacity(0.3),
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey.withOpacity(0.3),
+                        child: const Icon(Icons.error, color: Colors.white),
+                      ),
                     ),
                   ),
                 ),
               ),
-
-              // Image description
-              if (imageDescriptions != null &&
-                  index < imageDescriptions!.length &&
-                  imageDescriptions![index].isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.black.withOpacity(0.7),
-                  width: double.infinity,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Image Description:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        imageDescriptions![index],
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.white,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _truncateDescription(String description) {
-    if (description.length <= 50) return description;
-    return '${description.substring(0, 47)}...';
   }
 }

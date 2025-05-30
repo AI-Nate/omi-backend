@@ -435,9 +435,7 @@ class SummaryTab extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: EnhancedSummarySection(
                         conversation: provider.conversation,
-                        enhancedByImage: provider.hasImageEnhancedSummary,
-                        imageDataList: provider.summaryImageDataList,
-                        imageDescriptions: provider.summaryImageDescriptions,
+                        enhancedByImage: provider.hasImageEnhancedSummary(),
                       ),
                     ),
                     // Add space at the bottom but do not show the basic summary

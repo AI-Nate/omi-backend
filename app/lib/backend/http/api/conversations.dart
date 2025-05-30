@@ -1017,7 +1017,43 @@ Future<ServerConversation?> uploadAndProcessConversationImages(
     debugPrint('DEBUG CLIENT: Response body: ${response.body}');
 
     if (response.statusCode == 200) {
-      return ServerConversation.fromJson(jsonDecode(response.body));
+      try {
+        final responseData = jsonDecode(response.body);
+        debugPrint('DEBUG CLIENT: Parsed response data successfully');
+
+        // Check if structured data exists and has image URLs
+        if (responseData['structured'] != null) {
+          final structured = responseData['structured'];
+          debugPrint('DEBUG CLIENT: Structured data found');
+
+          // Check both possible field names
+          final imageUrls =
+              structured['imageUrls'] ?? structured['image_urls'] ?? [];
+          debugPrint('DEBUG CLIENT: Image URLs in response: $imageUrls');
+          debugPrint('DEBUG CLIENT: Number of image URLs: ${imageUrls.length}');
+
+          // Check other structured fields
+          debugPrint(
+              'DEBUG CLIENT: Overview length: ${(structured['overview'] ?? '').length}');
+          debugPrint(
+              'DEBUG CLIENT: Key takeaways count: ${(structured['keyTakeaways'] ?? structured['key_takeaways'] ?? []).length}');
+        } else {
+          debugPrint('DEBUG CLIENT: No structured data in response');
+        }
+
+        final conversation = ServerConversation.fromJson(responseData);
+        debugPrint('DEBUG CLIENT: ServerConversation created successfully');
+        debugPrint(
+            'DEBUG CLIENT: Conversation image URLs after parsing: ${conversation.structured.imageUrls}');
+        debugPrint(
+            'DEBUG CLIENT: Number of images in conversation object: ${conversation.structured.imageUrls.length}');
+
+        return conversation;
+      } catch (e) {
+        debugPrint('ERROR CLIENT: Failed to parse response: $e');
+        debugPrint('ERROR CLIENT: Response body was: ${response.body}');
+        return null;
+      }
     } else {
       debugPrint(
           'ERROR CLIENT: Upload failed with ${response.statusCode}: ${response.body}');

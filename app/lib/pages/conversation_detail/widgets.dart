@@ -564,8 +564,8 @@ class GetAppsWidgets extends StatelessWidget {
         final summarizedApp = provider.getSummarizedApp();
         final structured = provider.conversation.structured;
         final hasStructuredOverview = structured.overview.trim().isNotEmpty;
-        final isProcessingImage = provider.loadingImageAnalysis;
-        final hasImageEnhancement = provider.hasImageEnhancedSummary;
+        final isProcessingImage = provider.isImageSummaryLoading;
+        final hasImageEnhancement = provider.hasImageEnhancedSummary();
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -1244,7 +1244,7 @@ class GetSheetMainOptions extends StatelessWidget {
               children: [
                 ListTile(
                   title: const Text('Add Image to Summary'),
-                  leading: provider.loadingImageAnalysis
+                  leading: provider.isImageSummaryLoading
                       ? const SizedBox(
                           width: 24,
                           height: 24,
@@ -1254,20 +1254,20 @@ class GetSheetMainOptions extends StatelessWidget {
                           ),
                         )
                       : const Icon(Icons.add_photo_alternate),
-                  subtitle: provider.loadingImageAnalysis
+                  subtitle: provider.isImageSummaryLoading
                       ? const Text(
-                          'Enhancing summary with image content...',
+                          'Uploading and processing images...',
                           style: TextStyle(
                             color: Colors.grey,
                             fontSize: 12,
                           ),
                         )
                       : null,
-                  onTap: provider.loadingImageAnalysis
+                  onTap: provider.isImageSummaryLoading
                       ? null
                       : () async {
                           Navigator.pop(context);
-                          provider.addImageToSummary(context);
+                          provider.addImageToSummary();
                         },
                 )
               ],

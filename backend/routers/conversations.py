@@ -766,6 +766,10 @@ async def upload_and_process_conversation_images(
         uploaded_urls = upload_multiple_conversation_images(images_data, uid, conversation_id)
         image_urls.extend(uploaded_urls)
         
+        print(f"DEBUG: Uploaded {len(uploaded_urls)} images to Firebase Storage:")
+        for i, url in enumerate(uploaded_urls):
+            print(f"DEBUG: Image {i}: {url}")
+        
         # Get image descriptions using OpenAI
         for image_data in images_data:
             try:
@@ -788,6 +792,9 @@ async def upload_and_process_conversation_images(
         # Check if this is the first image enhancement for this conversation
         existing_image_urls = conversation.structured.image_urls or []
         is_first_enhancement = len(existing_image_urls) == 0
+        
+        print(f"DEBUG: Existing image URLs: {existing_image_urls}")
+        print(f"DEBUG: Is first enhancement: {is_first_enhancement}")
         
         # Create prompt for OpenAI to analyze images and enhance summary
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
@@ -862,6 +869,8 @@ async def upload_and_process_conversation_images(
             temperature=0.1
         )
         
+        print(f"DEBUG: OpenAI processing completed successfully")
+        
         # Update the conversation structured data
         if is_first_enhancement:
             # First enhancement - replace content
@@ -893,13 +902,26 @@ async def upload_and_process_conversation_images(
                 if not _contains_similar_item(existing_contents, learning_content):
                     conversation.structured.things_to_learn.append(learning)
         
+        print(f"DEBUG: Before adding image URLs - current image_urls: {conversation.structured.image_urls}")
+        
         # Add image URLs to the conversation
         conversation.structured.image_urls.extend(image_urls)
+        
+        print(f"DEBUG: After adding image URLs - updated image_urls: {conversation.structured.image_urls}")
         
         # Update the conversation in the database
         conversations_db.update_conversation_structured(uid, conversation_id, conversation.structured.dict())
         
-        return conversation
+        print(f"DEBUG: Database updated successfully")
+        
+        # Fetch the updated conversation from database to ensure we have the latest data
+        updated_conversation_data = _get_conversation_by_id(uid, conversation_id)
+        final_conversation = Conversation(**updated_conversation_data)
+        
+        print(f"DEBUG: Final conversation image URLs from database: {final_conversation.structured.image_urls}")
+        print(f"DEBUG: Returning conversation with {len(final_conversation.structured.image_urls)} image URLs")
+        
+        return final_conversation
         
     except Exception as e:
         print(f"Error processing images: {e}")

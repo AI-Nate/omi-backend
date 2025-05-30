@@ -18,6 +18,9 @@ class Structured {
 
   List<Event> events = [];
 
+  // Image URLs for images uploaded to Firebase Storage
+  List<String> imageUrls = [];
+
   Structured(this.title, this.overview,
       {this.id = 0, this.emoji = '', this.category = 'other'});
 
@@ -98,6 +101,14 @@ class Structured {
         ));
       }
     }
+
+    // Parse image URLs
+    if (json['imageUrls'] != null || json['image_urls'] != null) {
+      final imageUrls = json['imageUrls'] ?? json['image_urls'] ?? [];
+      structured.imageUrls =
+          (imageUrls as List).map<String>((item) => item.toString()).toList();
+    }
+
     return structured;
   }
 
@@ -157,6 +168,7 @@ class Structured {
       'thingsToLearn': thingsToLearn.map((item) => item.toJson()).toList(),
       'actionItems': actionItems.map((item) => item.description).toList(),
       'events': events.map((event) => event.toJson()).toList(),
+      'imageUrls': imageUrls,
     };
   }
 }

@@ -34,6 +34,7 @@ import 'package:omi/providers/developer_mode_provider.dart';
 import 'package:omi/providers/device_provider.dart';
 import 'package:omi/providers/memories_provider.dart';
 import 'package:omi/providers/home_provider.dart';
+import 'package:omi/providers/timeline_provider.dart';
 import 'package:omi/providers/conversation_provider.dart';
 import 'package:omi/providers/message_provider.dart';
 import 'package:omi/providers/onboarding_provider.dart';
@@ -229,6 +230,20 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           ChangeNotifierProvider(create: (context) => PaymentMethodProvider()),
           ChangeNotifierProvider(create: (context) => PersonaProvider()),
           ChangeNotifierProvider(create: (context) => MemoriesProvider()),
+          ChangeNotifierProxyProvider<ConversationProvider, TimelineProvider>(
+            create: (context) => TimelineProvider(),
+            update: (BuildContext context, conversation,
+                TimelineProvider? previous) {
+              if (previous != null) {
+                previous.setConversationProvider(conversation);
+                return previous;
+              } else {
+                final provider = TimelineProvider();
+                provider.setConversationProvider(conversation);
+                return provider;
+              }
+            },
+          ),
         ],
         builder: (context, child) {
           return WithForegroundTask(
