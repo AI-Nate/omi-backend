@@ -656,27 +656,47 @@ async def upload_and_process_conversation_images(
     """
     Upload one or more images to Firebase Storage and process them with OpenAI to enhance the conversation summary.
     """
+    print(f"DEBUG: Starting upload_and_process_conversation_images for conversation {conversation_id}, user {uid}")
+    print(f"DEBUG: Received {len(files)} files")
+    
     # Get the existing conversation
-    conversation_data = _get_conversation_by_id(uid, conversation_id)
-    conversation = Conversation(**conversation_data)
+    try:
+        conversation_data = _get_conversation_by_id(uid, conversation_id)
+        conversation = Conversation(**conversation_data)
+        print(f"DEBUG: Successfully retrieved conversation")
+    except Exception as e:
+        print(f"DEBUG: Error retrieving conversation: {e}")
+        raise HTTPException(status_code=404, detail=f"Conversation not found: {str(e)}")
     
     # Validate files
     if not files:
+        print(f"DEBUG: No files provided")
         raise HTTPException(status_code=400, detail="No files provided")
     
+    print(f"DEBUG: Starting file validation")
     # Check file types and sizes
-    for file in files:
+    for i, file in enumerate(files):
+        print(f"DEBUG: Validating file {i}: {file.filename}, content_type: {file.content_type}")
         if not file.content_type.startswith('image/'):
+            print(f"DEBUG: File {file.filename} is not an image: {file.content_type}")
             raise HTTPException(status_code=400, detail=f"File {file.filename} is not an image")
         
         # Check file size (limit to 10MB per image)
         file_size = 0
-        content = await file.read()
-        file_size = len(content)
-        await file.seek(0)  # Reset file pointer
+        try:
+            content = await file.read()
+            file_size = len(content)
+            await file.seek(0)  # Reset file pointer
+            print(f"DEBUG: File {file.filename} size: {file_size} bytes")
+        except Exception as e:
+            print(f"DEBUG: Error reading file {file.filename}: {e}")
+            raise HTTPException(status_code=400, detail=f"Error reading file {file.filename}")
         
         if file_size > 10 * 1024 * 1024:  # 10MB limit
+            print(f"DEBUG: File {file.filename} is too large: {file_size}")
             raise HTTPException(status_code=400, detail=f"File {file.filename} is too large (max 10MB)")
+    
+    print(f"DEBUG: File validation completed successfully")
     
     try:
         # Read image data and upload to Firebase Storage
