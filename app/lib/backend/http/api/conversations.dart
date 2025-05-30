@@ -10,6 +10,7 @@ import 'package:omi/backend/schema/structured.dart';
 import 'package:omi/backend/schema/transcript_segment.dart';
 import 'package:omi/env/env.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:instabug_flutter/instabug_flutter.dart';
 import 'package:path/path.dart';
 import 'package:omi/backend/http/openai.dart';
@@ -944,5 +945,47 @@ Future<void> enrichConversationSummaryWithMultipleImages(
     }
   } catch (e) {
     debugPrint('Error generating image-enriched summary: $e');
+  }
+}
+
+// New function to upload images directly to backend
+Future<ServerConversation?> uploadAndProcessConversationImages(
+    String conversationId, List<Uint8List> imagesData) async {
+  try {
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse(
+          '${Env.apiBaseUrl}v1/conversations/$conversationId/upload-images'),
+    );
+
+    // Add authorization header
+    request.headers.addAll({'Authorization': await getAuthHeader()});
+
+    // Add image files to the request
+    for (int i = 0; i < imagesData.length; i++) {
+      var multipartFile = http.MultipartFile.fromBytes(
+        'files',
+        imagesData[i],
+        filename: 'image_$i.jpg',
+        contentType: MediaType('image', 'jpeg'),
+      );
+      request.files.add(multipartFile);
+    }
+
+    // Send the request
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    debugPrint('uploadAndProcessConversationImages: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      return ServerConversation.fromJson(jsonDecode(response.body));
+    } else {
+      debugPrint('Error uploading images: ${response.body}');
+      return null;
+    }
+  } catch (e) {
+    debugPrint('Error uploading and processing images: $e');
+    return null;
   }
 }
