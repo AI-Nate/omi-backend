@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to read conversation images
+    match /{userId}/conversation_images/{allPaths=**} {
+      // Allow read access to authenticated users for their own images
+      // or to any authenticated user (since conversation images can be shared)
+      allow read: if request.auth != null;
+      
+      // Only allow writes from service accounts or the image owner
+      allow write: if request.auth != null && 
+                      (request.auth.uid == userId || 
+                       request.auth.token.admin == true);
+    }
+    
+    // Allow authenticated users to read other user profile/shared content
+    match /{userId}/shared/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Default: deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+} 
