@@ -967,7 +967,7 @@ Future<ServerConversation?> uploadAndProcessConversationImages(
         'files',
         imagesData[i],
         filename: 'image_$i.jpg',
-        contentType: MediaType('image', 'jpeg'),
+        contentType: MediaType.parse('image/jpeg'),
       );
       request.files.add(multipartFile);
     }
