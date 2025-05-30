@@ -1,5 +1,9 @@
 import json
 import os
+import sys
+
+# Add parent directory to path to find routers module
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import firebase_admin
 from fastapi import FastAPI
