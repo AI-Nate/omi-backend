@@ -134,6 +134,10 @@ class Structured(BaseModel):
         description="A list of events extracted from the conversation, that the user must have on his calendar.",
         default=[],
     )
+    image_urls: List[str] = Field(
+        description="URLs of images uploaded to Firebase Storage that enhance this conversation summary",
+        default=[],
+    )
 
     def __str__(self):
         result = (f"{str(self.title).capitalize()} ({str(self.category.value).capitalize()})\n"

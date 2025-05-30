@@ -198,3 +198,37 @@ def set_user_language_preference(uid: str, language: str) -> None:
     """
     user_ref = db.collection('users').document(uid)
     user_ref.set({'language': language}, merge=True)
+
+
+def get_user_name(uid: str) -> str:
+    """
+    Get the user's name.
+    
+    Args:
+        uid: User ID
+        
+    Returns:
+        User's name or 'User' as default
+    """
+    user_ref = db.collection('users').document(uid)
+    user_doc = user_ref.get()
+    
+    if user_doc.exists:
+        user_data = user_doc.to_dict()
+        # Try different possible name fields
+        name = user_data.get('name') or user_data.get('given_name') or user_data.get('full_name')
+        return name if name else 'User'
+    
+    return 'User'  # Return default if user not found
+
+
+def set_user_name(uid: str, name: str) -> None:
+    """
+    Set the user's name.
+    
+    Args:
+        uid: User ID
+        name: User's name
+    """
+    user_ref = db.collection('users').document(uid)
+    user_ref.set({'name': name}, merge=True)

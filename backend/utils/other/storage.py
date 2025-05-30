@@ -331,3 +331,93 @@ def upload_multi_chat_files(files_name: List[str], uid: str) -> dict:
         else:
             dictFiles[name] = f'https://storage.googleapis.com/{chat_files_bucket}/{uid}/{name}'
     return dictFiles
+
+
+# **********************************
+# ******* CONVERSATION IMAGES *******
+# **********************************
+def upload_conversation_image(image_data: bytes, uid: str, conversation_id: str, image_index: int = 0) -> str:
+    """
+    Upload an image for a conversation summary to Firebase Storage.
+    
+    Args:
+        image_data: Raw image data as bytes
+        uid: User ID
+        conversation_id: ID of the conversation
+        image_index: Index of the image (for multiple images per conversation)
+    
+    Returns:
+        str: Public URL of the uploaded image
+    """
+    import uuid
+    import tempfile
+    import os
+    
+    # Create a unique filename
+    unique_id = str(uuid.uuid4())[:8]
+    filename = f"{conversation_id}_{image_index}_{unique_id}.jpg"
+    
+    # Create temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+        temp_file.write(image_data)
+        temp_file_path = temp_file.name
+    
+    try:
+        # Upload to Firebase Storage
+        bucket = storage_client.bucket(chat_files_bucket)  # Reusing chat files bucket
+        path = f'{uid}/conversation_images/{filename}'
+        blob = bucket.blob(path)
+        blob.cache_control = 'public, max-age=3600'  # Cache for 1 hour
+        blob.upload_from_filename(temp_file_path)
+        
+        # Return public URL
+        public_url = f'https://storage.googleapis.com/{chat_files_bucket}/{path}'
+        return public_url
+        
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+
+
+def upload_multiple_conversation_images(images_data: List[bytes], uid: str, conversation_id: str) -> List[str]:
+    """
+    Upload multiple images for a conversation summary to Firebase Storage.
+    
+    Args:
+        images_data: List of raw image data as bytes
+        uid: User ID
+        conversation_id: ID of the conversation
+    
+    Returns:
+        List[str]: List of public URLs of the uploaded images
+    """
+    urls = []
+    for index, image_data in enumerate(images_data):
+        try:
+            url = upload_conversation_image(image_data, uid, conversation_id, index)
+            urls.append(url)
+        except Exception as e:
+            print(f"Failed to upload image {index} for conversation {conversation_id}: {e}")
+            continue
+    return urls
+
+
+def delete_conversation_images(uid: str, conversation_id: str):
+    """
+    Delete all images associated with a conversation.
+    
+    Args:
+        uid: User ID
+        conversation_id: ID of the conversation
+    """
+    bucket = storage_client.bucket(chat_files_bucket)
+    prefix = f'{uid}/conversation_images/{conversation_id}_'
+    blobs = bucket.list_blobs(prefix=prefix)
+    
+    for blob in blobs:
+        try:
+            blob.delete()
+            print(f"Deleted conversation image: {blob.name}")
+        except Exception as e:
+            print(f"Failed to delete conversation image {blob.name}: {e}")

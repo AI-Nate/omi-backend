@@ -1,6 +1,7 @@
 import json
 import re
 import os
+import base64
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Tuple, Dict
 
@@ -64,6 +65,54 @@ def num_tokens_from_string(string: str) -> int:
 
 
 # TODO: include caching layer, redis
+
+
+# **********************************************
+# *********** IMAGE ANALYSIS ******************
+# **********************************************
+
+def analyze_image_content(image_data: bytes) -> str:
+    """
+    Analyze image content using OpenAI Vision API.
+    
+    Args:
+        image_data: Raw image data as bytes
+    
+    Returns:
+        str: Description of the image content
+    """
+    try:
+        # Encode image to base64
+        base64_image = base64.b64encode(image_data).decode('utf-8')
+        
+        # Create vision-compatible OpenAI client
+        vision_llm = ChatOpenAI(model='gpt-4o')
+        
+        # Create the message with image
+        message = HumanMessage(
+            content=[
+                {
+                    "type": "text",
+                    "text": "Analyze this image and provide a detailed description of what you see. Focus on the main subjects, activities, objects, text, settings, and any other relevant details that could be useful for understanding the context and content."
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}",
+                        "detail": "high"
+                    }
+                }
+            ]
+        )
+        
+        # Get response from OpenAI
+        response = vision_llm.invoke([message])
+        
+        return response.content.strip()
+        
+    except Exception as e:
+        print(f"Error analyzing image content: {e}")
+        return "Image content could not be analyzed"
 
 
 # **********************************************
