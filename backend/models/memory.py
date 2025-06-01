@@ -48,6 +48,7 @@ class CategoryEnum(str, Enum):
     family = 'family'
     economics = 'economics'
     environment = 'environment'
+    nature = 'nature'
     other = 'other'
 
 
