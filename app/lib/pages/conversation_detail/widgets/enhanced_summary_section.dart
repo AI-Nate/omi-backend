@@ -408,6 +408,7 @@ class EnhancedSummarySection extends StatelessWidget {
   }
 
   Widget _buildImageCard(BuildContext context, int index) {
+    final imageUrl = conversation.structured.imageUrls[index];
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -423,18 +424,25 @@ class EnhancedSummarySection extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: CachedNetworkImage(
-            imageUrl: conversation.structured.imageUrls[index],
+            imageUrl: imageUrl,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.grey.withOpacity(0.3),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.grey.withOpacity(0.3),
-              child: const Icon(Icons.error, color: Colors.white),
-            ),
+            placeholder: (context, url) {
+              return Container(
+                color: Colors.grey.withOpacity(0.3),
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            },
+            errorWidget: (context, url, error) {
+              return Container(
+                color: Colors.grey.withOpacity(0.3),
+                child: const Icon(Icons.error, color: Colors.white),
+              );
+            },
+            imageBuilder: (context, imageProvider) {
+              return Image(image: imageProvider, fit: BoxFit.cover);
+            },
           ),
         ),
       ),

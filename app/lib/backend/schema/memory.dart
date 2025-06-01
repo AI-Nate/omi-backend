@@ -1,4 +1,14 @@
-enum MemoryCategory { core, lifestyle, hobbies, interests, habits, work, skills, learnings, other }
+enum MemoryCategory {
+  core,
+  lifestyle,
+  hobbies,
+  interests,
+  habits,
+  work,
+  skills,
+  learnings,
+  other
+}
 
 enum MemoryVisibility { private, public }
 
@@ -51,7 +61,8 @@ class Memory {
       edited: json['edited'] ?? false,
       deleted: json['deleted'] ?? false,
       visibility: json['visibility'] != null
-          ? (MemoryVisibility.values.asNameMap()[json['visibility']] ?? MemoryVisibility.public)
+          ? (MemoryVisibility.values.asNameMap()[json['visibility']] ??
+              MemoryVisibility.public)
           : MemoryVisibility.public,
     );
   }

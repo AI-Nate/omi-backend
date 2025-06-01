@@ -42,6 +42,7 @@ import 'package:omi/pages/payments/payment_method_provider.dart';
 import 'package:omi/providers/speech_profile_provider.dart';
 import 'package:omi/services/notifications.dart';
 import 'package:omi/services/services.dart';
+import 'package:omi/services/firebase_storage_service.dart';
 import 'package:omi/utils/alerts/app_snackbar.dart';
 import 'package:omi/utils/analytics/growthbook.dart';
 import 'package:omi/utils/analytics/intercom.dart';
@@ -67,6 +68,10 @@ Future<bool> _init() async {
     await Firebase.initializeApp(
         options: dev.DefaultFirebaseOptions.currentPlatform, name: 'dev');
   }
+
+  // Initialize Firebase Storage
+  FirebaseStorageService()
+      .initialize(bucketName: 'omi-how-to-learn-fd5fd.firebasestorage.app');
 
   await IntercomManager().initIntercom();
   await NotificationService.instance.initialize();

@@ -389,9 +389,12 @@ class SummaryTab extends StatelessWidget {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Selector<ConversationDetailProvider,
-          Tuple3<bool, bool, Function(int)>>(
-        selector: (context, provider) => Tuple3(provider.conversation.discarded,
-            provider.showRatingUI, provider.setConversationRating),
+          Tuple4<bool, bool, Function(int), List<String>>>(
+        selector: (context, provider) => Tuple4(
+            provider.conversation.discarded,
+            provider.showRatingUI,
+            provider.setConversationRating,
+            provider.conversation.structured.imageUrls),
         builder: (context, data, child) {
           // Get the most up-to-date conversation data
           final provider =

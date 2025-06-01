@@ -36,6 +36,7 @@ dependencies:
   firebase_core: 3.13.0
   firebase_auth: 5.5.3
   firebase_messaging: 15.2.5
+  firebase_storage: ^12.3.2
 
   # Analytics and Support
   intercom_flutter: 9.2.10
@@ -111,7 +112,7 @@ dependency_overrides:
   uuid: ^4.4.0
   js: ^0.7.1
   google_sign_in_ios: 5.8.1
-  geolocator_android: ^5.0.0
+  geolocator_android: 4.6.2
   opus_flutter_ios:
     git:
       url: https://github.com/mdmohsin7/opus_flutter.git
@@ -121,11 +122,6 @@ dependency_overrides:
     git:
       url: https://github.com/mdmohsin7/opus_flutter.git
       path: opus_flutter_android
-    # flutter_blue_plus:
-    # git:
-    #   url: https://github.com/chipweinberger/flutter_blue_plus
-    #   ref: 1.32.13
-    #   version: ^1.32.13
   manage_calendar_events:
     git:
       url: https://github.com/beastoin/manage_calendar_events

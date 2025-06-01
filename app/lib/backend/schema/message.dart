@@ -13,7 +13,8 @@ enum MessageType {
   const MessageType(this.value);
 
   static MessageType valuesFromString(String value) {
-    return MessageType.values.firstWhereOrNull((e) => e.value == value) ?? MessageType.text;
+    return MessageType.values.firstWhereOrNull((e) => e.value == value) ??
+        MessageType.text;
   }
 }
 
@@ -68,7 +69,8 @@ class MessageFile {
   String mimeType;
   DateTime createdAt;
 
-  MessageFile(this.openaiFileId, this.thumbnail, this.name, this.mimeType, this.id, this.createdAt, this.thumbnailName);
+  MessageFile(this.openaiFileId, this.thumbnail, this.name, this.mimeType,
+      this.id, this.createdAt, this.thumbnailName);
 
   static MessageFile fromJson(Map<String, dynamic> json) {
     return MessageFile(
@@ -144,13 +146,18 @@ class ServerMessage {
       json['id'],
       DateTime.parse(json['created_at']).toLocal(),
       json['text'] ?? "",
-      MessageSender.values.firstWhere((e) => e.toString().split('.').last == json['sender']),
+      MessageSender.values
+          .firstWhere((e) => e.toString().split('.').last == json['sender']),
       MessageType.valuesFromString(json['type']),
       json['plugin_id'],
       json['from_integration'] ?? false,
-      ((json['files'] ?? []) as List<dynamic>).map((m) => MessageFile.fromJson(m)).toList(),
+      ((json['files'] ?? []) as List<dynamic>)
+          .map((m) => MessageFile.fromJson(m))
+          .toList(),
       (json['files_id'] ?? []).map((m) => m.toString()).toList(),
-      ((json['memories'] ?? []) as List<dynamic>).map((m) => MessageConversation.fromJson(m)).toList(),
+      ((json['memories'] ?? []) as List<dynamic>)
+          .map((m) => MessageConversation.fromJson(m))
+          .toList(),
       askForNps: json['ask_for_nps'] ?? false,
     );
   }

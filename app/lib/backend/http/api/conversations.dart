@@ -1265,3 +1265,96 @@ Future<Map<String, dynamic>> testImageUploadMethods(
 
   return results;
 }
+
+// Function to create a new conversation from images
+Future<ServerConversation?> createConversationFromImages(
+    List<Uint8List> imagesData) async {
+  debugPrint('DEBUG CLIENT: Starting createConversationFromImages');
+  debugPrint('DEBUG CLIENT: Number of images: ${imagesData.length}');
+
+  var request = http.MultipartRequest(
+    'POST',
+    Uri.parse('${Env.apiBaseUrl}v1/conversations/create-from-images'),
+  );
+
+  // Add authorization header
+  request.headers.addAll({'Authorization': await getAuthHeader()});
+  debugPrint('DEBUG CLIENT: Authorization header added');
+
+  // Add image files to the request
+  for (int i = 0; i < imagesData.length; i++) {
+    debugPrint(
+        'DEBUG CLIENT: Processing image $i, size: ${imagesData[i].length} bytes');
+
+    // Detect image type from magic bytes
+    String detectedType = 'jpeg'; // default
+    String mimeType = 'image/jpeg'; // default
+
+    if (imagesData[i].length > 8) {
+      // Check for JPEG
+      if (imagesData[i][0] == 0xFF && imagesData[i][1] == 0xD8) {
+        detectedType = 'jpeg';
+        mimeType = 'image/jpeg';
+      }
+      // Check for PNG
+      else if (imagesData[i][0] == 0x89 &&
+          imagesData[i][1] == 0x50 &&
+          imagesData[i][2] == 0x4E &&
+          imagesData[i][3] == 0x47) {
+        detectedType = 'png';
+        mimeType = 'image/png';
+      }
+    }
+
+    debugPrint(
+        'DEBUG CLIENT: Image $i detected as $detectedType, using MIME type: $mimeType');
+
+    var mediaType = MediaType('image', detectedType == 'png' ? 'png' : 'jpeg');
+
+    var multipartFile = http.MultipartFile.fromBytes(
+      'files',
+      imagesData[i],
+      filename: 'image_$i.$detectedType',
+      contentType: mediaType,
+    );
+
+    debugPrint('DEBUG CLIENT: MultipartFile created for image $i');
+    request.files.add(multipartFile);
+  }
+
+  debugPrint('DEBUG CLIENT: All files added, sending request...');
+
+  try {
+    // Send the request
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    debugPrint('DEBUG CLIENT: Response received');
+    debugPrint('DEBUG CLIENT: Status code: ${response.statusCode}');
+    debugPrint('DEBUG CLIENT: Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      try {
+        var conversation =
+            ServerConversation.fromJson(jsonDecode(response.body));
+        debugPrint(
+            'DEBUG CLIENT: Successfully created new conversation from images');
+        debugPrint('DEBUG CLIENT: New conversation ID: ${conversation.id}');
+        debugPrint(
+            'DEBUG CLIENT: Number of images in new conversation: ${conversation.structured.imageUrls.length}');
+        return conversation;
+      } catch (e) {
+        debugPrint('ERROR CLIENT: Failed to parse response: $e');
+        debugPrint('ERROR CLIENT: Response body was: ${response.body}');
+        return null;
+      }
+    } else {
+      debugPrint(
+          'ERROR CLIENT: Create conversation failed with ${response.statusCode}: ${response.body}');
+      return null;
+    }
+  } catch (e) {
+    debugPrint('ERROR CLIENT: Exception during conversation creation: $e');
+    return null;
+  }
+}

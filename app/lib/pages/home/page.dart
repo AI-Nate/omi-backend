@@ -28,6 +28,7 @@ import 'package:omi/providers/device_provider.dart';
 import 'package:omi/providers/home_provider.dart';
 import 'package:omi/providers/conversation_provider.dart';
 import 'package:omi/providers/message_provider.dart';
+import 'package:omi/providers/timeline_provider.dart';
 import 'package:omi/services/notifications.dart';
 import 'package:omi/utils/analytics/analytics_manager.dart';
 import 'package:omi/utils/analytics/mixpanel.dart';
@@ -720,6 +721,76 @@ class _HomePageState extends State<HomePage>
           ),
           Row(
             children: [
+              // Add + button for Timeline tab only
+              Consumer<HomeProvider>(
+                builder: (context, homeProvider, child) {
+                  if (homeProvider.selectedIndex == 1) {
+                    // Timeline tab
+                    return Consumer<TimelineProvider>(
+                      builder: (context, timelineProvider, child) {
+                        return Container(
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.transparent,
+                          ),
+                          child: IconButton(
+                            padding:
+                                const EdgeInsets.fromLTRB(2.0, 2.0, 8.0, 2.0),
+                            icon: timelineProvider.isCreatingFromImages
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.add,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                            onPressed: timelineProvider.isCreatingFromImages
+                                ? null
+                                : () async {
+                                    MixpanelManager()
+                                        .track('Timeline Add Images Clicked');
+
+                                    final newConversation = await timelineProvider
+                                        .createTimelineConversationFromImages();
+
+                                    if (newConversation != null &&
+                                        context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'New conversation created from images!'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    } else if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Failed to create conversation from images'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  },
+                          ),
+                        );
+                      },
+                    );
+                  } else {
+                    return const SizedBox
+                        .shrink(); // Don't show button for other tabs
+                  }
+                },
+              ),
               Container(
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,

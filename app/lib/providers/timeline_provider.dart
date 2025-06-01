@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:omi/backend/http/api/conversations.dart';
 import 'package:omi/backend/schema/conversation.dart';
 import 'package:omi/backend/preferences.dart';
@@ -41,12 +44,15 @@ class TimelineEvent {
                 60);
 
     // Calculate duration in minutes
-    int duration = 30; // default
+    int duration = 30; // default for normal conversations
     if (conversation.finishedAt != null && conversation.startedAt != null) {
       duration = conversation.finishedAt!
           .difference(conversation.startedAt!)
           .inMinutes;
-      if (duration <= 0) duration = 30;
+      if (duration <= 0) {
+        // Use shorter duration for image-based conversations
+        duration = conversation.source == ConversationSource.workflow ? 5 : 30;
+      }
     }
 
     return TimelineEvent(
@@ -74,11 +80,13 @@ class TimelineProvider extends ChangeNotifier {
   String _searchQuery = '';
   List<String> _selectedCategories = [];
   ConversationProvider? _conversationProvider;
+  bool _isCreatingFromImages = false;
 
   List<TimelineEvent> get events => _filteredEvents();
   List<TimelineEvent> get allEvents => _events;
   String get searchQuery => _searchQuery;
   List<String> get selectedCategories => _selectedCategories;
+  bool get isCreatingFromImages => _isCreatingFromImages;
 
   // Group events by date for better timeline organization
   Map<DateTime, List<TimelineEvent>> get groupedEvents {
@@ -289,6 +297,47 @@ class TimelineProvider extends ChangeNotifier {
       'food': '#F59E0B',
     };
     return categoryColors[category.toLowerCase()] ?? '#6B7280';
+  }
+
+  // Create a new conversation from images
+  Future<ServerConversation?> createTimelineConversationFromImages() async {
+    if (_isCreatingFromImages) return null;
+
+    try {
+      _isCreatingFromImages = true;
+      notifyListeners();
+
+      final ImagePicker picker = ImagePicker();
+
+      // Allow user to pick multiple images
+      final List<XFile> images = await picker.pickMultiImage();
+
+      if (images.isNotEmpty) {
+        List<Uint8List> imagesData = [];
+
+        // Read all selected images
+        for (XFile image in images) {
+          final Uint8List imageBytes = await image.readAsBytes();
+          imagesData.add(imageBytes);
+        }
+
+        // Create new conversation from images using the API function
+        final newConversation = await createConversationFromImages(imagesData);
+
+        if (newConversation != null) {
+          // Refresh conversations to include the new one
+          await _conversationProvider?.getInitialConversations();
+          return newConversation;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error creating conversation from images: $e');
+    } finally {
+      _isCreatingFromImages = false;
+      notifyListeners();
+    }
+
+    return null;
   }
 
   @override
