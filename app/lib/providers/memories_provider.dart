@@ -27,11 +27,14 @@ class MemoriesProvider extends ChangeNotifier {
   List<Memory> get filteredMemories {
     return _memories.where((memory) {
       // Apply search filter
-      final matchesSearch =
-          _searchQuery.isEmpty || memory.content.decodeString.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch = _searchQuery.isEmpty ||
+          memory.content.decodeString
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase());
 
       // Apply category filter
-      final matchesCategory = _categoryFilter == null || memory.category == _categoryFilter;
+      final matchesCategory =
+          _categoryFilter == null || memory.category == _categoryFilter;
 
       return matchesSearch && matchesCategory;
     }).toList()
@@ -55,7 +58,8 @@ class MemoriesProvider extends ChangeNotifier {
 
   void _setCategories() {
     categories = MemoryCategory.values.map((category) {
-      final count = memories.where((memory) => memory.category == category).length;
+      final count =
+          memories.where((memory) => memory.category == category).length;
       return Tuple2(category, count);
     }).toList();
     notifyListeners();
@@ -65,15 +69,44 @@ class MemoriesProvider extends ChangeNotifier {
     await loadMemories();
   }
 
+  Future<void> forceRefresh() async {
+    print('DEBUG: Force refreshing memories...');
+    await loadMemories();
+    notifyListeners();
+  }
+
   Future<void> loadMemories() async {
     _loading = true;
     notifyListeners();
 
+    print('DEBUG: Starting to load memories...');
     _memories = await getMemories();
-    _unreviewed = _memories
-        .where(
-            (memory) => !memory.reviewed && memory.createdAt.isAfter(DateTime.now().subtract(const Duration(days: 1))))
+    print('DEBUG: Loaded ${_memories.length} total memories from API');
+
+    // Debug: Print details about recent memories
+    final recentMemories = _memories
+        .where((memory) => memory.createdAt
+            .isAfter(DateTime.now().subtract(const Duration(days: 7))))
         .toList();
+
+    print('DEBUG: Found ${recentMemories.length} memories from last 7 days');
+    for (var memory in recentMemories) {
+      print(
+          'DEBUG: Memory - ID: ${memory.id.substring(0, 8)}..., reviewed: ${memory.reviewed}, userReview: ${memory.userReview}, createdAt: ${memory.createdAt}');
+    }
+
+    _unreviewed = _memories
+        .where((memory) =>
+            !memory.reviewed &&
+            memory.createdAt.isAfter(DateTime.now().subtract(const Duration(
+                days: 7)))) // Changed from 1 day to 7 days for testing
+        .toList();
+
+    print('DEBUG: Found ${_unreviewed.length} unreviewed memories');
+    for (var memory in _unreviewed) {
+      print(
+          'DEBUG: Unreviewed - ID: ${memory.id.substring(0, 8)}..., content: ${memory.content.substring(0, 50)}...');
+    }
 
     _loading = false;
     _setCategories();
@@ -98,7 +131,8 @@ class MemoriesProvider extends ChangeNotifier {
   }
 
   void createMemory(String content,
-      [MemoryVisibility visibility = MemoryVisibility.public, MemoryCategory category = MemoryCategory.core]) async {
+      [MemoryVisibility visibility = MemoryVisibility.public,
+      MemoryCategory category = MemoryCategory.core]) async {
     final newMemory = Memory(
       id: const Uuid().v4(),
       uid: SharedPreferencesUtil().uid,
@@ -117,7 +151,8 @@ class MemoriesProvider extends ChangeNotifier {
     _setCategories();
   }
 
-  Future<void> updateMemoryVisibility(Memory memory, MemoryVisibility visibility) async {
+  Future<void> updateMemoryVisibility(
+      Memory memory, MemoryVisibility visibility) async {
     await updateMemoryVisibilityServer(memory.id, visibility.name);
 
     final idx = _memories.indexWhere((m) => m.id == memory.id);
@@ -132,7 +167,8 @@ class MemoriesProvider extends ChangeNotifier {
     }
   }
 
-  void editMemory(Memory memory, String value, [MemoryCategory? category]) async {
+  void editMemory(Memory memory, String value,
+      [MemoryCategory? category]) async {
     await editMemoryServer(memory.id, value);
 
     final idx = _memories.indexWhere((m) => m.id == memory.id);
@@ -185,7 +221,8 @@ class MemoriesProvider extends ChangeNotifier {
   }
 
   Future<void> updateAllMemoriesVisibility(bool makePrivate) async {
-    final visibility = makePrivate ? MemoryVisibility.private : MemoryVisibility.public;
+    final visibility =
+        makePrivate ? MemoryVisibility.private : MemoryVisibility.public;
     int updatedCount = 0;
     List<Memory> memoriesSuccessfullyUpdated = [];
 

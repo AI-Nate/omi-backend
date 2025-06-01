@@ -71,27 +71,15 @@ def create_memory(uid: str, data: dict):
 
 
 def save_memories(uid: str, data: List[dict]):
-    print(f"DEBUG save_memories: Starting to save {len(data)} memories for user {uid}")
-    
     batch = db.batch()
     user_ref = db.collection(users_collection).document(uid)
     memories_ref = user_ref.collection(memories_collection)
     
-    for i, memory in enumerate(data):
-        print(f"DEBUG save_memories: Memory {i+1}/{len(data)}")
-        print(f"  - ID: {memory.get('id', 'NO_ID')[:8]}...")
-        print(f"  - manually_added: {memory.get('manually_added')}")
-        print(f"  - reviewed: {memory.get('reviewed')}")
-        print(f"  - user_review: {memory.get('user_review')} (type: {type(memory.get('user_review'))})")
-        print(f"  - user_review is None: {memory.get('user_review') is None}")
-        print(f"  - user_review is False: {memory.get('user_review') is False}")
-        
+    for memory in data:
         memory_ref = memories_ref.document(memory['id'])
         batch.set(memory_ref, memory)
         
-    print(f"DEBUG save_memories: Committing batch with {len(data)} memories")
     batch.commit()
-    print(f"DEBUG save_memories: Batch committed successfully")
 
 
 def delete_memories(uid: str):
