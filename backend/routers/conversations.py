@@ -157,7 +157,10 @@ def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
         # Convert to UTC using available information
         if timezone_offset is not None:
             # Use timezone offset from EXIF
-            utc_timestamp = local_timestamp - timedelta(minutes=timezone_offset)
+            utc_naive = local_timestamp - timedelta(minutes=timezone_offset)
+            # Convert to timezone-aware UTC datetime
+            import pytz
+            utc_timestamp = pytz.UTC.localize(utc_naive)
             print(f"DEBUG: Converted to UTC using EXIF timezone offset: {utc_timestamp}")
             return utc_timestamp
             
@@ -170,8 +173,8 @@ def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
                     local_tz = pytz.timezone(timezone_name)
                     # Localize the naive datetime to the GPS timezone
                     localized_dt = local_tz.localize(local_timestamp)
-                    # Convert to UTC
-                    utc_timestamp = localized_dt.astimezone(pytz.UTC).replace(tzinfo=None)
+                    # Convert to UTC timezone-aware datetime
+                    utc_timestamp = localized_dt.astimezone(pytz.UTC)
                     print(f"DEBUG: Converted to UTC using GPS timezone ({timezone_name}): {utc_timestamp}")
                     return utc_timestamp
             except Exception as e:
