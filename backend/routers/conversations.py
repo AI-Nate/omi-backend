@@ -686,6 +686,12 @@ def process_image_summary(
     if is_first_analysis:
         # Create a prompt to analyze the images and generate a new summary
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
+        
+        # Get valid categories for the prompt
+        from models.conversation import CategoryEnum
+        valid_categories = [cat.value for cat in CategoryEnum]
+        valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+        
         prompt = f"""
         You are a personal growth coach helping {user_name} discover profound meaning and growth opportunities from the visual moments they choose to capture and preserve.
 
@@ -731,6 +737,10 @@ def process_image_summary(
         - Help them see how their way of noticing and capturing moments is a valuable life skill
         - Encourage them to continue paying attention to what resonates with them visually
 
+        **Technical Requirements:**
+        - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
+        - Choose the category that best represents the main theme or content of the images
+
         User Information for Deep Personalization:
         - Name: {user_name}
         - Primary language: {user_language}
@@ -767,6 +777,12 @@ def process_image_summary(
         
         # Create a prompt to analyze the images and provide incremental insights
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
+        
+        # Get valid categories for the prompt
+        from models.conversation import CategoryEnum
+        valid_categories = [cat.value for cat in CategoryEnum]
+        valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+        
         prompt = f"""
         You are a personal growth coach helping {user_name} deepen the insights from their ongoing life journey.
         
@@ -815,6 +831,10 @@ def process_image_summary(
         - Help them see the value in paying attention to multiple dimensions of their experiences
         - Use encouraging language that celebrates their curiosity and growth mindset
 
+        **Technical Requirements:**
+        - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
+        - Choose the category that best represents the main theme or content of the images
+
         User Information for Deep Personalization:
         - Name: {user_name}
         - Primary language: {user_language}
@@ -822,7 +842,7 @@ def process_image_summary(
         {user_name}'s Original Conversation:
         {transcript}
         
-        What {user_name} Newly Captured:
+        New Image Descriptions:
         {images_text}
         """
         
@@ -1053,128 +1073,70 @@ async def upload_and_process_conversation_images(
         print(f"DEBUG: Existing image URLs: {existing_image_urls}")
         print(f"DEBUG: Is first enhancement: {is_first_enhancement}")
         
-        # Create prompt for OpenAI to analyze images and enhance summary
+        # Create structured data from images
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
         
-        if is_first_enhancement:
-            # First time enhancement - generate comprehensive enhanced summary
-            prompt = f"""
-            You are a personal growth coach helping {user_name} discover profound meaning and growth opportunities from the visual moments they choose to capture and preserve.
+        # Get valid categories for the prompt
+        from models.conversation import CategoryEnum
+        valid_categories = [cat.value for cat in CategoryEnum]
+        valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+        
+        prompt = f"""
+        You are a personal growth coach helping {user_name} discover profound meaning and growth opportunities from the visual moments they choose to capture and preserve.
 
-            {user_name} has shared visual content that was meaningful enough for them to capture and revisit. Your role is to help them understand the deeper significance of what they chose to document and how these visual moments can contribute to their personal journey and growth.
+        {user_name} has shared visual content that was meaningful enough for them to capture and revisit. Your role is to help them understand the deeper significance of what they chose to document and how these visual moments can contribute to their personal journey and growth.
 
-            **Think from {user_name}'s perspective**: These images represent moments that caught their attention, sparked their curiosity, or held some significance for them. Help them understand WHY these moments mattered and how they reflect their values, interests, and growth.
+        **Think from {user_name}'s perspective**: These images represent moments that caught their attention, sparked their curiosity, or held some significance for them. Help them understand WHY these moments mattered and how they reflect their values, interests, and growth.
 
-            Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
+        Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
 
-            1. **Overview**: Write directly to {user_name} about the significance of what they captured:
-               - What these visual moments reveal about their interests, values, or current life focus
-               - The personal meaning behind their choice to capture and preserve these specific moments
-               - How these images reflect their way of seeing and engaging with the world
-               - What this collection of visual content says about their personality, priorities, or journey
-               - The emotional or practical significance of these moments in their life story
+        1. **Overview**: Write directly to {user_name} about the significance of what they captured:
+           - What these visual moments reveal about their interests, values, or current life focus
+           - The personal meaning behind their choice to capture and preserve these specific moments
+           - How these images reflect their way of seeing and engaging with the world
+           - What this collection of visual content says about their personality, priorities, or journey
+           - The emotional or practical significance of these moments in their life story
 
-            2. **Key Takeaways**: Help {user_name} extract 3-5 profound insights from their visual choices:
-               - Personal realizations about what draws their attention and why
-               - Life lessons or patterns that emerge from what they choose to notice and capture
-               - Understanding about their aesthetic preferences, interests, or values
-               - Insights about their growth, curiosity, or areas of focus
-               - Recognition of their unique perspective and way of engaging with experiences
+        2. **Key Takeaways**: Help {user_name} extract 3-5 profound insights from their visual choices:
+           - Personal realizations about what draws their attention and why
+           - Life lessons or patterns that emerge from what they choose to notice and capture
+           - Understanding about their aesthetic preferences, interests, or values
+           - Insights about their growth, curiosity, or areas of focus
+           - Recognition of their unique perspective and way of engaging with experiences
 
-            3. **Growth Opportunities**: Provide 2-3 personalized suggestions for {user_name}:
-               - Start with empowering action verbs that inspire and motivate them
-               - Focus on skills, habits, or perspectives that will enhance their ability to engage meaningfully with life
-               - Connect improvements to their demonstrated interests and visual awareness
-               - Explain HOW each improvement will enrich their experiences and personal satisfaction
-               - Suggest ways to build on their existing strengths and curiosity
-               - Make recommendations feel like natural extensions of what they already love doing
+        3. **Growth Opportunities**: Provide 2-3 personalized suggestions for {user_name}:
+           - Start with empowering action verbs that inspire and motivate them
+           - Focus on skills, habits, or perspectives that will enhance their ability to engage meaningfully with life
+           - Connect improvements to their demonstrated interests and visual awareness
+           - Explain HOW each improvement will enrich their experiences and personal satisfaction
+           - Suggest ways to build on their existing strengths and curiosity
+           - Make recommendations feel like natural extensions of what they already love doing
 
-            4. **Learning Opportunities**: Suggest 1-2 areas that align with {user_name}'s demonstrated interests:
-               - Topics directly related to what they chose to capture or the themes in their images
-               - Skills that would enhance their ability to appreciate, understand, or engage with similar experiences
-               - Knowledge areas that would deepen their enjoyment of their interests
-               - Learning that would help them find even more meaning in the moments they choose to capture
+        4. **Learning Opportunities**: Suggest 1-2 areas that align with {user_name}'s demonstrated interests:
+           - Topics directly related to what they chose to capture or the themes in their images
+           - Skills that would enhance their ability to appreciate, understand, or engage with similar experiences
+           - Knowledge areas that would deepen their enjoyment of their interests
+           - Learning that would help them find even more meaning in the moments they choose to capture
 
-            **Personal Growth Framework**:
-            - Honor their choice to capture these particular moments as meaningful and valuable
-            - Frame their visual attention as a strength and source of insight about themselves
-            - Use encouraging language that celebrates their curiosity and unique perspective
-            - Connect their visual choices to broader themes about who they are and who they're becoming
-            - Help them see how their way of noticing and capturing moments is a valuable life skill
-            - Encourage them to continue paying attention to what resonates with them visually
+        **Personal Growth Framework**:
+        - Honor their choice to capture these particular moments as meaningful and valuable
+        - Frame their visual attention as a strength and source of insight about themselves
+        - Use encouraging language that celebrates their curiosity and unique perspective
+        - Connect their visual choices to broader themes about who they are and who they're becoming
+        - Help them see how their way of noticing and capturing moments is a valuable life skill
+        - Encourage them to continue paying attention to what resonates with them visually
 
-            User Information for Deep Personalization:
-            - Name: {user_name}
-            - Primary language: {user_language}
-            
-            Visual Moments {user_name} Chose to Capture:
-            {images_text}
-            """
-        else:
-            # Incremental enhancement - add new insights without duplicating existing content
-            existing_overview = conversation.structured.overview or ""
-            existing_takeaways = [str(t) for t in conversation.structured.key_takeaways] or []
-            existing_improvements = [str(t.content if hasattr(t, 'content') else t) for t in conversation.structured.things_to_improve] or []
-            existing_learnings = [str(t.content if hasattr(t, 'content') else t) for t in conversation.structured.things_to_learn] or []
-            
-            prompt = f"""
-            You are a personal growth coach helping {user_name} deepen the insights from their ongoing life journey.
-            
-            {user_name} is adding new visual content to a meaningful experience they previously shared. Your role is to help them discover additional layers of meaning and growth opportunities that emerge when they pay attention to more details from their life.
+        **Technical Requirements:**
+        - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
+        - Choose the category that best represents the main theme or content of the images
 
-            **Think from {user_name}'s perspective**: They're continuing to process and understand a significant moment in their life. Help them see how these additional visual elements add richness to their understanding of themselves and their growth.
-
-            Build upon their existing insights to create an even richer understanding:
-
-            **Context of {user_name}'s Previous Insights**:
-            - Previous Overview: {existing_overview}
-            - Previous Key Takeaways: {", ".join(existing_takeaways)}
-            - Previous Growth Areas: {", ".join(existing_improvements)}
-            - Previous Learning Interests: {", ".join(existing_learnings)}
-
-            **Help {user_name} Discover Additional Insights**:
-
-            1. **Updated Overview**: Help {user_name} see how these new visual elements enrich their understanding:
-               - How the new images add depth to their original experience
-               - What additional aspects of their personality, values, or journey these reveal
-               - How this expanded perspective enhances the meaning of this moment in their life
-               - New connections between their thoughts, actions, and what they chose to capture
-
-            2. **Additional Key Takeaways**: Guide {user_name} to discover new insights that emerge:
-               - Fresh realizations that come from seeing more of the complete picture
-               - New patterns or themes about their interests, values, or growth areas
-               - Additional life lessons that become clear with this expanded view
-               - Deeper understanding of their motivations or aspirations
-
-            3. **Additional Growth Opportunities**: Suggest new ways {user_name} can evolve:
-               - New skills or habits that would enhance their ability to engage with life fully
-               - Growth areas revealed by their attention to visual details and experiences
-               - Ways to build on their existing strengths and interests
-               - Steps that feel like natural progressions in their personal development
-
-            4. **Additional Learning Opportunities**: Suggest enriching knowledge areas for {user_name}:
-               - New topics that emerge from their expanded experience
-               - Skills that would help them better appreciate or engage with similar experiences
-               - Knowledge that connects to their demonstrated curiosity and interests
-               - Learning that would enhance their ability to find meaning in everyday moments
-
-            **Enhancement Principles**:
-            - Build on their existing insights rather than replacing them
-            - Focus on how the new visual content adds richness to their understanding
-            - Frame everything as exciting opportunities for continued growth
-            - Help them see the value in paying attention to multiple dimensions of their experiences
-            - Use encouraging language that celebrates their curiosity and growth mindset
-
-            User Information for Deep Personalization:
-            - Name: {user_name}
-            - Primary language: {user_language}
-            
-            {user_name}'s Original Conversation:
-            {transcript}
-            
-            New Image Descriptions:
-            {images_text}
-            """
+        User Information for Deep Personalization:
+        - Name: {user_name}
+        - Primary language: {user_language}
+        
+        Visual Moments {user_name} Chose to Capture:
+        {images_text}
+        """
         
         # Process with OpenAI
         result = process_prompt(
@@ -1363,6 +1325,11 @@ async def create_conversation_from_images(
         # Create structured data from images
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
         
+        # Get valid categories for the prompt
+        from models.conversation import CategoryEnum
+        valid_categories = [cat.value for cat in CategoryEnum]
+        valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+        
         prompt = f"""
         You are a personal growth coach helping {user_name} discover profound meaning and growth opportunities from the visual moments they choose to capture and preserve.
 
@@ -1407,6 +1374,10 @@ async def create_conversation_from_images(
         - Connect their visual choices to broader themes about who they are and who they're becoming
         - Help them see how their way of noticing and capturing moments is a valuable life skill
         - Encourage them to continue paying attention to what resonates with them visually
+
+        **Technical Requirements:**
+        - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
+        - Choose the category that best represents the main theme or content of the images
 
         User Information for Deep Personalization:
         - Name: {user_name}
@@ -1491,7 +1462,7 @@ async def create_conversation_from_images(
             title=title,
             overview=result.overview,
             emoji='📸',  # Camera emoji for image-based conversations
-            category='visual',  # New category for image conversations
+            category=result.category,  # Use the LLM's category result instead of hardcoding
             key_takeaways=result.key_takeaways,
             things_to_improve=things_to_improve_list,
             things_to_learn=things_to_learn_list,

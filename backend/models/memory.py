@@ -50,6 +50,7 @@ class CategoryEnum(str, Enum):
     environment = 'environment'
     nature = 'nature'
     visual = 'visual'
+    culture = 'culture'
     other = 'other'
 
 
