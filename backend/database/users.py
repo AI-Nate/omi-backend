@@ -217,9 +217,22 @@ def get_user_name(uid: str) -> str:
         user_data = user_doc.to_dict()
         # Try different possible name fields
         name = user_data.get('name') or user_data.get('given_name') or user_data.get('full_name')
-        return name if name else 'User'
+        if name:
+            return name
     
-    return 'User'  # Return default if user not found
+    # Fallback to Firebase Auth if no name in Firestore
+    try:
+        from database.auth import get_user_name as get_auth_user_name
+        auth_name = get_auth_user_name(uid, use_default=False)
+        if auth_name and auth_name != 'The User':
+            # Store the name in Firestore for future use
+            user_ref.set({'name': auth_name}, merge=True)
+            print(f"INFO: Stored Firebase Auth name '{auth_name}' to Firestore for uid: {uid}")
+            return auth_name
+    except Exception as e:
+        print(f"WARNING: Error getting Firebase Auth name for uid {uid}: {e}")
+    
+    return 'User'  # Return default if all methods fail
 
 
 def set_user_name(uid: str, name: str) -> None:

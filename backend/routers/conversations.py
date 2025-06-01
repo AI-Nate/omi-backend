@@ -675,22 +675,6 @@ def process_image_summary(
     user_language = users_db.get_user_language_preference(uid) or 'English'
     user_name = users_db.get_user_name(uid) or 'User'
     
-    # Debug logging for user name issue
-    print(f"DEBUG: Retrieved user_name: '{user_name}' for uid: {uid}")
-    print(f"DEBUG: user_language: '{user_language}'")
-    
-    # Try alternative method if we get 'User'
-    if user_name == 'User':
-        try:
-            from database.auth import get_user_name as get_auth_user_name
-            auth_user_name = get_auth_user_name(uid)
-            print(f"DEBUG: Firebase Auth user_name: '{auth_user_name}' for uid: {uid}")
-            if auth_user_name and auth_user_name != 'The User':
-                user_name = auth_user_name
-                print(f"DEBUG: Using Firebase Auth name: '{user_name}'")
-        except Exception as e:
-            print(f"DEBUG: Error getting auth user name: {e}")
-    
     # Get existing transcript
     transcript = get_conversation_transcript(conversation)
     
@@ -1075,24 +1059,8 @@ async def upload_and_process_conversation_images(
         user_language = users_db.get_user_language_preference(uid) or 'English'
         user_name = users_db.get_user_name(uid) or 'User'
         
-        # Debug logging for user name issue
-        print(f"DEBUG: Retrieved user_name: '{user_name}' for uid: {uid}")
-        print(f"DEBUG: user_language: '{user_language}'")
-        
-        # Try alternative method if we get 'User'
-        if user_name == 'User':
-            try:
-                from database.auth import get_user_name as get_auth_user_name
-                auth_user_name = get_auth_user_name(uid)
-                print(f"DEBUG: Firebase Auth user_name: '{auth_user_name}' for uid: {uid}")
-                if auth_user_name and auth_user_name != 'The User':
-                    user_name = auth_user_name
-                    print(f"DEBUG: Using Firebase Auth name: '{user_name}'")
-            except Exception as e:
-                print(f"DEBUG: Error getting auth user name: {e}")
-        
         # Get conversation transcript
-        transcript = "\n".join([seg.text for seg in conversation.transcript_segments if seg.text])
+        transcript = get_conversation_transcript(conversation)
         
         if not transcript:
             raise HTTPException(status_code=400, detail="Conversation has no transcript content")
@@ -1352,22 +1320,6 @@ async def create_conversation_from_images(
         # Get user preferences
         user_language = users_db.get_user_language_preference(uid) or 'English'
         user_name = users_db.get_user_name(uid) or 'User'
-        
-        # Debug logging for user name issue
-        print(f"DEBUG: create_conversation_from_images - Retrieved user_name: '{user_name}' for uid: {uid}")
-        print(f"DEBUG: create_conversation_from_images - user_language: '{user_language}'")
-        
-        # Try alternative method if we get 'User'
-        if user_name == 'User':
-            try:
-                from database.auth import get_user_name as get_auth_user_name
-                auth_user_name = get_auth_user_name(uid)
-                print(f"DEBUG: create_conversation_from_images - Firebase Auth user_name: '{auth_user_name}' for uid: {uid}")
-                if auth_user_name and auth_user_name != 'The User':
-                    user_name = auth_user_name
-                    print(f"DEBUG: create_conversation_from_images - Using Firebase Auth name: '{user_name}'")
-            except Exception as e:
-                print(f"DEBUG: create_conversation_from_images - Error getting auth user name: {e}")
         
         # Create structured data from images
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
