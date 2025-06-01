@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Body, File, UploadFile, Form
 from typing import Optional, List, Dict, Union
-from datetime import datetime, timezone
+from datetime import datetime
 from pydantic import BaseModel
-import uuid
+import traceback
 
 import database.conversations as conversations_db
 import database.users as users_db
@@ -942,8 +942,9 @@ async def create_conversation_from_images(
     uid: str = Depends(auth.get_current_user_uid)
 ):
     """
-    Create a new conversation from uploaded images.
-    The images will be analyzed and used to generate a new conversation summary.
+    Create a new conversation from one or more uploaded images.
+    This endpoint uploads images, analyzes their content, and creates a new conversation 
+    with structured insights based on the image content.
     """
     print(f"DEBUG: Starting create_conversation_from_images for user {uid}")
     print(f"DEBUG: Received {len(files)} files")
@@ -953,15 +954,75 @@ async def create_conversation_from_images(
         print(f"DEBUG: No files provided")
         raise HTTPException(status_code=400, detail="No files provided")
     
+    def detect_image_type_from_content(content: bytes) -> str:
+        """
+        Detect image type using magic bytes (file signatures)
+        Returns the detected MIME type or None if not an image
+        """
+        if len(content) < 12:
+            return None
+            
+        # JPEG signature
+        if content[:2] == b'\xff\xd8':
+            return 'image/jpeg'
+            
+        # PNG signature 
+        if content[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
+            return 'image/png'
+            
+        # GIF signature
+        if content[:6] in (b'GIF87a', b'GIF89a'):
+            return 'image/gif'
+            
+        # WEBP signature
+        if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+            return 'image/webp'
+            
+        # BMP signature
+        if content[:2] == b'BM':
+            return 'image/bmp'
+            
+        # TIFF signature (little-endian and big-endian)
+        if content[:4] in (b'II*\x00', b'MM\x00*'):
+            return 'image/tiff'
+            
+        return None
+    
+    print(f"DEBUG: Starting file validation")
+    
     # Validate each file
     for file in files:
+        print(f"DEBUG: Validating file: {file.filename}")
+        print(f"DEBUG: Content type: {file.content_type}")
+        
+        # Read file content for validation
         content = await file.read()
+        await file.seek(0)  # Reset file pointer
+        
+        print(f"DEBUG: File size: {len(content)} bytes")
+        
+        # Detect MIME type from content
         detected_mime_type = detect_image_type_from_content(content)
+        
         if not detected_mime_type:
-            raise HTTPException(status_code=400, detail=f"Invalid image file: {file.filename}")
-        await file.seek(0)  # Reset file pointer for later use
+            print(f"DEBUG: File {file.filename} is not a valid image")
+            raise HTTPException(status_code=400, detail=f"File {file.filename} is not a valid image")
+        
+        # Check file size (limit to 10MB)
+        if len(content) > 10 * 1024 * 1024:
+            print(f"DEBUG: File {file.filename} is too large")
+            raise HTTPException(status_code=400, detail=f"File {file.filename} is too large (max 10MB)")
+        
+        print(f"DEBUG: File {file.filename} validation passed - detected as {detected_mime_type}")
+    
+    print(f"DEBUG: File validation completed successfully")
     
     try:
+        # Generate new conversation ID
+        import uuid
+        conversation_id = str(uuid.uuid4())
+        print(f"DEBUG: Generated conversation ID: {conversation_id}")
+        
         # Read image data and upload to Firebase Storage
         images_data = []
         image_urls = []
@@ -972,10 +1033,12 @@ async def create_conversation_from_images(
             images_data.append(image_data)
         
         # Upload images to Firebase Storage
-        uploaded_urls = upload_multiple_conversation_images(images_data, uid, "new")
+        uploaded_urls = upload_multiple_conversation_images(images_data, uid, conversation_id)
         image_urls.extend(uploaded_urls)
         
-        print(f"DEBUG: Uploaded {len(uploaded_urls)} images to Firebase Storage")
+        print(f"DEBUG: Uploaded {len(uploaded_urls)} images to Firebase Storage:")
+        for i, url in enumerate(uploaded_urls):
+            print(f"DEBUG: Image {i}: {url}")
         
         # Get image descriptions using OpenAI
         for image_data in images_data:
@@ -990,22 +1053,23 @@ async def create_conversation_from_images(
         user_language = users_db.get_user_language_preference(uid) or 'English'
         user_name = users_db.get_user_name(uid) or 'User'
         
-        # Create a new conversation with image-generated content
+        # Create structured data from images
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
+        
         prompt = f"""
-        Based on the following image descriptions, provide a comprehensive:
-        1. Overview (a concise summary of the image content)
-        2. Key Takeaways (3-5 bullet points from the images)
-        3. Things to Improve (2-3 practical suggestions based on the images)
+        Based on the following image descriptions, create a comprehensive analysis:
+        1. Overview (a concise summary of what the images show and their significance)
+        2. Key Takeaways (3-5 bullet points with insights from the images)
+        3. Things to Improve (2-3 practical suggestions based on the image content)
         4. Things to Learn (1-2 topics worth exploring related to the image content)
         
         User Information for Personalization:
         - Name: {user_name}
         - Primary language: {user_language}
         
-        Make all sections highly personalized, actionable, and relevant based on the image content.
+        Make all sections personalized, actionable, and relevant based on the image content.
         
-        Images Descriptions:
+        Image Descriptions:
         {images_text}
         """
         
@@ -1017,31 +1081,63 @@ async def create_conversation_from_images(
             temperature=0.1
         )
         
-        # Create new conversation
-        conversation_id = str(uuid.uuid4())
+        print(f"DEBUG: OpenAI processing completed successfully")
+        
+        # Generate a title based on the images
+        title_prompt = f"""
+        Based on these image descriptions, generate a concise, descriptive title (max 50 characters):
+        
+        {images_text}
+        
+        The title should be clear and capture the main theme or content of the images.
+        """
+        
+        title_result = generate_summary_with_prompt("", title_prompt)
+        title = title_result.strip().strip('"\'') if title_result else "Images Conversation"
+        if len(title) > 50:
+            title = title[:47] + "..."
+        
+        # Create the new conversation
+        from datetime import datetime, timezone
+        from models.conversation import Structured, TranscriptSegment
+        
+        # Create structured data
         structured = Structured(
+            title=title,
             overview=result.overview,
+            emoji='📸',  # Camera emoji for image-based conversations
+            category='visual',  # New category for image conversations
             key_takeaways=result.key_takeaways,
             things_to_improve=result.things_to_improve,
             things_to_learn=result.things_to_learn,
             image_urls=image_urls
         )
         
-        conversation = Conversation(
+        # Create a conversation with empty transcript but rich structured data
+        new_conversation = Conversation(
             id=conversation_id,
             uid=uid,
             structured=structured,
+            transcript_segments=[],
             created_at=datetime.now(timezone.utc),
+            started_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(timezone.utc),
             discarded=False,
-            deleted=False
+            deleted=False,
+            source='image_upload',
+            language='en',  # Default to English
+            status='completed'
         )
         
         # Store the conversation in the database
-        conversations_db.upsert_conversation(uid, conversation.dict())
+        conversations_db.upsert_conversation(uid, new_conversation.dict())
         
-        print(f"DEBUG: Created new conversation {conversation_id} from images")
-        return conversation
+        print(f"DEBUG: New conversation created successfully with ID: {conversation_id}")
+        print(f"DEBUG: Conversation has {len(image_urls)} image URLs")
+        
+        return new_conversation
         
     except Exception as e:
-        print(f"ERROR: Failed to create conversation from images: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"ERROR: Exception during image conversation creation: {e}")
+        print(f"ERROR: Stack trace: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Failed to create conversation from images: {str(e)}")
