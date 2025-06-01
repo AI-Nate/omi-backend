@@ -871,6 +871,13 @@ async def upload_and_process_conversation_images(
         )
         
         print(f"DEBUG: OpenAI processing completed successfully")
+        print(f"DEBUG: Result type: {type(result)}")
+        print(f"DEBUG: Result overview: {result.overview}")
+        print(f"DEBUG: Result key_takeaways: {result.key_takeaways}")
+        print(f"DEBUG: Result things_to_improve type: {type(result.things_to_improve)}")
+        print(f"DEBUG: Result things_to_improve: {result.things_to_improve}")
+        print(f"DEBUG: Result things_to_learn type: {type(result.things_to_learn)}")
+        print(f"DEBUG: Result things_to_learn: {result.things_to_learn}")
         
         # Update the conversation structured data
         if is_first_enhancement:
@@ -1097,9 +1104,52 @@ async def create_conversation_from_images(
         if len(title) > 50:
             title = title[:47] + "..."
         
+        print(f"DEBUG: Generated title: {title}")
+        
         # Create the new conversation
         from datetime import datetime, timezone
-        from models.conversation import Structured, TranscriptSegment
+        from models.conversation import Structured, TranscriptSegment, ResourceItem as ConversationResourceItem
+        
+        # Convert things_to_improve to proper format
+        things_to_improve_list = []
+        if result.things_to_improve:
+            for item in result.things_to_improve:
+                if hasattr(item, 'content'):
+                    # It's already a ResourceItem-like object
+                    things_to_improve_list.append(ConversationResourceItem(
+                        content=item.content,
+                        url=getattr(item, 'url', ''),
+                        title=getattr(item, 'title', '')
+                    ))
+                else:
+                    # It's a string
+                    things_to_improve_list.append(ConversationResourceItem(
+                        content=str(item),
+                        url='',
+                        title=''
+                    ))
+        
+        # Convert things_to_learn to proper format
+        things_to_learn_list = []
+        if result.things_to_learn:
+            for item in result.things_to_learn:
+                if hasattr(item, 'content'):
+                    # It's already a ResourceItem-like object
+                    things_to_learn_list.append(ConversationResourceItem(
+                        content=item.content,
+                        url=getattr(item, 'url', ''),
+                        title=getattr(item, 'title', '')
+                    ))
+                else:
+                    # It's a string
+                    things_to_learn_list.append(ConversationResourceItem(
+                        content=str(item),
+                        url='',
+                        title=''
+                    ))
+        
+        print(f"DEBUG: Converted things_to_improve: {things_to_improve_list}")
+        print(f"DEBUG: Converted things_to_learn: {things_to_learn_list}")
         
         # Create structured data
         structured = Structured(
@@ -1108,8 +1158,8 @@ async def create_conversation_from_images(
             emoji='📸',  # Camera emoji for image-based conversations
             category='visual',  # New category for image conversations
             key_takeaways=result.key_takeaways,
-            things_to_improve=result.things_to_improve,
-            things_to_learn=result.things_to_learn,
+            things_to_improve=things_to_improve_list,
+            things_to_learn=things_to_learn_list,
             image_urls=image_urls
         )
         
