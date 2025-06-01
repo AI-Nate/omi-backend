@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Body, File, UploadFile, Form
 from typing import Optional, List, Dict, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
+import uuid
 
 import database.conversations as conversations_db
 import database.users as users_db
@@ -934,3 +935,113 @@ async def upload_and_process_conversation_images(
             except:
                 pass
         raise HTTPException(status_code=500, detail=f"Error processing images: {str(e)}")
+
+@router.post("/v1/conversations/create-from-images", response_model=Conversation, tags=['conversations'])
+async def create_conversation_from_images(
+    files: List[UploadFile] = File(...),
+    uid: str = Depends(auth.get_current_user_uid)
+):
+    """
+    Create a new conversation from uploaded images.
+    The images will be analyzed and used to generate a new conversation summary.
+    """
+    print(f"DEBUG: Starting create_conversation_from_images for user {uid}")
+    print(f"DEBUG: Received {len(files)} files")
+    
+    # Validate files
+    if not files:
+        print(f"DEBUG: No files provided")
+        raise HTTPException(status_code=400, detail="No files provided")
+    
+    # Validate each file
+    for file in files:
+        content = await file.read()
+        detected_mime_type = detect_image_type_from_content(content)
+        if not detected_mime_type:
+            raise HTTPException(status_code=400, detail=f"Invalid image file: {file.filename}")
+        await file.seek(0)  # Reset file pointer for later use
+    
+    try:
+        # Read image data and upload to Firebase Storage
+        images_data = []
+        image_urls = []
+        image_descriptions = []
+        
+        for file in files:
+            image_data = await file.read()
+            images_data.append(image_data)
+        
+        # Upload images to Firebase Storage
+        uploaded_urls = upload_multiple_conversation_images(images_data, uid, "new")
+        image_urls.extend(uploaded_urls)
+        
+        print(f"DEBUG: Uploaded {len(uploaded_urls)} images to Firebase Storage")
+        
+        # Get image descriptions using OpenAI
+        for image_data in images_data:
+            try:
+                description = analyze_image_content(image_data)
+                image_descriptions.append(description)
+            except Exception as e:
+                print(f"Error analyzing image: {e}")
+                image_descriptions.append("Image content could not be analyzed")
+        
+        # Get user preferences
+        user_language = users_db.get_user_language_preference(uid) or 'English'
+        user_name = users_db.get_user_name(uid) or 'User'
+        
+        # Create a new conversation with image-generated content
+        images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
+        prompt = f"""
+        Based on the following image descriptions, provide a comprehensive:
+        1. Overview (a concise summary of the image content)
+        2. Key Takeaways (3-5 bullet points from the images)
+        3. Things to Improve (2-3 practical suggestions based on the images)
+        4. Things to Learn (1-2 topics worth exploring related to the image content)
+        
+        User Information for Personalization:
+        - Name: {user_name}
+        - Primary language: {user_language}
+        
+        Make all sections highly personalized, actionable, and relevant based on the image content.
+        
+        Images Descriptions:
+        {images_text}
+        """
+        
+        # Process with OpenAI
+        result = process_prompt(
+            EnhancedSummaryOutput,
+            prompt,
+            model_name="gpt-4o",
+            temperature=0.1
+        )
+        
+        # Create new conversation
+        conversation_id = str(uuid.uuid4())
+        structured = Structured(
+            overview=result.overview,
+            key_takeaways=result.key_takeaways,
+            things_to_improve=result.things_to_improve,
+            things_to_learn=result.things_to_learn,
+            image_urls=image_urls
+        )
+        
+        conversation = Conversation(
+            id=conversation_id,
+            uid=uid,
+            structured=structured,
+            created_at=datetime.now(timezone.utc),
+            discarded=False,
+            deleted=False
+        )
+        
+        # Store the conversation in the database
+        conversations_db.upsert_conversation(uid, conversation.dict())
+        
+        print(f"DEBUG: Created new conversation {conversation_id} from images")
+        return conversation
+        
+    except Exception as e:
+        print(f"ERROR: Failed to create conversation from images: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
