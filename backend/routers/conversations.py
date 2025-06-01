@@ -1224,7 +1224,7 @@ async def create_conversation_from_images(
             finished_at=conversation_timestamp,
             discarded=False,
             deleted=False,
-            source='image_upload',
+            source='workflow',
             language='en',  # Default to English
             status='completed'
         )
