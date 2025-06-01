@@ -347,7 +347,7 @@ def upload_conversation_image(image_data: bytes, uid: str, conversation_id: str,
         image_index: Index of the image (for multiple images per conversation)
     
     Returns:
-        str: Public URL of the uploaded image
+        str: Signed URL of the uploaded image
     """
     import uuid
     import tempfile
@@ -370,9 +370,8 @@ def upload_conversation_image(image_data: bytes, uid: str, conversation_id: str,
         blob.cache_control = 'public, max-age=3600'  # Cache for 1 hour
         blob.upload_from_filename(temp_file_path)
         
-        # Return public URL
-        public_url = f'https://storage.googleapis.com/{chat_files_bucket}/{path}'
-        return public_url
+        # Return signed URL instead of public storage URL
+        return _get_signed_url(blob, 60 * 24)  # 24 hours expiry
         
     finally:
         # Clean up temporary file
