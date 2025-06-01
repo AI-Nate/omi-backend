@@ -71,45 +71,69 @@ class MemoriesProvider extends ChangeNotifier {
 
   Future<void> forceRefresh() async {
     print('DEBUG: Force refreshing memories...');
+    print('DEBUG: Current memories count before refresh: ${_memories.length}');
+    print(
+        'DEBUG: Current unreviewed count before refresh: ${_unreviewed.length}');
+    print('DEBUG: Current loading state before refresh: $_loading');
+
     await loadMemories();
+
+    print('DEBUG: Memories count after refresh: ${_memories.length}');
+    print('DEBUG: Unreviewed count after refresh: ${_unreviewed.length}');
+    print('DEBUG: Loading state after refresh: $_loading');
+
     notifyListeners();
+    print('DEBUG: forceRefresh completed');
   }
 
   Future<void> loadMemories() async {
     _loading = true;
     notifyListeners();
 
-    print('DEBUG: Starting to load memories...');
-    _memories = await getMemories();
-    print('DEBUG: Loaded ${_memories.length} total memories from API');
+    try {
+      print('DEBUG: Starting to load memories...');
+      _memories = await getMemories();
+      print('DEBUG: Loaded ${_memories.length} total memories from API');
 
-    // Debug: Print details about recent memories
-    final recentMemories = _memories
-        .where((memory) => memory.createdAt
-            .isAfter(DateTime.now().subtract(const Duration(days: 7))))
-        .toList();
+      // Safe filtering for recent memories
+      final recentMemories = _memories.where((memory) {
+        try {
+          return memory.createdAt
+              .isAfter(DateTime.now().subtract(const Duration(days: 7)));
+        } catch (e) {
+          print('DEBUG: Error checking memory date: $e');
+          return false;
+        }
+      }).toList();
 
-    print('DEBUG: Found ${recentMemories.length} memories from last 7 days');
-    for (var memory in recentMemories) {
-      print(
-          'DEBUG: Memory - ID: ${memory.id.substring(0, 8)}..., reviewed: ${memory.reviewed}, userReview: ${memory.userReview}, createdAt: ${memory.createdAt}');
+      print('DEBUG: Found ${recentMemories.length} memories from last 7 days');
+
+      // Safe filtering for unreviewed memories
+      _unreviewed = _memories.where((memory) {
+        try {
+          return !memory.reviewed &&
+              memory.createdAt
+                  .isAfter(DateTime.now().subtract(const Duration(days: 7)));
+        } catch (e) {
+          print('DEBUG: Error checking unreviewed memory: $e');
+          return false;
+        }
+      }).toList();
+
+      print('DEBUG: Found ${_unreviewed.length} unreviewed memories');
+    } catch (e, stackTrace) {
+      print('ERROR: Exception in loadMemories: $e');
+      print('ERROR: Stack trace: $stackTrace');
+
+      // Fallback to empty state
+      _memories = [];
+      _unreviewed = [];
+    } finally {
+      // Always ensure loading is set to false
+      print('DEBUG: Setting _loading = false');
+      _loading = false;
+      _setCategories();
     }
-
-    _unreviewed = _memories
-        .where((memory) =>
-            !memory.reviewed &&
-            memory.createdAt.isAfter(DateTime.now().subtract(const Duration(
-                days: 7)))) // Changed from 1 day to 7 days for testing
-        .toList();
-
-    print('DEBUG: Found ${_unreviewed.length} unreviewed memories');
-    for (var memory in _unreviewed) {
-      print(
-          'DEBUG: Unreviewed - ID: ${memory.id.substring(0, 8)}..., content: ${memory.content.substring(0, 50)}...');
-    }
-
-    _loading = false;
-    _setCategories();
   }
 
   void deleteMemory(Memory memory) async {

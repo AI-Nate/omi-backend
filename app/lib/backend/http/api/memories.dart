@@ -34,42 +34,51 @@ Future<bool> updateMemoryVisibilityServer(
 }
 
 Future<List<Memory>> getMemories({int limit = 100, int offset = 0}) async {
-  print('DEBUG API: Calling getMemories with limit=$limit, offset=$offset');
+  final timestamp = DateTime.now().toIso8601String();
+  print(
+      'DEBUG API [$timestamp]: Calling getMemories with limit=$limit, offset=$offset');
+
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v3/memories?limit=$limit&offset=$offset',
     headers: {},
     method: 'GET',
     body: '',
   );
+
   if (response == null) {
-    print('DEBUG API: getMemories response is null');
+    print('DEBUG API [$timestamp]: getMemories response is null');
     return [];
   }
-  print('DEBUG API: getMemories response status: ${response.statusCode}');
-  print('DEBUG API: getMemories response body length: ${response.body.length}');
+
+  print(
+      'DEBUG API [$timestamp]: getMemories response status: ${response.statusCode}');
+  print(
+      'DEBUG API [$timestamp]: getMemories response body length: ${response.body.length}');
 
   if (response.statusCode != 200) {
     print(
-        'DEBUG API: getMemories failed with status ${response.statusCode}: ${response.body}');
+        'DEBUG API [$timestamp]: getMemories failed with status ${response.statusCode}: ${response.body}');
     return [];
   }
 
   try {
     List<dynamic> memories = json.decode(response.body);
-    print('DEBUG API: Parsed ${memories.length} memories from response');
+    print(
+        'DEBUG API [$timestamp]: Parsed ${memories.length} memories from response');
 
     // Debug: Print sample of raw memory data
     if (memories.isNotEmpty) {
-      print('DEBUG API: Sample raw memory: ${memories[0]}');
+      print('DEBUG API [$timestamp]: Sample raw memory: ${memories[0]}');
     }
 
     final memoryObjects =
         memories.map((memory) => Memory.fromJson(memory)).toList();
-    print('DEBUG API: Converted to ${memoryObjects.length} Memory objects');
+    print(
+        'DEBUG API [$timestamp]: Converted to ${memoryObjects.length} Memory objects');
 
     return memoryObjects;
   } catch (e) {
-    print('DEBUG API: Error parsing memories JSON: $e');
+    print('DEBUG API [$timestamp]: Error parsing memories JSON: $e');
     return [];
   }
 }
