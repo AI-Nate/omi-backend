@@ -828,9 +828,9 @@ async def upload_and_process_conversation_images(
         if valid_timestamps:
             # Use the earliest image timestamp as the conversation timestamp
             earliest_timestamp = min(valid_timestamps)
-            # Convert to UTC timezone
-            conversation_timestamp = earliest_timestamp.replace(tzinfo=timezone.utc)
-            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp}")
+            # EXIF timestamps are already in local time, so don't convert to UTC
+            conversation_timestamp = earliest_timestamp
+            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp} (preserving local time from EXIF)")
         else:
             # Fallback to current time if no EXIF timestamps found
             conversation_timestamp = datetime.now(timezone.utc)
@@ -1090,9 +1090,9 @@ async def create_conversation_from_images(
         if valid_timestamps:
             # Use the earliest image timestamp as the conversation timestamp
             earliest_timestamp = min(valid_timestamps)
-            # Convert to UTC timezone
-            conversation_timestamp = earliest_timestamp.replace(tzinfo=timezone.utc)
-            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp}")
+            # EXIF timestamps are already in local time, so don't convert to UTC
+            conversation_timestamp = earliest_timestamp
+            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp} (preserving local time from EXIF)")
         else:
             # Fallback to current time if no EXIF timestamps found
             conversation_timestamp = datetime.now(timezone.utc)
