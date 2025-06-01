@@ -30,7 +30,7 @@ from utils.llm import obtain_emotional_message, retrieve_metadata_fields_from_tr
     get_app_result, should_discard_conversation, summarize_experience_text, new_memories_extractor, \
     trends_extractor, get_message_structure, \
     retrieve_metadata_from_message, retrieve_metadata_from_text, select_best_app_for_conversation, \
-    extract_memories_from_text, get_reprocess_transcript_structure
+    extract_memories_from_text, get_reprocess_transcript_structure, extract_memories_from_image_content
 from utils.notifications import send_notification
 from utils.other.hume import get_hume, HumeJobCallbackModel, HumeJobModelPredictionResponseModel
 from utils.retrieval.rag import retrieve_rag_conversation_context
@@ -212,6 +212,40 @@ def _extract_memories(uid: str, conversation: Conversation):
 
     print(f"Saving {len(parsed_memories)} memories for conversation {conversation.id}")
     memories_db.save_memories(uid, [fact.dict() for fact in parsed_memories])
+
+
+def _extract_memories_from_image_conversation(uid: str, conversation_id: str, image_descriptions: List[str], 
+                                             structured_summary: Optional[str] = None, transcript: Optional[str] = None):
+    """Extract memories from image-based conversations and save them to the database"""
+    
+    print(f"_extract_memories_from_image_conversation: Starting memory extraction for conversation {conversation_id}")
+    print(f"  - Image descriptions: {len(image_descriptions)}")
+    print(f"  - Has transcript: {bool(transcript and len(transcript.strip()) > 0)}")
+    print(f"  - Has structured summary: {bool(structured_summary and len(structured_summary.strip()) > 0)}")
+    
+    # Delete existing memories for this conversation
+    memories_db.delete_memories_for_conversation(uid, conversation_id)
+
+    # Extract new memories from image content
+    new_memories: List[Memory] = extract_memories_from_image_content(
+        uid=uid,
+        image_descriptions=image_descriptions,
+        structured_summary=structured_summary,
+        transcript=transcript
+    )
+
+    if not new_memories or len(new_memories) == 0:
+        print(f"No memories extracted for image conversation {conversation_id}")
+        return
+
+    # Convert to database format and save
+    parsed_memories = []
+    for memory in new_memories:
+        parsed_memories.append(MemoryDB.from_memory(memory, uid, conversation_id, False))
+        print(f'_extract_memories_from_image_conversation: {memory.category.value.upper()} | {memory.content}')
+
+    print(f"Saving {len(parsed_memories)} memories for image conversation {conversation_id}")
+    memories_db.save_memories(uid, [memory.dict() for memory in parsed_memories])
 
 
 def send_new_memories_notification(token: str, memories: [MemoryDB]):

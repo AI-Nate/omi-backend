@@ -6,6 +6,7 @@ import traceback
 from PIL import Image
 from PIL.ExifTags import TAGS
 import io
+import threading
 
 import database.conversations as conversations_db
 import database.users as users_db
@@ -14,7 +15,7 @@ from database.vector_db import delete_vector
 from models.conversation import *
 from models.conversation import SearchRequest
 
-from utils.conversations.process_conversation import process_conversation, retrieve_in_progress_conversation
+from utils.conversations.process_conversation import process_conversation, retrieve_in_progress_conversation, _extract_memories_from_image_conversation
 from utils.conversations.search import search_conversations
 from utils.llm import generate_summary_with_prompt, get_transcript_structure, EnhancedSummaryOutput, process_prompt, analyze_image_content
 from utils.other import endpoints as auth
@@ -886,6 +887,29 @@ def process_image_summary(
     # Update the conversation in the database
     conversations_db.upsert_conversation(uid, conversation.as_dict_cleaned_dates())
     
+    # Extract memories from image content in background thread
+    image_descriptions_list = image_descriptions  # The list we built above
+    structured_summary_text = result.overview if hasattr(result, 'overview') else ""
+    
+    # Add key takeaways and insights to structured summary for memory extraction
+    summary_parts = [structured_summary_text] if structured_summary_text else []
+    if hasattr(result, 'key_takeaways') and result.key_takeaways:
+        summary_parts.append("Key Takeaways: " + "; ".join(result.key_takeaways))
+    if hasattr(result, 'things_to_improve') and result.things_to_improve:
+        improvement_texts = [item.content if hasattr(item, 'content') else str(item) for item in result.things_to_improve]
+        summary_parts.append("Growth Opportunities: " + "; ".join(improvement_texts))
+    if hasattr(result, 'things_to_learn') and result.things_to_learn:
+        learning_texts = [item.content if hasattr(item, 'content') else str(item) for item in result.things_to_learn]
+        summary_parts.append("Learning Opportunities: " + "; ".join(learning_texts))
+    
+    full_structured_summary = "\n\n".join(summary_parts) if summary_parts else ""
+    
+    print(f"DEBUG: Starting memory extraction for upload-images with {len(image_descriptions)} image descriptions")
+    threading.Thread(
+        target=_extract_memories_from_image_conversation,
+        args=(uid, conversation_id, image_descriptions_list, full_structured_summary, transcript)
+    ).start()
+    
     return Conversation(**conversation)
 
 # Helper function to check if a list already contains a similar item
@@ -1197,12 +1221,31 @@ async def upload_and_process_conversation_images(
         
         print(f"DEBUG: Database updated successfully")
         
+        # Extract memories from image content in background thread
+        structured_summary_text = result.overview if hasattr(result, 'overview') else ""
+        
+        # Add key takeaways and insights to structured summary for memory extraction
+        summary_parts = [structured_summary_text] if structured_summary_text else []
+        if hasattr(result, 'key_takeaways') and result.key_takeaways:
+            summary_parts.append("Key Takeaways: " + "; ".join(result.key_takeaways))
+        if hasattr(result, 'things_to_improve') and result.things_to_improve:
+            improvement_texts = [item.content if hasattr(item, 'content') else str(item) for item in result.things_to_improve]
+            summary_parts.append("Growth Opportunities: " + "; ".join(improvement_texts))
+        if hasattr(result, 'things_to_learn') and result.things_to_learn:
+            learning_texts = [item.content if hasattr(item, 'content') else str(item) for item in result.things_to_learn]
+            summary_parts.append("Learning Opportunities: " + "; ".join(learning_texts))
+        
+        full_structured_summary = "\n\n".join(summary_parts) if summary_parts else ""
+        
+        print(f"DEBUG: Starting memory extraction for upload-images with {len(image_descriptions)} image descriptions")
+        threading.Thread(
+            target=_extract_memories_from_image_conversation,
+            args=(uid, conversation_id, image_descriptions, full_structured_summary, transcript)
+        ).start()
+        
         # Fetch the updated conversation from database to ensure we have the latest data
         updated_conversation_data = _get_conversation_by_id(uid, conversation_id)
         final_conversation = Conversation(**updated_conversation_data)
-        
-        print(f"DEBUG: Final conversation image URLs from database: {final_conversation.structured.image_urls}")
-        print(f"DEBUG: Returning conversation with {len(final_conversation.structured.image_urls)} image URLs")
         
         return final_conversation
         
@@ -1489,6 +1532,28 @@ async def create_conversation_from_images(
         
         print(f"DEBUG: New conversation created successfully with ID: {conversation_id}")
         print(f"DEBUG: Conversation has {len(image_urls)} image URLs")
+        
+        # Extract memories from image content in background thread
+        structured_summary_text = result.overview if hasattr(result, 'overview') else ""
+        
+        # Add key takeaways and insights to structured summary for memory extraction
+        summary_parts = [structured_summary_text] if structured_summary_text else []
+        if hasattr(result, 'key_takeaways') and result.key_takeaways:
+            summary_parts.append("Key Takeaways: " + "; ".join(result.key_takeaways))
+        if hasattr(result, 'things_to_improve') and result.things_to_improve:
+            improvement_texts = [item.content if hasattr(item, 'content') else str(item) for item in result.things_to_improve]
+            summary_parts.append("Growth Opportunities: " + "; ".join(improvement_texts))
+        if hasattr(result, 'things_to_learn') and result.things_to_learn:
+            learning_texts = [item.content if hasattr(item, 'content') else str(item) for item in result.things_to_learn]
+            summary_parts.append("Learning Opportunities: " + "; ".join(learning_texts))
+        
+        full_structured_summary = "\n\n".join(summary_parts) if summary_parts else ""
+        
+        print(f"DEBUG: Starting memory extraction for create-from-images with {len(image_descriptions)} image descriptions")
+        threading.Thread(
+            target=_extract_memories_from_image_conversation,
+            args=(uid, conversation_id, image_descriptions, full_structured_summary, None)  # No transcript for image-only
+        ).start()
         
         return new_conversation
         

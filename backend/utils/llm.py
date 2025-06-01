@@ -1390,6 +1390,157 @@ def extract_memories_from_text(
         return []
 
 
+def extract_memories_from_image_content(
+        uid: str, image_descriptions: List[str], structured_summary: Optional[str] = None, 
+        transcript: Optional[str] = None, user_name: Optional[str] = None, memories_str: Optional[str] = None
+) -> List[Memory]:
+    """Extract memories from image descriptions, structured summaries, and optional transcript content"""
+    if user_name is None or memories_str is None:
+        user_name, memories_str = get_prompt_memories(uid)
+
+    if not image_descriptions or len(image_descriptions) == 0:
+        return []
+
+    # Build the content for memory extraction
+    content_parts = []
+    
+    # Add image descriptions
+    if image_descriptions:
+        content_parts.append("**Visual Content Captured:**")
+        for i, desc in enumerate(image_descriptions):
+            content_parts.append(f"Image {i+1}: {desc.strip()}")
+        content_parts.append("")
+    
+    # Add transcript if available
+    if transcript and len(transcript.strip()) > 0:
+        content_parts.append("**Conversation Transcript:**")
+        content_parts.append(transcript.strip())
+        content_parts.append("")
+    
+    # Add structured summary if available
+    if structured_summary and len(structured_summary.strip()) > 0:
+        content_parts.append("**Key Insights and Analysis:**")
+        content_parts.append(structured_summary.strip())
+        content_parts.append("")
+    
+    if not content_parts:
+        return []
+    
+    full_content = "\n".join(content_parts)
+    
+    # Determine the content source for better prompting
+    if transcript and len(transcript.strip()) > 0:
+        text_source = "visual_and_conversation_content"
+        source_description = "visual content they captured along with their conversation"
+    else:
+        text_source = "visual_content_only"
+        source_description = "visual content they captured and the insights derived from it"
+
+    try:
+        # Create a specialized prompt for image-based memory extraction
+        image_memory_prompt = f'''
+        You are an expert at extracting both (1) new facts about {user_name} and (2) new learnings or insights relevant to {user_name}.
+
+        You will be provided with:
+        1. A list of existing facts about {user_name} and learnings {user_name} already knows (to avoid repetition).
+        2. Content from {source_description} from which you will extract new information.
+
+        ---
+
+        ## Part 1: Extract New Facts About {user_name}
+
+        **Categories for Facts**:
+        - **core**: Fundamental personal information like age, city of residence, marital status, and health.
+        - **hobbies**: Activities {user_name} enjoys in their leisure time.
+        - **lifestyle**: Details about {user_name}'s way of living, daily routines, or habits.
+        - **interests**: Subjects or areas that {user_name} is curious or passionate about.
+        - **habits**: Regular practices or tendencies of {user_name}.
+        - **work**: Information related to {user_name}'s occupation, job, or professional life.
+        - **skills**: Abilities or expertise that {user_name} possesses.
+        - **other**: Any other relevant information that doesn't fit into the above categories.
+
+        **Focus on Visual Content Insights**:
+        Pay special attention to what {user_name}'s choice to capture and preserve these visual moments reveals about them:
+        - Their interests, values, and priorities based on what they chose to document
+        - Their lifestyle, activities, and experiences reflected in the images
+        - Their relationships, work, or personal life shown in the visual content
+        - Their aesthetic preferences, hobbies, or areas of focus
+        - Any personal details revealed through their visual documentation choices
+
+        **Requirements**:
+        1. **Relevance & Non-Repetition**: Include only new facts not already known from the "existing facts."
+        2. **Conciseness**: Clearly and succinctly present each fact, e.g. "{user_name} enjoys photography of nature."
+        3. **Visual Inference**: Include logical inferences about {user_name} based on what they chose to capture visually.
+        4. **Gender Neutrality**: Avoid pronouns like "he" or "she," since {user_name}'s gender is unknown.
+        5. **Limit**: Identify up to 10 new facts. If there are none, output an empty list.
+
+        ---
+
+        ## Part 2: Extract New Learnings or Insights
+
+        You will also identify valuable learnings, facts, or insights that {user_name} can gain from this content. These can be about the world, life lessons, motivational ideas, historical or scientific facts, or practical advice related to what they captured or discussed.
+
+        **Categories for Learnings**:
+        - **learnings**: Any learning the user has.
+
+        **Tags for Learnings**:
+        - **life_lessons**: General wisdom or principles for living.
+        - **world_facts**: Interesting information about geography, cultures, or global matters.
+        - **motivational_insights**: Statements or ideas that can inspire or encourage.
+        - **historical_facts**: Notable events or information from the past.
+        - **scientific_facts**: Insights related to science or technology.
+        - **practical_advice**: Tips or recommendations that can be applied in daily life.
+
+        **Requirements**:
+        1. **Relevance & Non-Repetition**: Include only new insights not already in the user's known learnings.
+        2. **Conciseness**: State each learning clearly and briefly.
+        3. **Visual Context**: Extract learnings that relate to the visual content, experiences, or insights.
+        4. **Practical Value**: Focus on learnings that have practical value for {user_name}'s growth.
+        5. **Limit**: Identify up to 10 new learnings. If there are none, output an empty list.
+
+        ---
+
+        ## Existing Knowledge (Do Not Repeat)
+
+        **Existing facts about {user_name} and learnings {user_name} already has**:
+
+        ```
+        {memories_str}
+        ```
+
+        ---
+
+        ## Content to Analyze
+
+        {full_content}
+
+        ---
+
+        ## Output Instructions
+
+        1. Provide **one** list in your final output:
+           - **New Facts About {user_name} and New Learnings or Insights** (up to 20 total)
+
+        2. **Do not** include any additional commentary or explanation. Only list the extracted items.
+
+        If no new facts or learnings are found, output empty lists accordingly.
+        '''
+
+        parser = PydanticOutputParser(pydantic_object=MemoriesByTexts)
+        response: MemoriesByTexts = llm_mini.with_structured_output(MemoriesByTexts).invoke(
+            image_memory_prompt + f"\n\n{parser.get_format_instructions()}"
+        )
+        
+        print(f'extract_memories_from_image_content: Extracted {len(response.facts)} memories from {text_source}')
+        for memory in response.facts:
+            print(f'  - {memory.category.value.upper()}: {memory.content}')
+        
+        return response.facts
+    except Exception as e:
+        print(f'Error extracting memories from {text_source}: {e}')
+        return []
+
+
 class Learnings(BaseModel):
     result: List[str] = Field(
         min_items=0,
