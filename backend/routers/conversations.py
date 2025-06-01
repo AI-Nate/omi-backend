@@ -24,7 +24,83 @@ from utils.app_integrations import trigger_external_integrations
 router = APIRouter()
 
 
+# Utility functions for image processing
+def detect_image_type_from_content(content: bytes) -> str:
+    """
+    Detect image type using magic bytes (file signatures)
+    Returns the detected MIME type or None if not an image
+    """
+    if len(content) < 12:
+        return None
+        
+    # JPEG signature
+    if content[:2] == b'\xff\xd8':
+        return 'image/jpeg'
+        
+    # PNG signature 
+    if content[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
+        return 'image/png'
+        
+    # GIF signature
+    if content[:6] in (b'GIF87a', b'GIF89a'):
+        return 'image/gif'
+        
+    # WEBP signature
+    if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+        return 'image/webp'
+        
+    # BMP signature
+    if content[:2] == b'BM':
+        return 'image/bmp'
+        
+    # TIFF signature (little-endian and big-endian)
+    if content[:4] in (b'II*\x00', b'MM\x00*'):
+        return 'image/tiff'
+        
+    return None
 
+
+def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
+    """
+    Extract the creation timestamp from image EXIF data.
+    Returns the datetime when the photo was taken, or None if not found.
+    """
+    try:
+        # Create PIL Image from bytes
+        image = Image.open(io.BytesIO(image_data))
+        
+        # Get EXIF data
+        exif_data = image.getexif()
+        
+        if exif_data:
+            # Common EXIF timestamp tags
+            timestamp_tags = [
+                'DateTime',           # General date/time
+                'DateTimeOriginal',   # Original date/time (preferred)
+                'DateTimeDigitized',  # Digitized date/time
+            ]
+            
+            for tag_id, value in exif_data.items():
+                tag_name = TAGS.get(tag_id, tag_id)
+                
+                if tag_name in timestamp_tags:
+                    try:
+                        # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
+                        timestamp = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+                        print(f"DEBUG: Found EXIF timestamp - {tag_name}: {timestamp}")
+                        return timestamp
+                    except (ValueError, TypeError) as e:
+                        print(f"DEBUG: Failed to parse timestamp {value}: {e}")
+                        continue
+            
+            print("DEBUG: No valid timestamp found in EXIF data")
+        else:
+            print("DEBUG: No EXIF data found in image")
+            
+    except Exception as e:
+        print(f"DEBUG: Error extracting EXIF timestamp: {e}")
+    
+    return None
 
 
 def _get_conversation_by_id(uid: str, conversation_id: str) -> dict:
@@ -679,82 +755,6 @@ async def upload_and_process_conversation_images(
         print(f"DEBUG: No files provided")
         raise HTTPException(status_code=400, detail="No files provided")
     
-    def detect_image_type_from_content(content: bytes) -> str:
-        """
-        Detect image type using magic bytes (file signatures)
-        Returns the detected MIME type or None if not an image
-        """
-        if len(content) < 12:
-            return None
-            
-        # JPEG signature
-        if content[:2] == b'\xff\xd8':
-            return 'image/jpeg'
-            
-        # PNG signature 
-        if content[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
-            return 'image/png'
-            
-        # GIF signature
-        if content[:6] in (b'GIF87a', b'GIF89a'):
-            return 'image/gif'
-            
-        # WEBP signature
-        if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
-            return 'image/webp'
-            
-        # BMP signature
-        if content[:2] == b'BM':
-            return 'image/bmp'
-            
-        # TIFF signature (little-endian and big-endian)
-        if content[:4] in (b'II*\x00', b'MM\x00*'):
-            return 'image/tiff'
-            
-        return None
-
-    def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
-        """
-        Extract the creation timestamp from image EXIF data.
-        Returns the datetime when the photo was taken, or None if not found.
-        """
-        try:
-            # Create PIL Image from bytes
-            image = Image.open(io.BytesIO(image_data))
-            
-            # Get EXIF data
-            exif_data = image.getexif()
-            
-            if exif_data:
-                # Common EXIF timestamp tags
-                timestamp_tags = [
-                    'DateTime',           # General date/time
-                    'DateTimeOriginal',   # Original date/time (preferred)
-                    'DateTimeDigitized',  # Digitized date/time
-                ]
-                
-                for tag_id, value in exif_data.items():
-                    tag_name = TAGS.get(tag_id, tag_id)
-                    
-                    if tag_name in timestamp_tags:
-                        try:
-                            # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
-                            timestamp = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
-                            print(f"DEBUG: Found EXIF timestamp - {tag_name}: {timestamp}")
-                            return timestamp
-                        except (ValueError, TypeError) as e:
-                            print(f"DEBUG: Failed to parse timestamp {value}: {e}")
-                            continue
-                
-                print("DEBUG: No valid timestamp found in EXIF data")
-            else:
-                print("DEBUG: No EXIF data found in image")
-                
-        except Exception as e:
-            print(f"DEBUG: Error extracting EXIF timestamp: {e}")
-        
-        return None
-    
     print(f"DEBUG: Starting file validation")
     # Check file types and sizes using magic bytes detection
     for i, file in enumerate(files):
@@ -1025,40 +1025,6 @@ async def create_conversation_from_images(
     if not files:
         print(f"DEBUG: No files provided")
         raise HTTPException(status_code=400, detail="No files provided")
-    
-    def detect_image_type_from_content(content: bytes) -> str:
-        """
-        Detect image type using magic bytes (file signatures)
-        Returns the detected MIME type or None if not an image
-        """
-        if len(content) < 12:
-            return None
-            
-        # JPEG signature
-        if content[:2] == b'\xff\xd8':
-            return 'image/jpeg'
-            
-        # PNG signature 
-        if content[:8] == b'\x89\x50\x4e\x47\x0d\x0a\x1a\x0a':
-            return 'image/png'
-            
-        # GIF signature
-        if content[:6] in (b'GIF87a', b'GIF89a'):
-            return 'image/gif'
-            
-        # WEBP signature
-        if content[:4] == b'RIFF' and content[8:12] == b'WEBP':
-            return 'image/webp'
-            
-        # BMP signature
-        if content[:2] == b'BM':
-            return 'image/bmp'
-            
-        # TIFF signature (little-endian and big-endian)
-        if content[:4] in (b'II*\x00', b'MM\x00*'):
-            return 'image/tiff'
-            
-        return None
     
     print(f"DEBUG: Starting file validation")
     
