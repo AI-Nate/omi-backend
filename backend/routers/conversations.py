@@ -1158,7 +1158,6 @@ async def create_conversation_from_images(
         print(f"DEBUG: Generated title: {title}")
         
         # Create the new conversation
-        from datetime import datetime, timezone
         from models.conversation import Structured, TranscriptSegment, ResourceItem as ConversationResourceItem
         
         # Convert things_to_improve to proper format
