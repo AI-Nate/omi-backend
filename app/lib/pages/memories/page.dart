@@ -37,7 +37,8 @@ class _ReviewPromptHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return SizedBox.expand(child: child);
   }
 
@@ -47,7 +48,8 @@ class _ReviewPromptHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-class MemoriesPageState extends State<MemoriesPage> with AutomaticKeepAliveClientMixin {
+class MemoriesPageState extends State<MemoriesPage>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
@@ -106,216 +108,284 @@ class MemoriesPageState extends State<MemoriesPage> with AutomaticKeepAliveClien
                     child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ))
-                : NestedScrollView(
-                    controller: _scrollController,
-                    headerSliverBuilder: (context, innerBoxIsScrolled) {
-                      return [
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-                            child: Row(
-                              children: [
-                                Consumer<HomeProvider>(builder: (context, home, child) {
-                                  return Expanded(
-                                    child: SizedBox(
-                                      height: 44,
-                                      child: SearchBar(
-                                        hintText: 'Search memories',
-                                        leading: const Padding(
-                                          padding: EdgeInsets.only(left: 6.0),
-                                          child:
-                                              Icon(FontAwesomeIcons.magnifyingGlass, color: Colors.white70, size: 14),
-                                        ),
-                                        backgroundColor: WidgetStateProperty.all(AppStyles.backgroundSecondary),
-                                        elevation: WidgetStateProperty.all(0),
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                        ),
-                                        focusNode: home.memoriesSearchFieldFocusNode,
-                                        controller: _searchController,
-                                        trailing: provider.searchQuery.isNotEmpty
-                                            ? [
-                                                IconButton(
-                                                  icon: const Icon(Icons.close, color: Colors.white70, size: 16),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: const BoxConstraints(
-                                                    minHeight: 36,
-                                                    minWidth: 36,
-                                                  ),
-                                                  onPressed: () {
-                                                    _searchController.clear();
-                                                    provider.setSearchQuery('');
-                                                    MixpanelManager().memorySearchCleared(provider.memories.length);
-                                                  },
-                                                )
-                                              ]
-                                            : null,
-                                        hintStyle: WidgetStateProperty.all(
-                                          TextStyle(color: AppStyles.textTertiary, fontSize: 14),
-                                        ),
-                                        textStyle: WidgetStateProperty.all(
-                                          TextStyle(color: AppStyles.textPrimary, fontSize: 14),
-                                        ),
-                                        shape: WidgetStateProperty.all(
-                                          RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(AppStyles.radiusLarge),
+                : RefreshIndicator(
+                    backgroundColor: Colors.black,
+                    color: Colors.white,
+                    onRefresh: () => provider.forceRefresh(),
+                    child: NestedScrollView(
+                      controller: _scrollController,
+                      headerSliverBuilder: (context, innerBoxIsScrolled) {
+                        return [
+                          SliverToBoxAdapter(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                              child: Row(
+                                children: [
+                                  Consumer<HomeProvider>(
+                                      builder: (context, home, child) {
+                                    return Expanded(
+                                      child: SizedBox(
+                                        height: 44,
+                                        child: SearchBar(
+                                          hintText: 'Search memories',
+                                          leading: const Padding(
+                                            padding: EdgeInsets.only(left: 6.0),
+                                            child: Icon(
+                                                FontAwesomeIcons
+                                                    .magnifyingGlass,
+                                                color: Colors.white70,
+                                                size: 14),
                                           ),
+                                          backgroundColor:
+                                              WidgetStateProperty.all(AppStyles
+                                                  .backgroundSecondary),
+                                          elevation: WidgetStateProperty.all(0),
+                                          padding: WidgetStateProperty.all(
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 12, vertical: 4),
+                                          ),
+                                          focusNode:
+                                              home.memoriesSearchFieldFocusNode,
+                                          controller: _searchController,
+                                          trailing: provider
+                                                  .searchQuery.isNotEmpty
+                                              ? [
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                        Icons.close,
+                                                        color: Colors.white70,
+                                                        size: 16),
+                                                    padding: EdgeInsets.zero,
+                                                    constraints:
+                                                        const BoxConstraints(
+                                                      minHeight: 36,
+                                                      minWidth: 36,
+                                                    ),
+                                                    onPressed: () {
+                                                      _searchController.clear();
+                                                      provider
+                                                          .setSearchQuery('');
+                                                      MixpanelManager()
+                                                          .memorySearchCleared(
+                                                              provider.memories
+                                                                  .length);
+                                                    },
+                                                  )
+                                                ]
+                                              : null,
+                                          hintStyle: WidgetStateProperty.all(
+                                            TextStyle(
+                                                color: AppStyles.textTertiary,
+                                                fontSize: 14),
+                                          ),
+                                          textStyle: WidgetStateProperty.all(
+                                            TextStyle(
+                                                color: AppStyles.textPrimary,
+                                                fontSize: 14),
+                                          ),
+                                          shape: WidgetStateProperty.all(
+                                            RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      AppStyles.radiusLarge),
+                                            ),
+                                          ),
+                                          onChanged: (value) =>
+                                              provider.setSearchQuery(value),
+                                          onSubmitted: (value) {
+                                            if (value.isNotEmpty) {
+                                              MixpanelManager().memorySearched(
+                                                  value,
+                                                  provider
+                                                      .filteredMemories.length);
+                                            }
+                                          },
                                         ),
-                                        onChanged: (value) => provider.setSearchQuery(value),
-                                        onSubmitted: (value) {
-                                          if (value.isNotEmpty) {
-                                            MixpanelManager().memorySearched(value, provider.filteredMemories.length);
-                                          }
-                                        },
                                       ),
-                                    ),
-                                  );
-                                }),
-                                const SizedBox(width: 8),
-                                SizedBox(
-                                  width: 44,
-                                  height: 44,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      _showMemoryManagementSheet(context, provider);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppStyles.backgroundSecondary,
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.zero,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                    );
+                                  }),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 44,
+                                    height: 44,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        _showMemoryManagementSheet(
+                                            context, provider);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            AppStyles.backgroundSecondary,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.zero,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
                                       ),
+                                      child: const Icon(
+                                          FontAwesomeIcons.sliders,
+                                          size: 16),
                                     ),
-                                    child: const Icon(FontAwesomeIcons.sliders, size: 16),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                SizedBox(
-                                  width: 44,
-                                  height: 44,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      showMemoryDialog(context, provider);
-                                      MixpanelManager().memoriesPageCreateMemoryBtn();
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppStyles.backgroundSecondary,
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.zero,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 44,
+                                    height: 44,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        showMemoryDialog(context, provider);
+                                        MixpanelManager()
+                                            .memoriesPageCreateMemoryBtn();
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            AppStyles.backgroundSecondary,
+                                        foregroundColor: Colors.white,
+                                        padding: EdgeInsets.zero,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
                                       ),
+                                      child: const Icon(FontAwesomeIcons.plus,
+                                          size: 18),
                                     ),
-                                    child: const Icon(FontAwesomeIcons.plus, size: 18),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                        if (provider.unreviewed.isNotEmpty)
-                          SliverPersistentHeader(
-                            pinned: true,
-                            floating: true,
-                            delegate: _ReviewPromptHeaderDelegate(
-                              height: 56.0,
-                              child: Material(
-                                color: Theme.of(context).colorScheme.surfaceVariant,
-                                elevation: 1,
-                                child: InkWell(
-                                  onTap: () => _showReviewSheet(context, provider.unreviewed, provider),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Row(
-                                            children: [
-                                              Icon(FontAwesomeIcons.listCheck,
-                                                  color: Theme.of(context).colorScheme.onSurfaceVariant, size: 18),
-                                              const SizedBox(width: 12),
-                                              Flexible(
-                                                child: Text(
-                                                  '${provider.unreviewed.length} ${provider.unreviewed.length == 1 ? "memory" : "memories"} to review',
-                                                  style: TextStyle(
-                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                      fontWeight: FontWeight.w500),
-                                                  overflow: TextOverflow.ellipsis,
+                          if (provider.unreviewed.isNotEmpty)
+                            SliverPersistentHeader(
+                              pinned: true,
+                              floating: true,
+                              delegate: _ReviewPromptHeaderDelegate(
+                                height: 56.0,
+                                child: Material(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceVariant,
+                                  elevation: 1,
+                                  child: InkWell(
+                                    onTap: () => _showReviewSheet(
+                                        context, provider.unreviewed, provider),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16.0),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Row(
+                                              children: [
+                                                Icon(FontAwesomeIcons.listCheck,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                    size: 18),
+                                                const SizedBox(width: 12),
+                                                Flexible(
+                                                  child: Text(
+                                                    '${provider.unreviewed.length} ${provider.unreviewed.length == 1 ? "memory" : "memories"} to review',
+                                                    style: TextStyle(
+                                                        color: Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurfaceVariant,
+                                                        fontWeight:
+                                                            FontWeight.w500),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 8.0),
-                                          child: Text('Review',
-                                              style: TextStyle(
-                                                  color: Theme.of(context).colorScheme.primary,
-                                                  fontWeight: FontWeight.bold)),
-                                        ),
-                                      ],
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                left: 8.0),
+                                            child: Text('Review',
+                                                style: TextStyle(
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primary,
+                                                    fontWeight:
+                                                        FontWeight.bold)),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        SliverPersistentHeader(
-                          pinned: true,
-                          floating: true,
-                          delegate: _SliverSearchBarDelegate(
-                            minHeight: 0,
-                            maxHeight: 0,
-                            child: Container(),
-                          ),
-                        ),
-                      ];
-                    },
-                    body: provider.filteredMemories.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.note_add, size: 48, color: Colors.grey.shade600),
-                                const SizedBox(height: 16),
-                                Text(
-                                  provider.searchQuery.isEmpty && _selectedCategory == null
-                                      ? 'No memories yet'
-                                      : _selectedCategory != null
-                                          ? 'No memories in this category'
-                                          : 'No memories found',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade400,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                if (provider.searchQuery.isEmpty && _selectedCategory == null) ...[
-                                  const SizedBox(height: 8),
-                                  TextButton(
-                                    onPressed: () => showMemoryDialog(context, provider),
-                                    child: const Text('Add your first memory'),
-                                  ),
-                                ],
-                              ],
+                          SliverPersistentHeader(
+                            pinned: true,
+                            floating: true,
+                            delegate: _SliverSearchBarDelegate(
+                              minHeight: 0,
+                              maxHeight: 0,
+                              child: Container(),
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 16),
-                            itemCount: provider.filteredMemories.length,
-                            itemBuilder: (context, index) {
-                              final memory = provider.filteredMemories[index];
-                              return MemoryItem(
-                                memory: memory,
-                                provider: provider,
-                                onTap: (BuildContext context, Memory tappedMemory, MemoriesProvider tappedProvider) {
-                                  MixpanelManager().memoryListItemClicked(tappedMemory);
-                                  _showQuickEditSheet(context, tappedMemory, tappedProvider);
-                                },
-                              );
-                            },
                           ),
+                        ];
+                      },
+                      body: provider.filteredMemories.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.note_add,
+                                      size: 48, color: Colors.grey.shade600),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    provider.searchQuery.isEmpty &&
+                                            _selectedCategory == null
+                                        ? 'No memories yet'
+                                        : _selectedCategory != null
+                                            ? 'No memories in this category'
+                                            : 'No memories found',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade400,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  if (provider.searchQuery.isEmpty &&
+                                      _selectedCategory == null) ...[
+                                    const SizedBox(height: 8),
+                                    TextButton(
+                                      onPressed: () =>
+                                          showMemoryDialog(context, provider),
+                                      child:
+                                          const Text('Add your first memory'),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(
+                                  top: 8, left: 16, right: 16, bottom: 16),
+                              itemCount: provider.filteredMemories.length,
+                              itemBuilder: (context, index) {
+                                final memory = provider.filteredMemories[index];
+                                return MemoryItem(
+                                  memory: memory,
+                                  provider: provider,
+                                  onTap: (BuildContext context,
+                                      Memory tappedMemory,
+                                      MemoriesProvider tappedProvider) {
+                                    MixpanelManager()
+                                        .memoryListItemClicked(tappedMemory);
+                                    _showQuickEditSheet(
+                                        context, tappedMemory, tappedProvider);
+                                  },
+                                );
+                              },
+                            ),
+                    ),
                   ),
           ),
         );
@@ -323,7 +393,8 @@ class MemoriesPageState extends State<MemoriesPage> with AutomaticKeepAliveClien
     );
   }
 
-  void _showQuickEditSheet(BuildContext context, Memory memory, MemoriesProvider provider) {
+  void _showQuickEditSheet(
+      BuildContext context, Memory memory, MemoriesProvider provider) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -336,7 +407,8 @@ class MemoriesPageState extends State<MemoriesPage> with AutomaticKeepAliveClien
     );
   }
 
-  void _showReviewSheet(BuildContext context, List<Memory> memories, MemoriesProvider existingProvider) async {
+  void _showReviewSheet(BuildContext context, List<Memory> memories,
+      MemoriesProvider existingProvider) async {
     if (memories.isEmpty || !mounted) return;
     await showModalBottomSheet(
       context: context,
@@ -356,7 +428,8 @@ class MemoriesPageState extends State<MemoriesPage> with AutomaticKeepAliveClien
     );
   }
 
-  void _showDeleteAllConfirmation(BuildContext context, MemoriesProvider provider) {
+  void _showDeleteAllConfirmation(
+      BuildContext context, MemoriesProvider provider) {
     if (provider.memories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -408,7 +481,8 @@ class MemoriesPageState extends State<MemoriesPage> with AutomaticKeepAliveClien
     );
   }
 
-  void _showMemoryManagementSheet(BuildContext context, MemoriesProvider provider) {
+  void _showMemoryManagementSheet(
+      BuildContext context, MemoriesProvider provider) {
     MixpanelManager().memoriesManagementSheetOpened();
     showModalBottomSheet(
       context: context,
@@ -437,12 +511,15 @@ class _SliverSearchBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => maxHeight;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return SizedBox.expand(child: child);
   }
 
   @override
   bool shouldRebuild(_SliverSearchBarDelegate oldDelegate) {
-    return maxHeight != oldDelegate.maxHeight || minHeight != oldDelegate.minHeight || child != oldDelegate.child;
+    return maxHeight != oldDelegate.maxHeight ||
+        minHeight != oldDelegate.minHeight ||
+        child != oldDelegate.child;
   }
 }
