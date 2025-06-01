@@ -679,6 +679,10 @@ def process_image_summary(
     # Get conversation transcript
     transcript = get_conversation_transcript(conversation)
     
+    # Note: transcript can be empty for image-only conversations
+    # We'll use None for empty transcripts to match create-from-images behavior
+    transcript_for_memory = transcript if transcript else None
+    
     # If this is the first image analysis for this conversation, we'll do a complete analysis
     # For subsequent images, we'll do an incremental analysis to avoid overwriting previous insights
     is_first_analysis = not conversation.get('structured', {}).get('key_takeaways', [])
@@ -907,7 +911,7 @@ def process_image_summary(
     print(f"DEBUG: Starting memory extraction for upload-images with {len(image_descriptions)} image descriptions")
     threading.Thread(
         target=_extract_memories_from_image_conversation,
-        args=(uid, conversation_id, image_descriptions_list, full_structured_summary, transcript)
+        args=(uid, conversation_id, image_descriptions_list, full_structured_summary, transcript_for_memory)
     ).start()
     
     return Conversation(**conversation)
@@ -1086,8 +1090,9 @@ async def upload_and_process_conversation_images(
         # Get conversation transcript
         transcript = get_conversation_transcript(conversation_data)
         
-        if not transcript:
-            raise HTTPException(status_code=400, detail="Conversation has no transcript content")
+        # Note: transcript can be empty for image-only conversations
+        # We'll use None for empty transcripts to match create-from-images behavior
+        transcript_for_memory = transcript if transcript else None
         
         # Check if this is the first image enhancement for this conversation
         existing_image_urls = conversation.structured.image_urls or []
@@ -1095,6 +1100,7 @@ async def upload_and_process_conversation_images(
         
         print(f"DEBUG: Existing image URLs: {existing_image_urls}")
         print(f"DEBUG: Is first enhancement: {is_first_enhancement}")
+        print(f"DEBUG: Transcript available: {bool(transcript)}")
         
         # Create structured data from images
         images_text = "\n\n".join([f"Image {i+1}:\n{desc.strip()}" for i, desc in enumerate(image_descriptions)])
@@ -1104,62 +1110,126 @@ async def upload_and_process_conversation_images(
         valid_categories = [cat.value for cat in CategoryEnum]
         valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
         
-        prompt = f"""
-        You are a personal growth coach helping {user_name} discover profound meaning and growth opportunities from the visual moments they choose to capture and preserve.
+        # Create different prompts depending on whether we have transcript content
+        if transcript:
+            # Conversation with both images and transcript
+            prompt = f"""
+            You are a personal growth coach helping {user_name} discover profound meaning and growth opportunities from their conversation experience that includes both spoken content and visual moments they chose to capture.
 
-        {user_name} has shared visual content that was meaningful enough for them to capture and revisit. Your role is to help them understand the deeper significance of what they chose to document and how these visual moments can contribute to their personal journey and growth.
+            {user_name} has shared a conversation alongside visual content that was meaningful enough for them to capture and preserve. Your role is to help them understand the deeper significance of both the spoken experience and the visual moments, and how together they contribute to their personal journey and growth.
 
-        **Think from {user_name}'s perspective**: These images represent moments that caught their attention, sparked their curiosity, or held some significance for them. Help them understand WHY these moments mattered and how they reflect their values, interests, and growth.
+            **Think from {user_name}'s perspective**: These images represent moments they chose to document during or related to their conversation. Help them understand WHY these moments mattered and how they connect to the broader themes and insights from their spoken experience.
 
-        Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
+            Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
 
-        1. **Overview**: Write directly to {user_name} about the significance of what they captured:
-           - What these visual moments reveal about their interests, values, or current life focus
-           - The personal meaning behind their choice to capture and preserve these specific moments
-           - How these images reflect their way of seeing and engaging with the world
-           - What this collection of visual content says about their personality, priorities, or journey
-           - The emotional or practical significance of these moments in their life story
+            1. **Overview**: Write directly to {user_name} about the significance of their complete experience:
+               - How the visual moments enhance and deepen the insights from their conversation
+               - What the combination of spoken content and visual documentation reveals about their interests, values, or current life focus
+               - The personal meaning behind their choice to capture these specific moments alongside their conversation
+               - How the images and conversation together reflect their way of engaging with and learning from experiences
+               - The emotional or practical significance of this multi-modal experience in their life story
 
-        2. **Key Takeaways**: Help {user_name} extract 3-5 profound insights from their visual choices:
-           - Personal realizations about what draws their attention and why
-           - Life lessons or patterns that emerge from what they choose to notice and capture
-           - Understanding about their aesthetic preferences, interests, or values
-           - Insights about their growth, curiosity, or areas of focus
-           - Recognition of their unique perspective and way of engaging with experiences
+            2. **Key Takeaways**: Help {user_name} extract 3-5 profound insights from their complete experience:
+               - Personal realizations that emerge from connecting their spoken insights with their visual choices
+               - Life lessons or patterns that become clearer when viewing both conversation and images together
+               - Understanding about their learning style, interests, or values revealed through multiple modes of engagement
+               - Insights about their growth, curiosity, or areas of focus strengthened by this comprehensive experience
+               - Recognition of their unique way of processing and documenting meaningful moments
 
-        3. **Growth Opportunities**: Provide 2-3 personalized suggestions for {user_name}:
-           - Start with empowering action verbs that inspire and motivate them
-           - Focus on skills, habits, or perspectives that will enhance their ability to engage meaningfully with life
-           - Connect improvements to their demonstrated interests and visual awareness
-           - Explain HOW each improvement will enrich their experiences and personal satisfaction
-           - Suggest ways to build on their existing strengths and curiosity
-           - Make recommendations feel like natural extensions of what they already love doing
+            3. **Growth Opportunities**: Provide 2-3 personalized suggestions for {user_name}:
+               - Start with empowering action verbs that inspire and motivate them
+               - Focus on skills, habits, or perspectives that will enhance their ability to engage meaningfully with multi-faceted experiences
+               - Connect improvements to their demonstrated ability to process information through multiple channels
+               - Explain HOW each improvement will enrich their learning and personal satisfaction
+               - Suggest ways to build on their strengths in both verbal processing and visual awareness
+               - Make recommendations feel like natural extensions of their comprehensive engagement style
 
-        4. **Learning Opportunities**: Suggest 1-2 areas that align with {user_name}'s demonstrated interests:
-           - Topics directly related to what they chose to capture or the themes in their images
-           - Skills that would enhance their ability to appreciate, understand, or engage with similar experiences
-           - Knowledge areas that would deepen their enjoyment of their interests
-           - Learning that would help them find even more meaning in the moments they choose to capture
+            4. **Learning Opportunities**: Suggest 1-2 areas that align with {user_name}'s demonstrated multi-modal learning approach:
+               - Topics that would benefit from their ability to combine spoken reflection with visual documentation
+               - Skills that would enhance their capacity to extract meaning from diverse types of experiences
+               - Knowledge areas that would deepen their ability to connect insights across different modes of engagement
+               - Learning that would help them continue developing their comprehensive approach to personal growth
 
-        **Personal Growth Framework**:
-        - Honor their choice to capture these particular moments as meaningful and valuable
-        - Frame their visual attention as a strength and source of insight about themselves
-        - Use encouraging language that celebrates their curiosity and unique perspective
-        - Connect their visual choices to broader themes about who they are and who they're becoming
-        - Help them see how their way of noticing and capturing moments is a valuable life skill
-        - Encourage them to continue paying attention to what resonates with them visually
+            **Personal Growth Framework**:
+            - Honor their choice to engage with experiences through multiple channels as a valuable learning strategy
+            - Frame their multi-modal approach as a strength and source of deeper insight
+            - Use encouraging language that celebrates their comprehensive curiosity and engagement
+            - Connect their combined verbal and visual processing to broader themes about their learning style and growth
+            - Help them see how their integrated approach to documenting and reflecting on experiences is a powerful tool for development
+            - Encourage them to continue leveraging both spoken reflection and visual documentation for maximum insight
 
-        **Technical Requirements:**
-        - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
-        - Choose the category that best represents the main theme or content of the images
+            **Technical Requirements:**
+            - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
+            - Choose the category that best represents the main theme or content of the overall experience
 
-        User Information for Deep Personalization:
-        - Name: {user_name}
-        - Primary language: {user_language}
-        
-        Visual Moments {user_name} Chose to Capture:
-        {images_text}
-        """
+            User Information for Deep Personalization:
+            - Name: {user_name}
+            - Primary language: {user_language}
+            
+            Conversation Content:
+            {transcript}
+            
+            Visual Moments {user_name} Chose to Capture:
+            {images_text}
+            """
+        else:
+            # Image-only conversation (no transcript)
+            prompt = f"""
+            You are a personal growth coach helping {user_name} discover profound meaning and growth opportunities from the visual moments they choose to capture and preserve.
+
+            {user_name} has shared visual content that was meaningful enough for them to capture and revisit. Your role is to help them understand the deeper significance of what they chose to document and how these visual moments can contribute to their personal journey and growth.
+
+            **Think from {user_name}'s perspective**: These images represent moments that caught their attention, sparked their curiosity, or held some significance for them. Help them understand WHY these moments mattered and how they reflect their values, interests, and growth.
+
+            Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
+
+            1. **Overview**: Write directly to {user_name} about the significance of what they captured:
+               - What these visual moments reveal about their interests, values, or current life focus
+               - The personal meaning behind their choice to capture and preserve these specific moments
+               - How these images reflect their way of seeing and engaging with the world
+               - What this collection of visual content says about their personality, priorities, or journey
+               - The emotional or practical significance of these moments in their life story
+
+            2. **Key Takeaways**: Help {user_name} extract 3-5 profound insights from their visual choices:
+               - Personal realizations about what draws their attention and why
+               - Life lessons or patterns that emerge from what they choose to notice and capture
+               - Understanding about their aesthetic preferences, interests, or values
+               - Insights about their growth, curiosity, or areas of focus
+               - Recognition of their unique perspective and way of engaging with experiences
+
+            3. **Growth Opportunities**: Provide 2-3 personalized suggestions for {user_name}:
+               - Start with empowering action verbs that inspire and motivate them
+               - Focus on skills, habits, or perspectives that will enhance their ability to engage meaningfully with life
+               - Connect improvements to their demonstrated interests and visual awareness
+               - Explain HOW each improvement will enrich their experiences and personal satisfaction
+               - Suggest ways to build on their existing strengths and curiosity
+               - Make recommendations feel like natural extensions of what they already love doing
+
+            4. **Learning Opportunities**: Suggest 1-2 areas that align with {user_name}'s demonstrated interests:
+               - Topics directly related to what they chose to capture or the themes in their images
+               - Skills that would enhance their ability to appreciate, understand, or engage with similar experiences
+               - Knowledge areas that would deepen their enjoyment of their interests
+               - Learning that would help them find even more meaning in the moments they choose to capture
+
+            **Personal Growth Framework**:
+            - Honor their choice to capture these particular moments as meaningful and valuable
+            - Frame their visual attention as a strength and source of insight about themselves
+            - Use encouraging language that celebrates their curiosity and unique perspective
+            - Connect their visual choices to broader themes about who they are and who they're becoming
+            - Help them see how their way of noticing and capturing moments is a valuable life skill
+            - Encourage them to continue paying attention to what resonates with them visually
+
+            **Technical Requirements:**
+            - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
+            - Choose the category that best represents the main theme or content of the images
+
+            User Information for Deep Personalization:
+            - Name: {user_name}
+            - Primary language: {user_language}
+            
+            Visual Moments {user_name} Chose to Capture:
+            {images_text}
+            """
         
         # Process with OpenAI
         result = process_prompt(
@@ -1240,7 +1310,7 @@ async def upload_and_process_conversation_images(
         print(f"DEBUG: Starting memory extraction for upload-images with {len(image_descriptions)} image descriptions")
         threading.Thread(
             target=_extract_memories_from_image_conversation,
-            args=(uid, conversation_id, image_descriptions, full_structured_summary, transcript)
+            args=(uid, conversation_id, image_descriptions, full_structured_summary, transcript_for_memory)
         ).start()
         
         # Fetch the updated conversation from database to ensure we have the latest data
