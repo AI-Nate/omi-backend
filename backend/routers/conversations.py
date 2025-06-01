@@ -1,8 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Body, File, UploadFile, Form
 from typing import Optional, List, Dict, Union
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 import traceback
+from PIL import Image
+from PIL.ExifTags import TAGS
+import io
 
 import database.conversations as conversations_db
 import database.users as users_db
@@ -709,6 +712,48 @@ async def upload_and_process_conversation_images(
             return 'image/tiff'
             
         return None
+
+    def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
+        """
+        Extract the creation timestamp from image EXIF data.
+        Returns the datetime when the photo was taken, or None if not found.
+        """
+        try:
+            # Create PIL Image from bytes
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Get EXIF data
+            exif_data = image.getexif()
+            
+            if exif_data:
+                # Common EXIF timestamp tags
+                timestamp_tags = [
+                    'DateTime',           # General date/time
+                    'DateTimeOriginal',   # Original date/time (preferred)
+                    'DateTimeDigitized',  # Digitized date/time
+                ]
+                
+                for tag_id, value in exif_data.items():
+                    tag_name = TAGS.get(tag_id, tag_id)
+                    
+                    if tag_name in timestamp_tags:
+                        try:
+                            # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
+                            timestamp = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+                            print(f"DEBUG: Found EXIF timestamp - {tag_name}: {timestamp}")
+                            return timestamp
+                        except (ValueError, TypeError) as e:
+                            print(f"DEBUG: Failed to parse timestamp {value}: {e}")
+                            continue
+                
+                print("DEBUG: No valid timestamp found in EXIF data")
+            else:
+                print("DEBUG: No EXIF data found in image")
+                
+        except Exception as e:
+            print(f"DEBUG: Error extracting EXIF timestamp: {e}")
+        
+        return None
     
     print(f"DEBUG: Starting file validation")
     # Check file types and sizes using magic bytes detection
@@ -758,10 +803,16 @@ async def upload_and_process_conversation_images(
         images_data = []
         image_urls = []
         image_descriptions = []
+        image_timestamps = []
         
         for file in files:
             image_data = await file.read()
             images_data.append(image_data)
+            
+            # Extract timestamp from EXIF data
+            timestamp = extract_image_timestamp(image_data)
+            image_timestamps.append(timestamp)
+            print(f"DEBUG: Image {len(images_data)-1} EXIF timestamp: {timestamp}")
         
         # Upload images to Firebase Storage
         uploaded_urls = upload_multiple_conversation_images(images_data, uid, conversation_id)
@@ -770,6 +821,20 @@ async def upload_and_process_conversation_images(
         print(f"DEBUG: Uploaded {len(uploaded_urls)} images to Firebase Storage:")
         for i, url in enumerate(uploaded_urls):
             print(f"DEBUG: Image {i}: {url}")
+        
+        # Determine the conversation timestamp based on image timestamps
+        valid_timestamps = [ts for ts in image_timestamps if ts is not None]
+        
+        if valid_timestamps:
+            # Use the earliest image timestamp as the conversation timestamp
+            earliest_timestamp = min(valid_timestamps)
+            # Convert to UTC timezone
+            conversation_timestamp = earliest_timestamp.replace(tzinfo=timezone.utc)
+            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp}")
+        else:
+            # Fallback to current time if no EXIF timestamps found
+            conversation_timestamp = datetime.now(timezone.utc)
+            print(f"DEBUG: No EXIF timestamps found, using current time: {conversation_timestamp}")
         
         # Get image descriptions using OpenAI
         for image_data in images_data:
@@ -1034,10 +1099,16 @@ async def create_conversation_from_images(
         images_data = []
         image_urls = []
         image_descriptions = []
+        image_timestamps = []
         
         for file in files:
             image_data = await file.read()
             images_data.append(image_data)
+            
+            # Extract timestamp from EXIF data
+            timestamp = extract_image_timestamp(image_data)
+            image_timestamps.append(timestamp)
+            print(f"DEBUG: Image {len(images_data)-1} EXIF timestamp: {timestamp}")
         
         # Upload images to Firebase Storage
         uploaded_urls = upload_multiple_conversation_images(images_data, uid, conversation_id)
@@ -1046,6 +1117,20 @@ async def create_conversation_from_images(
         print(f"DEBUG: Uploaded {len(uploaded_urls)} images to Firebase Storage:")
         for i, url in enumerate(uploaded_urls):
             print(f"DEBUG: Image {i}: {url}")
+        
+        # Determine the conversation timestamp based on image timestamps
+        valid_timestamps = [ts for ts in image_timestamps if ts is not None]
+        
+        if valid_timestamps:
+            # Use the earliest image timestamp as the conversation timestamp
+            earliest_timestamp = min(valid_timestamps)
+            # Convert to UTC timezone
+            conversation_timestamp = earliest_timestamp.replace(tzinfo=timezone.utc)
+            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp}")
+        else:
+            # Fallback to current time if no EXIF timestamps found
+            conversation_timestamp = datetime.now(timezone.utc)
+            print(f"DEBUG: No EXIF timestamps found, using current time: {conversation_timestamp}")
         
         # Get image descriptions using OpenAI
         for image_data in images_data:
@@ -1169,9 +1254,9 @@ async def create_conversation_from_images(
             uid=uid,
             structured=structured,
             transcript_segments=[],
-            created_at=datetime.now(timezone.utc),
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
+            created_at=conversation_timestamp,
+            started_at=conversation_timestamp,
+            finished_at=conversation_timestamp,
             discarded=False,
             deleted=False,
             source='image_upload',
