@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Body, File, UploadFile, Form
 from typing import Optional, List, Dict, Union
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import traceback
 from PIL import Image
@@ -62,8 +62,8 @@ def detect_image_type_from_content(content: bytes) -> str:
 
 def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
     """
-    Extract the creation timestamp from image EXIF data.
-    Returns the datetime when the photo was taken, or None if not found.
+    Extract the creation timestamp from image EXIF data and attempt to convert to UTC.
+    Returns the UTC datetime when the photo was taken, or local time if timezone cannot be determined.
     """
     try:
         # Create PIL Image from bytes
@@ -72,34 +72,165 @@ def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
         # Get EXIF data
         exif_data = image.getexif()
         
-        if exif_data:
-            # Common EXIF timestamp tags
-            timestamp_tags = [
-                'DateTime',           # General date/time
-                'DateTimeOriginal',   # Original date/time (preferred)
-                'DateTimeDigitized',  # Digitized date/time
-            ]
-            
-            for tag_id, value in exif_data.items():
-                tag_name = TAGS.get(tag_id, tag_id)
-                
-                if tag_name in timestamp_tags:
-                    try:
-                        # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
-                        timestamp = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
-                        print(f"DEBUG: Found EXIF timestamp - {tag_name}: {timestamp}")
-                        return timestamp
-                    except (ValueError, TypeError) as e:
-                        print(f"DEBUG: Failed to parse timestamp {value}: {e}")
-                        continue
-            
-            print("DEBUG: No valid timestamp found in EXIF data")
-        else:
+        if not exif_data:
             print("DEBUG: No EXIF data found in image")
+            return None
+            
+        local_timestamp = None
+        gps_info = None
+        timezone_offset = None
+        
+        # Extract timestamp
+        timestamp_tags = [
+            'DateTimeOriginal',   # Original date/time (preferred)
+            'DateTime',           # General date/time
+            'DateTimeDigitized',  # Digitized date/time
+        ]
+        
+        for tag_id, value in exif_data.items():
+            tag_name = TAGS.get(tag_id, tag_id)
+            
+            if tag_name in timestamp_tags:
+                try:
+                    # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
+                    local_timestamp = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+                    print(f"DEBUG: Found EXIF timestamp - {tag_name}: {local_timestamp}")
+                    break
+                except (ValueError, TypeError) as e:
+                    print(f"DEBUG: Failed to parse timestamp {value}: {e}")
+                    continue
+                    
+        if not local_timestamp:
+            print("DEBUG: No valid timestamp found in EXIF data")
+            return None
+            
+        # Try to extract timezone offset information (newer cameras)
+        timezone_offset_tags = [
+            'OffsetTimeOriginal',  # Timezone offset for DateTimeOriginal
+            'OffsetTime',          # Timezone offset for DateTime  
+            'OffsetTimeDigitized', # Timezone offset for DateTimeDigitized
+        ]
+        
+        for tag_id, value in exif_data.items():
+            tag_name = TAGS.get(tag_id, tag_id)
+            if tag_name in timezone_offset_tags and value:
+                try:
+                    # Parse timezone offset like "+07:00" or "-05:00"
+                    if isinstance(value, str) and len(value) >= 6:
+                        sign = 1 if value[0] == '+' else -1
+                        hours = int(value[1:3])
+                        minutes = int(value[4:6])
+                        timezone_offset = sign * (hours * 60 + minutes)  # offset in minutes
+                        print(f"DEBUG: Found timezone offset from {tag_name}: {value} ({timezone_offset} minutes)")
+                        break
+                except (ValueError, TypeError) as e:
+                    print(f"DEBUG: Failed to parse timezone offset {value}: {e}")
+                    
+        # Try to extract GPS coordinates
+        gps_ifd = exif_data.get_ifd(0x8825)  # GPS IFD tag
+        if gps_ifd:
+            try:
+                lat_ref = gps_ifd.get(1)  # GPSLatitudeRef (N/S)
+                lat_dms = gps_ifd.get(2)  # GPSLatitude (degrees, minutes, seconds)
+                lon_ref = gps_ifd.get(3)  # GPSLongitudeRef (E/W)  
+                lon_dms = gps_ifd.get(4)  # GPSLongitude (degrees, minutes, seconds)
+                
+                if all([lat_ref, lat_dms, lon_ref, lon_dms]):
+                    # Convert DMS to decimal degrees
+                    def dms_to_decimal(dms_tuple, ref):
+                        degrees = float(dms_tuple[0])
+                        minutes = float(dms_tuple[1])
+                        seconds = float(dms_tuple[2])
+                        decimal = degrees + minutes/60.0 + seconds/3600.0
+                        if ref in ['S', 'W']:
+                            decimal = -decimal
+                        return decimal
+                    
+                    latitude = dms_to_decimal(lat_dms, lat_ref)
+                    longitude = dms_to_decimal(lon_dms, lon_ref)
+                    gps_info = (latitude, longitude)
+                    print(f"DEBUG: Found GPS coordinates: {latitude}, {longitude}")
+                    
+            except Exception as e:
+                print(f"DEBUG: Error extracting GPS coordinates: {e}")
+                
+        # Convert to UTC using available information
+        if timezone_offset is not None:
+            # Use timezone offset from EXIF
+            utc_timestamp = local_timestamp - timedelta(minutes=timezone_offset)
+            print(f"DEBUG: Converted to UTC using EXIF timezone offset: {utc_timestamp}")
+            return utc_timestamp
+            
+        elif gps_info:
+            # Use GPS coordinates to determine timezone
+            try:
+                timezone_name = get_timezone_from_coordinates(gps_info[0], gps_info[1])
+                if timezone_name:
+                    import pytz
+                    local_tz = pytz.timezone(timezone_name)
+                    # Localize the naive datetime to the GPS timezone
+                    localized_dt = local_tz.localize(local_timestamp)
+                    # Convert to UTC
+                    utc_timestamp = localized_dt.astimezone(pytz.UTC).replace(tzinfo=None)
+                    print(f"DEBUG: Converted to UTC using GPS timezone ({timezone_name}): {utc_timestamp}")
+                    return utc_timestamp
+            except Exception as e:
+                print(f"DEBUG: Error converting GPS timezone: {e}")
+                
+        # Fallback: return local time (as before)
+        print(f"DEBUG: Could not determine timezone, returning local time: {local_timestamp}")
+        return local_timestamp
             
     except Exception as e:
         print(f"DEBUG: Error extracting EXIF timestamp: {e}")
     
+    return None
+
+
+def get_timezone_from_coordinates(latitude: float, longitude: float) -> Optional[str]:
+    """
+    Get timezone name from GPS coordinates using a geocoding service.
+    Returns timezone name like 'America/Los_Angeles' or None if lookup fails.
+    """
+    try:
+        # Option 1: Use timezonefinder library (lightweight, offline)
+        try:
+            from timezonefinder import TimezoneFinder
+            tf = TimezoneFinder()
+            timezone_name = tf.timezone_at(lat=latitude, lng=longitude)
+            if timezone_name:
+                print(f"DEBUG: Found timezone from coordinates: {timezone_name}")
+                return timezone_name
+        except ImportError:
+            print("DEBUG: timezonefinder not installed, trying online service")
+            
+        # Option 2: Use Google Timezone API (requires API key and internet)
+        import os
+        import requests
+        import time
+        
+        google_api_key = os.getenv('GOOGLE_MAPS_API_KEY')
+        if google_api_key:
+            # Use current timestamp for timezone lookup
+            timestamp = int(time.time())
+            url = f"https://maps.googleapis.com/maps/api/timezone/json"
+            params = {
+                'location': f"{latitude},{longitude}",
+                'timestamp': timestamp,
+                'key': google_api_key
+            }
+            
+            response = requests.get(url, params=params, timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') == 'OK':
+                    timezone_name = data.get('timeZoneId')
+                    print(f"DEBUG: Found timezone from Google API: {timezone_name}")
+                    return timezone_name
+                    
+    except Exception as e:
+        print(f"DEBUG: Error looking up timezone from coordinates: {e}")
+        
     return None
 
 
@@ -674,7 +805,7 @@ def process_image_summary(
         structured['things_to_learn'] = existing_learnings
     
     # Update the conversation in the database
-    conversations_db.upsert_conversation(uid, conversation)
+    conversations_db.upsert_conversation(uid, conversation.as_dict_cleaned_dates())
     
     return Conversation(**conversation)
 
@@ -1230,7 +1361,7 @@ async def create_conversation_from_images(
         )
         
         # Store the conversation in the database
-        conversations_db.upsert_conversation(uid, new_conversation.dict())
+        conversations_db.upsert_conversation(uid, new_conversation.as_dict_cleaned_dates())
         
         print(f"DEBUG: New conversation created successfully with ID: {conversation_id}")
         print(f"DEBUG: Conversation has {len(image_urls)} image URLs")
