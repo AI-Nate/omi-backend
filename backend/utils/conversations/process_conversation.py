@@ -241,11 +241,36 @@ def _extract_memories_from_image_conversation(uid: str, conversation_id: str, im
     # Convert to database format and save
     parsed_memories = []
     for memory in new_memories:
-        parsed_memories.append(MemoryDB.from_memory(memory, uid, conversation_id, False))
+        memory_db = MemoryDB.from_memory(memory, uid, conversation_id, False)
+        
+        # DEBUG: Log the user_review field before and after creation
+        print(f"DEBUG MEMORY CREATION:")
+        print(f"  - Memory content: {memory.content[:50]}...")
+        print(f"  - MemoryDB.manually_added: {memory_db.manually_added}")
+        print(f"  - MemoryDB.reviewed: {memory_db.reviewed}")
+        print(f"  - MemoryDB.user_review: {memory_db.user_review}")
+        print(f"  - MemoryDB.user_review type: {type(memory_db.user_review)}")
+        
+        # Test dict conversion
+        memory_dict = memory_db.dict()
+        print(f"  - Dict user_review: {memory_dict.get('user_review')}")
+        print(f"  - Dict user_review type: {type(memory_dict.get('user_review'))}")
+        print(f"  - Dict user_review is None: {memory_dict.get('user_review') is None}")
+        print(f"  - Dict user_review is False: {memory_dict.get('user_review') is False}")
+        
+        parsed_memories.append(memory_db)
         print(f'_extract_memories_from_image_conversation: {memory.category.value.upper()} | {memory.content}')
 
+    print(f"DEBUG: About to save {len(parsed_memories)} memories to database")
+    # Convert to dict for saving
+    memories_data = []
+    for memory_db in parsed_memories:
+        memory_dict = memory_db.dict()
+        print(f"DEBUG: Before saving - Memory {memory_db.id[:8]}... user_review: {memory_dict.get('user_review')} (type: {type(memory_dict.get('user_review'))})")
+        memories_data.append(memory_dict)
+    
     print(f"Saving {len(parsed_memories)} memories for image conversation {conversation_id}")
-    memories_db.save_memories(uid, [memory.dict() for memory in parsed_memories])
+    memories_db.save_memories(uid, memories_data)
 
 
 def send_new_memories_notification(token: str, memories: [MemoryDB]):
