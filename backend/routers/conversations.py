@@ -676,7 +676,7 @@ def process_image_summary(
     user_language = users_db.get_user_language_preference(uid) or 'English'
     user_name = users_db.get_user_name(uid) or 'User'
     
-    # Get existing transcript
+    # Get conversation transcript
     transcript = get_conversation_transcript(conversation)
     
     # If this is the first image analysis for this conversation, we'll do a complete analysis
@@ -1084,7 +1084,7 @@ async def upload_and_process_conversation_images(
         user_name = users_db.get_user_name(uid) or 'User'
         
         # Get conversation transcript
-        transcript = get_conversation_transcript(conversation)
+        transcript = get_conversation_transcript(conversation_data)
         
         if not transcript:
             raise HTTPException(status_code=400, detail="Conversation has no transcript content")
