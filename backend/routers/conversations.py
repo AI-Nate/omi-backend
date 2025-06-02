@@ -157,6 +157,95 @@ def extract_image_timestamp(image_data: bytes) -> Optional[dt]:
                         except Exception as e:
                             print(f"DEBUG: Error parsing iOS date: {e}")
             
+            # Check for XMP metadata which often contains timestamp information
+            if not local_timestamp:
+                xmp_data = None
+                # Try to get XMP data from various possible keys
+                if 'xmp' in image.info:
+                    xmp_data = image.info['xmp']
+                elif 'XML:com.adobe.xmp' in image.info:
+                    xmp_data = image.info['XML:com.adobe.xmp']
+                
+                if xmp_data:
+                    print(f"DEBUG: Found XMP metadata, attempting to parse timestamp")
+                    try:
+                        # Convert bytes to string if necessary
+                        if isinstance(xmp_data, bytes):
+                            xmp_string = xmp_data.decode('utf-8', errors='ignore')
+                        else:
+                            xmp_string = str(xmp_data)
+                        
+                        # Look for various timestamp patterns in XMP
+                        
+                        # Pattern for photoshop:DateCreated
+                        photoshop_pattern = r'<photoshop:DateCreated>([^<]+)</photoshop:DateCreated>'
+                        photoshop_match = re.search(photoshop_pattern, xmp_string)
+                        
+                        if photoshop_match:
+                            date_str = photoshop_match.group(1).strip()
+                            print(f"DEBUG: Found photoshop:DateCreated in XMP: {date_str}")
+                            
+                            # Try to parse the ISO format timestamp
+                            try:
+                                # Handle various ISO formats
+                                if date_str.endswith('Z'):
+                                    # UTC timezone
+                                    local_timestamp = dt.fromisoformat(date_str.replace('Z', '+00:00'))
+                                    print(f"DEBUG: Parsed XMP timestamp as UTC: {local_timestamp}")
+                                elif 'T' in date_str and ('+' in date_str or '-' in date_str[-6:]):
+                                    # Has timezone info
+                                    local_timestamp = dt.fromisoformat(date_str)
+                                    print(f"DEBUG: Parsed XMP timestamp with timezone: {local_timestamp}")
+                                elif 'T' in date_str:
+                                    # ISO format without timezone, assume local time
+                                    local_timestamp = dt.fromisoformat(date_str)
+                                    print(f"DEBUG: Parsed XMP timestamp as local time: {local_timestamp}")
+                                else:
+                                    # Try other common formats
+                                    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y:%m:%d %H:%M:%S"]:
+                                        try:
+                                            local_timestamp = dt.strptime(date_str, fmt)
+                                            print(f"DEBUG: Parsed XMP timestamp using format {fmt}: {local_timestamp}")
+                                            break
+                                        except ValueError:
+                                            continue
+                                            
+                            except Exception as e:
+                                print(f"DEBUG: Failed to parse photoshop:DateCreated '{date_str}': {e}")
+                        
+                        # Also look for other common XMP timestamp fields
+                        if not local_timestamp:
+                            other_patterns = [
+                                r'<xmp:CreateDate>([^<]+)</xmp:CreateDate>',
+                                r'<xmp:ModifyDate>([^<]+)</xmp:ModifyDate>',
+                                r'<xmp:MetadataDate>([^<]+)</xmp:MetadataDate>',
+                                r'<exif:DateTimeOriginal>([^<]+)</exif:DateTimeOriginal>',
+                                r'<exif:DateTime>([^<]+)</exif:DateTime>'
+                            ]
+                            
+                            for pattern in other_patterns:
+                                match = re.search(pattern, xmp_string)
+                                if match:
+                                    date_str = match.group(1).strip()
+                                    print(f"DEBUG: Found XMP timestamp field: {date_str}")
+                                    try:
+                                        # Try ISO format first
+                                        if 'T' in date_str:
+                                            local_timestamp = dt.fromisoformat(date_str.replace('Z', '+00:00') if date_str.endswith('Z') else date_str)
+                                        else:
+                                            # Try EXIF format
+                                            local_timestamp = dt.strptime(date_str, "%Y:%m:%d %H:%M:%S")
+                                        print(f"DEBUG: Successfully parsed XMP timestamp: {local_timestamp}")
+                                        break
+                                    except Exception as e:
+                                        print(f"DEBUG: Failed to parse XMP timestamp '{date_str}': {e}")
+                                        continue
+                        
+                    except Exception as e:
+                        print(f"DEBUG: Error processing XMP metadata: {e}")
+                else:
+                    print("DEBUG: No XMP metadata found")
+            
             if not local_timestamp:
                 print("DEBUG: No metadata timestamp found for PNG after checking all available metadata")
                 print("DEBUG: PNG screenshots (especially from iOS) typically don't include timestamp metadata")
