@@ -950,11 +950,13 @@ Future<void> enrichConversationSummaryWithMultipleImages(
 
 // New function to upload images directly to backend
 Future<ServerConversation?> uploadAndProcessConversationImages(
-    String conversationId, List<Uint8List> imagesData) async {
+    String conversationId, List<Uint8List> imagesData,
+    {String? userPrompt}) async {
   try {
     debugPrint(
         'DEBUG CLIENT: Starting upload for conversation $conversationId');
     debugPrint('DEBUG CLIENT: Number of images: ${imagesData.length}');
+    debugPrint('DEBUG CLIENT: User prompt: ${userPrompt ?? "none"}');
 
     var request = http.MultipartRequest(
       'POST',
@@ -965,6 +967,12 @@ Future<ServerConversation?> uploadAndProcessConversationImages(
     // Add authorization header
     request.headers.addAll({'Authorization': await getAuthHeader()});
     debugPrint('DEBUG CLIENT: Authorization header added');
+
+    // Add user prompt field if provided
+    if (userPrompt != null && userPrompt.isNotEmpty) {
+      request.fields['user_prompt'] = userPrompt;
+      debugPrint('DEBUG CLIENT: User prompt field added');
+    }
 
     // Add image files to the request
     for (int i = 0; i < imagesData.length; i++) {
@@ -1268,9 +1276,11 @@ Future<Map<String, dynamic>> testImageUploadMethods(
 
 // Function to create a new conversation from images
 Future<ServerConversation?> createConversationFromImages(
-    List<Uint8List> imagesData) async {
+    List<Uint8List> imagesData,
+    {String? userPrompt}) async {
   debugPrint('DEBUG CLIENT: Starting createConversationFromImages');
   debugPrint('DEBUG CLIENT: Number of images: ${imagesData.length}');
+  debugPrint('DEBUG CLIENT: User prompt: ${userPrompt ?? "none"}');
 
   var request = http.MultipartRequest(
     'POST',
@@ -1280,6 +1290,12 @@ Future<ServerConversation?> createConversationFromImages(
   // Add authorization header
   request.headers.addAll({'Authorization': await getAuthHeader()});
   debugPrint('DEBUG CLIENT: Authorization header added');
+
+  // Add user prompt field if provided
+  if (userPrompt != null && userPrompt.isNotEmpty) {
+    request.fields['user_prompt'] = userPrompt;
+    debugPrint('DEBUG CLIENT: User prompt field added');
+  }
 
   // Add image files to the request
   for (int i = 0; i < imagesData.length; i++) {

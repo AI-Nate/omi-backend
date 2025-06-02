@@ -71,12 +71,13 @@ def num_tokens_from_string(string: str) -> int:
 # *********** IMAGE ANALYSIS ******************
 # **********************************************
 
-def analyze_image_content(image_data: bytes) -> str:
+def analyze_image_content(image_data: bytes, user_prompt: Optional[str] = None) -> str:
     """
     Analyze image content using OpenAI Vision API.
     
     Args:
         image_data: Raw image data as bytes
+        user_prompt: Optional user-provided context or instructions for the analysis
     
     Returns:
         str: Description of the image content
@@ -88,12 +89,21 @@ def analyze_image_content(image_data: bytes) -> str:
         # Create vision-compatible OpenAI client
         vision_llm = ChatOpenAI(model='gpt-4o')
         
+        # Base analysis text
+        base_text = "Analyze this image and provide a detailed description of what you see. Focus on the main subjects, activities, objects, text, settings, and any other relevant details that could be useful for understanding the context and content."
+        
+        # Add user prompt if provided
+        if user_prompt and user_prompt.strip():
+            analysis_text = f"{base_text}\n\nAdditional context from user: {user_prompt.strip()}\n\nPlease incorporate this context into your analysis and focus on aspects that relate to the user's specific needs or instructions."
+        else:
+            analysis_text = base_text
+        
         # Create the message with image
         message = HumanMessage(
             content=[
                 {
                     "type": "text",
-                    "text": "Analyze this image and provide a detailed description of what you see. Focus on the main subjects, activities, objects, text, settings, and any other relevant details that could be useful for understanding the context and content."
+                    "text": analysis_text
                 },
                 {
                     "type": "image_url",
@@ -182,6 +192,14 @@ class ResourceItem(BaseModel):
     title: str = Field(description="Title of the resource", default="")
 
 
+class EnhancedEvent(BaseModel):
+    title: str = Field(description="The title of the event")
+    description: str = Field(description="A brief description of the event", default='')
+    start: str = Field(description="The start date and time of the event in ISO format")
+    duration: int = Field(description="The duration of the event in minutes", default=30)
+    user_prompt: str = Field(description="User-provided context or instructions for this event", default="")
+
+
 class EnhancedSummaryOutput(BaseModel):
     title: str = Field(description="A title/name for this conversation", default='')
     overview: str = Field(
@@ -206,8 +224,8 @@ class EnhancedSummaryOutput(BaseModel):
         default=[],
     )
     action_items: List[str] = Field(description="A list of action items from the conversation", default=[])
-    events: List[Dict] = Field(
-        description="A list of events extracted from the conversation, that the user must have on his calendar.",
+    events: List[EnhancedEvent] = Field(
+        description="A list of events extracted from the conversation, that the user must have on his calendar. Include any user-provided context in the user_prompt field.",
         default=[],
     )
 

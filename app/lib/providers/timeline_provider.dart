@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:omi/backend/http/api/conversations.dart';
 import 'package:omi/backend/schema/conversation.dart';
 import 'package:omi/backend/preferences.dart';
 import 'package:omi/providers/conversation_provider.dart';
+import 'package:omi/widgets/user_prompt_dialog.dart';
 
 class TimelineEvent {
   final String id;
@@ -300,7 +302,8 @@ class TimelineProvider extends ChangeNotifier {
   }
 
   // Create a new conversation from images
-  Future<ServerConversation?> createTimelineConversationFromImages() async {
+  Future<ServerConversation?> createTimelineConversationFromImages(
+      BuildContext context) async {
     if (_isCreatingFromImages) return null;
 
     try {
@@ -313,6 +316,19 @@ class TimelineProvider extends ChangeNotifier {
       final List<XFile> images = await picker.pickMultiImage();
 
       if (images.isNotEmpty) {
+        // Show user prompt dialog for context
+        final userPrompt = await showUserPromptDialog(
+          context: context,
+          title: 'Add Context to Your Images',
+          hintText:
+              'Example: "This was from our quarterly planning session - please create action items and follow-up meetings"',
+        );
+
+        // Return early if user cancelled
+        if (userPrompt == null) {
+          return null;
+        }
+
         List<Uint8List> imagesData = [];
 
         // Read all selected images
@@ -321,8 +337,11 @@ class TimelineProvider extends ChangeNotifier {
           imagesData.add(imageBytes);
         }
 
-        // Create new conversation from images using the API function
-        final newConversation = await createConversationFromImages(imagesData);
+        // Create new conversation from images using the API function with user prompt
+        final newConversation = await createConversationFromImages(
+          imagesData,
+          userPrompt: userPrompt.isNotEmpty ? userPrompt : null,
+        );
 
         if (newConversation != null) {
           // Refresh conversations to include the new one

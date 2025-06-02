@@ -1267,7 +1267,7 @@ class GetSheetMainOptions extends StatelessWidget {
                       ? null
                       : () async {
                           Navigator.pop(context);
-                          provider.addImageToSummary();
+                          provider.addImageToSummary(context);
                         },
                 )
               ],

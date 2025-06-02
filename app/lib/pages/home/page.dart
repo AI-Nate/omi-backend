@@ -758,7 +758,8 @@ class _HomePageState extends State<HomePage>
                                         .track('Timeline Add Images Clicked');
 
                                     final newConversation = await timelineProvider
-                                        .createTimelineConversationFromImages();
+                                        .createTimelineConversationFromImages(
+                                            context);
 
                                     if (newConversation != null &&
                                         context.mounted) {

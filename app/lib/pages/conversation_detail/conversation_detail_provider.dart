@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,12 +13,14 @@ import 'package:omi/backend/schema/structured.dart';
 import 'package:omi/backend/schema/transcript_segment.dart';
 import 'package:omi/providers/app_provider.dart';
 import 'package:omi/providers/conversation_provider.dart';
+import 'package:omi/providers/developer_mode_provider.dart';
 import 'package:omi/utils/analytics/mixpanel.dart';
 import 'package:instabug_flutter/instabug_flutter.dart';
 import 'package:tuple/tuple.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:omi/backend/http/openai.dart'; // For getPhotoDescription
 import 'package:omi/backend/http/api/apps.dart';
+import 'package:omi/widgets/user_prompt_dialog.dart';
 
 class ConversationDetailProvider extends ChangeNotifier
     with MessageNotifierMixin {
@@ -428,7 +431,7 @@ class ConversationDetailProvider extends ChangeNotifier
   }
 
   // Method to handle adding an image to the summary
-  Future<void> addImageToSummary() async {
+  Future<void> addImageToSummary(BuildContext context) async {
     if (!isImageSummaryLoading && conversation != null) {
       try {
         isImageSummaryLoading = true;
@@ -440,6 +443,19 @@ class ConversationDetailProvider extends ChangeNotifier
         final List<XFile> images = await picker.pickMultiImage();
 
         if (images.isNotEmpty) {
+          // Show user prompt dialog for context
+          final userPrompt = await showUserPromptDialog(
+            context: context,
+            title: 'Add Context to Your Images',
+            hintText:
+                'Example: "These screenshots show the key decisions we made - please extract action items and next steps"',
+          );
+
+          // Return early if user cancelled
+          if (userPrompt == null) {
+            return;
+          }
+
           List<Uint8List> imagesData = [];
 
           // Read all selected images
@@ -448,9 +464,12 @@ class ConversationDetailProvider extends ChangeNotifier
             imagesData.add(imageBytes);
           }
 
-          // Upload images to backend and get updated conversation
+          // Upload images to backend and get updated conversation with user prompt
           final updatedConversation = await uploadAndProcessConversationImages(
-              conversation!.id, imagesData);
+            conversation!.id,
+            imagesData,
+            userPrompt: userPrompt.isNotEmpty ? userPrompt : null,
+          );
 
           if (updatedConversation != null) {
             debugPrint(

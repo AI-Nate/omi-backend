@@ -656,6 +656,7 @@ def process_image_summary(
     """
     Process one or more image descriptions and update the conversation summary with insights from the images.
     Handles both single image descriptions and an array of image descriptions.
+    Accepts optional user_prompt for providing context and instructions for event generation.
     """
     # Get the existing conversation
     conversation = _get_conversation_by_id(uid, conversation_id)
@@ -663,6 +664,7 @@ def process_image_summary(
     # Check if we're receiving a single image description or multiple
     image_description = image_data.get("image_description", "")
     image_descriptions = image_data.get("image_descriptions", [])
+    user_prompt = image_data.get("user_prompt", "")  # Extract user prompt for context
     
     # Handle both single image and multiple images cases
     if not image_description and not image_descriptions:
@@ -703,6 +705,8 @@ def process_image_summary(
 
         **Think from {user_name}'s perspective**: These images represent moments that caught their attention, sparked their curiosity, or held some significance for them. Help them understand WHY these moments mattered and how they reflect their values, interests, and growth.
 
+        {"**User Context**: " + user_prompt.strip() + " Please incorporate this context throughout your analysis, especially when generating events and insights." if user_prompt.strip() else ""}
+
         Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
 
         1. **Overview**: Write directly to {user_name} about the significance of what they captured:
@@ -733,6 +737,13 @@ def process_image_summary(
            - Knowledge areas that would deepen their enjoyment of their interests
            - Learning that would help them find even more meaning in the moments they choose to capture
 
+        5. **Events**: Generate calendar events based on the images and any user context:
+           - Create events that align with the content and context of the images
+           - Use the user_prompt field to store any user-provided context or instructions for each event
+           - Make events specific, actionable, and meaningful based on the visual content
+           - Include appropriate timing and duration based on the activity type
+           - {"Focus especially on events that relate to: " + user_prompt.strip() if user_prompt.strip() else "Focus on events that emerge naturally from the image content"}
+
         **Personal Growth Framework**:
         - Honor their choice to capture these particular moments as meaningful and valuable
         - Frame their visual attention as a strength and source of insight about themselves
@@ -744,6 +755,7 @@ def process_image_summary(
         **Technical Requirements:**
         - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
         - Choose the category that best represents the main theme or content of the images
+        - For events, include the user-provided context in the user_prompt field for each event
 
         User Information for Deep Personalization:
         - Name: {user_name}
@@ -770,6 +782,33 @@ def process_image_summary(
         structured['key_takeaways'] = result.key_takeaways
         structured['things_to_improve'] = result.things_to_improve
         structured['things_to_learn'] = result.things_to_learn
+        
+        # Convert EnhancedEvent objects to Event objects with user prompt
+        if hasattr(result, 'events') and result.events:
+            from models.conversation import Event
+            from datetime import datetime
+            
+            structured_events = []
+            for enhanced_event in result.events:
+                try:
+                    # Parse the ISO date string
+                    start_datetime = datetime.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
+                    
+                    # Create Event object with user prompt
+                    event = Event(
+                        title=enhanced_event.title,
+                        description=enhanced_event.description,
+                        start=start_datetime,
+                        duration=enhanced_event.duration,
+                        user_prompt=user_prompt or enhanced_event.user_prompt,  # Use provided user prompt or extracted one
+                        created=False
+                    )
+                    structured_events.append(event.dict())
+                except Exception as e:
+                    print(f"Error converting event: {e}")
+                    continue
+            
+            structured['events'] = structured_events
     else:
         # For incremental updates, we'll analyze only the new images and merge insights
         # with the existing summary
@@ -969,10 +1008,12 @@ def generate_enhanced_summary(
 async def upload_and_process_conversation_images(
     conversation_id: str,
     files: List[UploadFile] = File(...),
+    user_prompt: Optional[str] = Form(default=""),
     uid: str = Depends(auth.get_current_user_uid)
 ):
     """
     Upload one or more images to Firebase Storage and process them with OpenAI to enhance the conversation summary.
+    Accepts optional user_prompt for providing context and instructions for event generation.
     """
     print(f"DEBUG: Starting upload_and_process_conversation_images for conversation {conversation_id}, user {uid}")
     print(f"DEBUG: Received {len(files)} files")
@@ -1077,7 +1118,7 @@ async def upload_and_process_conversation_images(
         # Get image descriptions using OpenAI
         for image_data in images_data:
             try:
-                description = analyze_image_content(image_data)
+                description = analyze_image_content(image_data, user_prompt)
                 image_descriptions.append(description)
             except Exception as e:
                 print(f"Error analyzing image: {e}")
@@ -1181,6 +1222,8 @@ async def upload_and_process_conversation_images(
 
             **Think from {user_name}'s perspective**: These images represent moments that caught their attention, sparked their curiosity, or held some significance for them. Help them understand WHY these moments mattered and how they reflect their values, interests, and growth.
 
+            {"**User Context**: " + user_prompt.strip() + " Please incorporate this context throughout your analysis, especially when generating events and insights." if user_prompt.strip() else ""}
+
             Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
 
             1. **Overview**: Write directly to {user_name} about the significance of what they captured:
@@ -1211,6 +1254,13 @@ async def upload_and_process_conversation_images(
                - Knowledge areas that would deepen their enjoyment of their interests
                - Learning that would help them find even more meaning in the moments they choose to capture
 
+            5. **Events**: Generate calendar events based on the images and any user context:
+               - Create events that align with the content and context of the images
+               - Use the user_prompt field to store any user-provided context or instructions for each event
+               - Make events specific, actionable, and meaningful based on the visual content
+               - Include appropriate timing and duration based on the activity type
+               - {"Focus especially on events that relate to: " + user_prompt.strip() if user_prompt.strip() else "Focus on events that emerge naturally from the image content"}
+
             **Personal Growth Framework**:
             - Honor their choice to capture these particular moments as meaningful and valuable
             - Frame their visual attention as a strength and source of insight about themselves
@@ -1222,6 +1272,7 @@ async def upload_and_process_conversation_images(
             **Technical Requirements:**
             - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
             - Choose the category that best represents the main theme or content of the images
+            - For events, include the user-provided context in the user_prompt field for each event
 
             User Information for Deep Personalization:
             - Name: {user_name}
@@ -1279,6 +1330,41 @@ async def upload_and_process_conversation_images(
                 if not _contains_similar_item(existing_contents, learning_content):
                     conversation.structured.things_to_learn.append(learning)
         
+        # Convert EnhancedEvent objects to Event objects with user prompt (for both first and incremental enhancements)
+        if hasattr(result, 'events') and result.events:
+            from models.conversation import Event
+            from datetime import datetime
+            
+            new_events = []
+            for enhanced_event in result.events:
+                try:
+                    # Parse the ISO date string
+                    start_datetime = datetime.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
+                    
+                    # Create Event object with user prompt
+                    event = Event(
+                        title=enhanced_event.title,
+                        description=enhanced_event.description,
+                        start=start_datetime,
+                        duration=enhanced_event.duration,
+                        user_prompt=user_prompt or enhanced_event.user_prompt,  # Use provided user prompt or extracted one
+                        created=False
+                    )
+                    new_events.append(event)
+                except Exception as e:
+                    print(f"Error converting event: {e}")
+                    continue
+            
+            # Add events based on enhancement type
+            if is_first_enhancement:
+                conversation.structured.events = new_events
+            else:
+                # For incremental enhancement, only add events that don't already exist
+                existing_event_titles = [event.title.lower() for event in conversation.structured.events]
+                for new_event in new_events:
+                    if new_event.title.lower() not in existing_event_titles:
+                        conversation.structured.events.append(new_event)
+        
         print(f"DEBUG: Before adding image URLs - current image_urls: {conversation.structured.image_urls}")
         
         # Add image URLs to the conversation
@@ -1334,12 +1420,14 @@ async def upload_and_process_conversation_images(
 @router.post("/v1/conversations/create-from-images", response_model=Conversation, tags=['conversations'])
 async def create_conversation_from_images(
     files: List[UploadFile] = File(...),
+    user_prompt: Optional[str] = Form(default=""),
     uid: str = Depends(auth.get_current_user_uid)
 ):
     """
     Create a new conversation from one or more uploaded images.
     This endpoint uploads images, analyzes their content, and creates a new conversation 
     with structured insights based on the image content.
+    Accepts optional user_prompt for providing context and instructions for event generation.
     """
     print(f"DEBUG: Starting create_conversation_from_images for user {uid}")
     print(f"DEBUG: Received {len(files)} files")
@@ -1424,7 +1512,7 @@ async def create_conversation_from_images(
         # Get image descriptions using OpenAI
         for image_data in images_data:
             try:
-                description = analyze_image_content(image_data)
+                description = analyze_image_content(image_data, user_prompt)
                 image_descriptions.append(description)
             except Exception as e:
                 print(f"Error analyzing image: {e}")
@@ -1448,6 +1536,8 @@ async def create_conversation_from_images(
         {user_name} has shared visual content that was meaningful enough for them to capture and revisit. Your role is to help them understand the deeper significance of what they chose to document and how these visual moments can contribute to their personal journey and growth.
 
         **Think from {user_name}'s perspective**: These images represent moments that caught their attention, sparked their curiosity, or held some significance for them. Help them understand WHY these moments mattered and how they reflect their values, interests, and growth.
+
+        {"**User Context**: " + user_prompt.strip() + " Please incorporate this context throughout your analysis, especially when generating events and insights." if user_prompt.strip() else ""}
 
         Create a comprehensive analysis that serves as a valuable tool for {user_name}'s self-discovery and development:
 
@@ -1479,6 +1569,13 @@ async def create_conversation_from_images(
            - Knowledge areas that would deepen their enjoyment of their interests
            - Learning that would help them find even more meaning in the moments they choose to capture
 
+        5. **Events**: Generate calendar events based on the images and any user context:
+           - Create events that align with the content and context of the images
+           - Use the user_prompt field to store any user-provided context or instructions for each event
+           - Make events specific, actionable, and meaningful based on the visual content
+           - Include appropriate timing and duration based on the activity type
+           - {"Focus especially on events that relate to: " + user_prompt.strip() if user_prompt.strip() else "Focus on events that emerge naturally from the image content"}
+
         **Personal Growth Framework**:
         - Honor their choice to capture these particular moments as meaningful and valuable
         - Frame their visual attention as a strength and source of insight about themselves
@@ -1490,6 +1587,7 @@ async def create_conversation_from_images(
         **Technical Requirements:**
         - For the category field, you MUST choose one of the following values EXACTLY as written: {valid_categories_str}
         - Choose the category that best represents the main theme or content of the images
+        - For events, include the user-provided context in the user_prompt field for each event
 
         User Information for Deep Personalization:
         - Name: {user_name}
@@ -1580,6 +1678,49 @@ async def create_conversation_from_images(
             things_to_learn=things_to_learn_list,
             image_urls=image_urls
         )
+        
+        # Convert EnhancedEvent objects to Event objects with user prompt
+        if hasattr(result, 'events') and result.events:
+            from models.conversation import Event
+            from datetime import datetime
+            
+            for enhanced_event in result.events:
+                try:
+                    # Parse the ISO format datetime
+                    start_time = datetime.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
+                    
+                    # Create Event object with user prompt
+                    event = Event(
+                        title=enhanced_event.title,
+                        description=enhanced_event.description,
+                        start=start_time,
+                        duration=enhanced_event.duration,
+                        user_prompt=user_prompt or enhanced_event.user_prompt  # Use provided user_prompt or from enhanced event
+                    )
+                    structured.events.append(event)
+                    print(f"DEBUG: Added event: {event.title} with user_prompt: {event.user_prompt}")
+                except Exception as e:
+                    print(f"ERROR: Failed to process event {enhanced_event.title}: {e}")
+                    # Create a default event for tomorrow if parsing fails
+                    default_start = datetime.now() + timedelta(days=1)
+                    default_start = default_start.replace(hour=10, minute=0, second=0, microsecond=0)
+                    
+                    event = Event(
+                        title=enhanced_event.title,
+                        description=enhanced_event.description,
+                        start=default_start,
+                        duration=getattr(enhanced_event, 'duration', 30),
+                        user_prompt=user_prompt or getattr(enhanced_event, 'user_prompt', '')
+                    )
+                    structured.events.append(event)
+                    print(f"DEBUG: Added default event: {event.title} with user_prompt: {event.user_prompt}")
+        
+        # Process action items
+        if hasattr(result, 'action_items') and result.action_items:
+            from models.conversation import ActionItem
+            for item in result.action_items:
+                structured.action_items.append(ActionItem(description=item))
+                print(f"DEBUG: Added action item: {item}")
         
         # Create a conversation with empty transcript but rich structured data
         new_conversation = Conversation(

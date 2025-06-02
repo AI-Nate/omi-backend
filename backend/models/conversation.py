@@ -86,6 +86,7 @@ class Event(BaseModel):
     start: datetime = Field(description="The start date and time of the event")
     duration: int = Field(description="The duration of the event in minutes", default=30)
     created: bool = False
+    user_prompt: Optional[str] = Field(description="User-provided context or instructions for this event", default='')
 
     def as_dict_cleaned_dates(self):
         event_dict = self.dict()
