@@ -232,12 +232,30 @@ async def process_audio_dg(
         print(f"   DEBUG: Calling stream_transcript with {len(segments)} segments")
         stream_transcript(segments)
 
+    def on_speech_started(self, speech_started, **kwargs):
+        print("🗣️ DEBUG: Speech Started - Deepgram detected voice activity")
+    
+    def on_utterance_end(self, utterance_end, **kwargs):
+        print("🔚 DEBUG: Utterance End - Speech segment completed")
+        print(f"   Utterance data: {utterance_end}")
+    
+    def on_unhandled(self, unhandled, **kwargs):
+        print(f"❓ DEBUG: Unhandled Websocket Message: {unhandled}")
+        # Check if this is a VAD event
+        if hasattr(unhandled, 'type'):
+            print(f"   Message type: {unhandled.type}")
+        if hasattr(unhandled, 'speech_final'):
+            print(f"   Speech final: {unhandled.speech_final}")
+    
     def on_error(self, error, **kwargs):
-        print(f"Deepgram Error: {error}")
-        
-    # Define close handler to release nova-3 lock when connection closes
+        print(f"❌ DEBUG: Deepgram Error: {error}")
+        print(f"   Error type: {type(error)}")
+        if hasattr(error, 'message'):
+            print(f"   Error message: {error.message}")
+    
     def on_close(self, close, **kwargs):
-        print("Connection Closed")
+        print("🔌 DEBUG: Connection Closed")
+        print(f"   Close data: {close}")
         global NOVA3_IN_USE
         if is_nova3:
             # Release nova-3 lock when connection closes
@@ -307,13 +325,19 @@ async def process_audio_dg(
                         print(f"Metadata: {metadata}")
                     
                     def on_speech_started(self, speech_started, **kwargs):
-                        print("Speech Started")
+                        print("🗣️ DEBUG: Speech Started - Deepgram detected voice activity")
                     
                     def on_utterance_end(self, utterance_end, **kwargs):
-                        pass
+                        print("🔚 DEBUG: Utterance End - Speech segment completed")
+                        print(f"   Utterance data: {utterance_end}")
                     
                     def on_unhandled(self, unhandled, **kwargs):
-                        print(f"Unhandled Websocket Message: {unhandled}")
+                        print(f"❓ DEBUG: Unhandled Websocket Message: {unhandled}")
+                        # Check if this is a VAD event
+                        if hasattr(unhandled, 'type'):
+                            print(f"   Message type: {unhandled.type}")
+                        if hasattr(unhandled, 'speech_final'):
+                            print(f"   Speech final: {unhandled.speech_final}")
                     
                     # Register additional event handlers
                     dg_connection.on(LiveTranscriptionEvents.Open, on_open)
@@ -327,9 +351,9 @@ async def process_audio_dg(
                     options = LiveOptions(
                         punctuate=True,
                         no_delay=True,
-                        endpointing=100,
-                        language=language,
-                        interim_results=False,
+                        endpointing=300,  # Increased from 100 to be less aggressive
+                        language=language if language != 'multi' else 'en',  # Use specific language instead of multi
+                        interim_results=True,  # Enable interim results for faster response
                         smart_format=True,
                         profanity_filter=False,
                         diarize=True,
@@ -339,7 +363,16 @@ async def process_audio_dg(
                         model=model,
                         sample_rate=sample_rate,
                         encoding='linear16',
+                        vad_events=True,  # Enable voice activity detection events
+                        utterance_end_ms=1000,  # Shorter utterance end for faster results
                     )
+                    
+                    print(f"DEBUG: Deepgram options configured:")
+                    print(f"   Language: {language if language != 'multi' else 'en'}")
+                    print(f"   Sample rate: {sample_rate}")
+                    print(f"   Encoding: linear16")
+                    print(f"   Interim results: True")
+                    print(f"   VAD events: True")
                     
                     # Start the connection with options
                     try:

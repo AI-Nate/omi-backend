@@ -752,11 +752,29 @@ async def _listen(
                     # Handle Deepgram sockets
                     if dg_socket1 is not None:
                         deepgram_chunk_count += 1
-                        dg_socket1.send(data)
                         
-                        # Debug: Log every 50th Deepgram chunk
+                        # Audio level analysis for debugging
                         if deepgram_chunk_count % 50 == 0:
-                            print(f"🔴 DEBUG: Sent audio chunk #{deepgram_chunk_count} to Deepgram, size: {len(data)} bytes")
+                            # Calculate RMS (Root Mean Square) to detect audio level
+                            import numpy as np
+                            audio_array = np.frombuffer(data, dtype=np.int16)
+                            rms = np.sqrt(np.mean(audio_array**2))
+                            max_amplitude = np.max(np.abs(audio_array))
+                            
+                            print(f"🔴 DEBUG: Sent audio chunk #{deepgram_chunk_count} to Deepgram")
+                            print(f"   Size: {len(data)} bytes")
+                            print(f"   RMS level: {rms:.2f}")
+                            print(f"   Max amplitude: {max_amplitude}")
+                            print(f"   Audio range: {np.min(audio_array)} to {np.max(audio_array)}")
+                            
+                            # Detect if audio is mostly silence
+                            silence_threshold = 500  # Adjust based on your audio levels
+                            if rms < silence_threshold:
+                                print(f"   ⚠️  WARNING: Audio level very low (RMS: {rms:.2f} < {silence_threshold}) - might be silence")
+                            else:
+                                print(f"   ✅ Good audio level detected (RMS: {rms:.2f})")
+                        
+                        dg_socket1.send(data)
 
                 # Send to external trigger
                 if audio_bytes_send is not None:
