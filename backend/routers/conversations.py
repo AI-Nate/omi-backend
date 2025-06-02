@@ -7,6 +7,7 @@ from PIL import Image
 from PIL.ExifTags import TAGS
 import io
 import threading
+import re
 
 import database.conversations as conversations_db
 import database.users as users_db
@@ -61,7 +62,7 @@ def detect_image_type_from_content(content: bytes) -> str:
     return None
 
 
-def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
+def extract_image_timestamp(image_data: bytes) -> Optional[dt]:
     """
     Extract the creation timestamp from image EXIF data and attempt to convert to UTC.
     Returns the UTC datetime when the photo was taken, or local time if timezone cannot be determined.
@@ -70,12 +71,67 @@ def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
         # Create PIL Image from bytes
         image = Image.open(io.BytesIO(image_data))
         
+        # Log image format
+        print(f"DEBUG: Image format detected: {image.format}")
+        
         # Get EXIF data
         exif_data = image.getexif()
         
         if not exif_data:
             print("DEBUG: No EXIF data found in image")
+            
+            # For PNG files, try to get creation time from other metadata
+            if image.format == 'PNG':
+                print("DEBUG: Attempting to extract PNG metadata")
+                # Log all available info from the PNG file
+                for key in sorted(image.info.keys()):
+                    print(f"DEBUG: PNG info - {key}: {image.info[key]}")
+                
+                # Try to get creation time from tEXt chunks if available
+                if 'Creation Time' in image.info:
+                    creation_time = image.info['Creation Time']
+                    print(f"DEBUG: Found PNG Creation Time: {creation_time}")
+                    try:
+                        # Try to parse the timestamp (format depends on how it was stored)
+                        parsed_time = dt.strptime(creation_time, "%Y:%m:%d %H:%M:%S")
+                        print(f"DEBUG: Successfully parsed PNG timestamp: {parsed_time}")
+                        return parsed_time
+                    except Exception as e:
+                        print(f"DEBUG: Failed to parse PNG Creation Time: {e}")
+                
+                # Check for iOS-specific metadata
+                for key in image.info:
+                    if isinstance(key, str) and 'date' in key.lower():
+                        print(f"DEBUG: Found iOS date metadata: {key} = {image.info[key]}")
+                        try:
+                            # Try various date formats iOS might use
+                            date_formats = [
+                                "%Y:%m:%d %H:%M:%S",
+                                "%Y-%m-%d %H:%M:%S",
+                                "%Y-%m-%dT%H:%M:%S",
+                                "%a %b %d %H:%M:%S %Y"  # Mon Jun 2 02:29:00 2025
+                            ]
+                            date_value = str(image.info[key])
+                            for date_format in date_formats:
+                                try:
+                                    parsed_time = dt.strptime(date_value, date_format)
+                                    print(f"DEBUG: Successfully parsed iOS timestamp: {parsed_time}")
+                                    return parsed_time
+                                except ValueError:
+                                    continue
+                            print(f"DEBUG: Failed to parse iOS date format: {date_value}")
+                        except Exception as e:
+                            print(f"DEBUG: Error parsing iOS date: {e}")
+                
+                # For iOS screenshots which often contain the date in the UI
+                # For now, we'll log this situation but future enhancement could use
+                # OCR to extract visible dates from the screenshot UI
+                print("DEBUG: No metadata timestamp found for PNG. iOS screenshots typically don't include EXIF")
+                print("DEBUG: In the future, could extract visible dates from the UI using OCR")
+            
             return None
+        
+        print(f"DEBUG: EXIF data found with {len(exif_data)} entries")
             
         local_timestamp = None
         gps_info = None
@@ -88,6 +144,11 @@ def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
             'DateTimeDigitized',  # Digitized date/time
         ]
         
+        # Log all EXIF tags for debugging
+        for tag_id, value in exif_data.items():
+            tag_name = TAGS.get(tag_id, f"Unknown tag {tag_id}")
+            print(f"DEBUG: EXIF tag - {tag_name}: {value}")
+            
         for tag_id, value in exif_data.items():
             tag_name = TAGS.get(tag_id, tag_id)
             
@@ -187,6 +248,9 @@ def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
             
     except Exception as e:
         print(f"DEBUG: Error extracting EXIF timestamp: {e}")
+        print(f"DEBUG: Exception type: {type(e).__name__}")
+        import traceback
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
     
     return None
 
@@ -1036,11 +1100,116 @@ async def upload_and_process_conversation_images(
     
     print(f"DEBUG: Starting file validation")
     # Check file types and sizes using magic bytes detection
+    filename_timestamps = []  # Store timestamps extracted from filenames
+    
     for i, file in enumerate(files):
         print(f"DEBUG: Validating file {i}: {file.filename}, content_type: {file.content_type}")
         print(f"DEBUG: File headers: {getattr(file, 'headers', 'None')}")
         print(f"DEBUG: File size: {file.size}")
         print(f"DEBUG: Available file attributes: {dir(file)}")
+        
+        # Attempt to extract timestamp from filename patterns
+        filename = file.filename
+        filename_timestamp = None
+        
+        if filename:
+            print(f"DEBUG: Analyzing filename for timestamp information: {filename}")
+            
+            # Check for iOS screenshot patterns like "Screenshot 2025-06-02 at 14.32.45.png"
+            ios_screenshot_pattern = r"Screenshot (\d{4}-\d{2}-\d{2}) at (\d{1,2})\.(\d{2})\.(\d{2}).*"
+            ios_match = re.search(ios_screenshot_pattern, filename)
+            if ios_match:
+                date_str = ios_match.group(1)
+                hour = int(ios_match.group(2))
+                minute = int(ios_match.group(3))
+                second = int(ios_match.group(4))
+                print(f"DEBUG: Found iOS screenshot timestamp in filename: {date_str} {hour}:{minute}:{second}")
+                try:
+                    # Create datetime object from extracted components
+                    filename_timestamp = dt.strptime(f"{date_str} {hour:02d}:{minute:02d}:{second:02d}", "%Y-%m-%d %H:%M:%S")
+                    filename_timestamps.append(filename_timestamp)
+                    print(f"DEBUG: Parsed filename timestamp: {filename_timestamp}")
+                except Exception as e:
+                    print(f"DEBUG: Error parsing filename timestamp: {e}")
+            
+            # Check for other timestamp patterns in filenames
+            # Format like "Photo Jun 2, 2025, 2 29 45 AM.png"
+            alt_pattern = r"Photo (\w+) (\d+), (\d{4}), (\d+) (\d+) (\d+) (AM|PM).*"
+            alt_match = re.search(alt_pattern, filename)
+            if alt_match and not filename_timestamp:
+                try:
+                    month_str = alt_match.group(1)
+                    day = int(alt_match.group(2))
+                    year = int(alt_match.group(3))
+                    hour = int(alt_match.group(4))
+                    minute = int(alt_match.group(5))
+                    second = int(alt_match.group(6))
+                    am_pm = alt_match.group(7)
+                    
+                    # Convert month name to number
+                    month_map = {
+                        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+                    }
+                    month = month_map.get(month_str[:3], 1)  # Default to January if not found
+                    
+                    # Adjust hour for PM
+                    if am_pm == "PM" and hour < 12:
+                        hour += 12
+                    elif am_pm == "AM" and hour == 12:
+                        hour = 0
+                        
+                    # Create datetime object
+                    filename_timestamp = dt(year, month, day, hour, minute, second)
+                    filename_timestamps.append(filename_timestamp)
+                    print(f"DEBUG: Parsed alternative filename timestamp: {filename_timestamp}")
+                except Exception as e:
+                    print(f"DEBUG: Error parsing alternative filename timestamp: {e}")
+            
+            # iOS metadata format seen in screenshots: "Monday • Jun 2, 2025 • 2:29AM"
+            ios_metadata_pattern = r"(\w+) • (\w+) (\d+), (\d{4}) • (\d+):(\d+)(AM|PM)"
+            ios_meta_match = re.search(ios_metadata_pattern, filename)
+            if not filename_timestamp and ios_meta_match:
+                try:
+                    weekday = ios_meta_match.group(1)  # Not used but captured
+                    month_str = ios_meta_match.group(2)
+                    day = int(ios_meta_match.group(3))
+                    year = int(ios_meta_match.group(4))
+                    hour = int(ios_meta_match.group(5))
+                    minute = int(ios_meta_match.group(6))
+                    am_pm = ios_meta_match.group(7)
+                    
+                    # Convert month name to number
+                    month_map = {
+                        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+                    }
+                    month = month_map.get(month_str[:3], 1)  # Default to January if not found
+                    
+                    # Adjust hour for PM
+                    if am_pm == "PM" and hour < 12:
+                        hour += 12
+                    elif am_pm == "AM" and hour == 12:
+                        hour = 0
+                    
+                    # Create datetime object
+                    filename_timestamp = dt(year, month, day, hour, minute)
+                    filename_timestamps.append(filename_timestamp)
+                    print(f"DEBUG: Parsed iOS metadata timestamp from filename: {filename_timestamp}")
+                except Exception as e:
+                    print(f"DEBUG: Error parsing iOS metadata timestamp: {e}")
+            
+            # Check for iOS image patterns like "IMG_4458.PNG" - these don't have direct timestamp info
+            # but the number is often sequential and might be useful for relative ordering
+            ios_img_pattern = r"IMG_(\d{4,})\.(?:PNG|JPG|HEIC)"
+            img_match = re.search(ios_img_pattern, filename, re.IGNORECASE)
+            if img_match:
+                img_number = img_match.group(1)
+                print(f"DEBUG: Found iOS image number in filename: IMG_{img_number}")
+                    
+            # Try to extract metadata directly from the image, which might be visible in the screenshot
+            # For example, look for patterns in the first few lines of the image for iOS screenshots
+            # This would require OCR which we can't implement here, but we can add a note for future enhancement
         
         # Read file content to check magic bytes
         file_size = 0
@@ -1101,19 +1270,23 @@ async def upload_and_process_conversation_images(
         for i, url in enumerate(uploaded_urls):
             print(f"DEBUG: Image {i}: {url}")
         
-        # Determine the conversation timestamp based on image timestamps
+        # Determine the conversation timestamp based on image timestamps and filename timestamps
         valid_timestamps = [ts for ts in image_timestamps if ts is not None]
+        
+        # Add any timestamps from filenames
+        if filename_timestamps:
+            print(f"DEBUG: Found {len(filename_timestamps)} timestamps from filenames")
+            valid_timestamps.extend(filename_timestamps)
         
         if valid_timestamps:
             # Use the earliest image timestamp as the conversation timestamp
             earliest_timestamp = min(valid_timestamps)
-            # EXIF timestamps are already in local time, so don't convert to UTC
             conversation_timestamp = earliest_timestamp
-            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp} (preserving local time from EXIF)")
+            print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp} (from {len(valid_timestamps)} timestamps)")
         else:
-            # Fallback to current time if no EXIF timestamps found
+            # Fallback to current time if no timestamps found
             conversation_timestamp = dt.now(timezone.utc)
-            print(f"DEBUG: No EXIF timestamps found, using current time: {conversation_timestamp}")
+            print(f"DEBUG: No timestamps found, using current time: {conversation_timestamp}")
         
         # Get image descriptions using OpenAI
         for image_data in images_data:
