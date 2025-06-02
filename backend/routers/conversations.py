@@ -79,27 +79,59 @@ def extract_image_timestamp(image_data: bytes) -> Optional[dt]:
         
         if not exif_data:
             print("DEBUG: No EXIF data found in image")
+        else:
+            print(f"DEBUG: EXIF data found with {len(exif_data)} entries")
+            # Log all EXIF tags for debugging
+            for tag_id, value in exif_data.items():
+                tag_name = TAGS.get(tag_id, f"Unknown tag {tag_id}")
+                print(f"DEBUG: EXIF tag - {tag_name}: {value}")
+        
+        local_timestamp = None
+        gps_info = None
+        timezone_offset = None
+        
+        # Try to extract timestamp from EXIF data if it exists
+        if exif_data:
+            # Extract timestamp
+            timestamp_tags = [
+                'DateTimeOriginal',   # Original date/time (preferred)
+                'DateTime',           # General date/time
+                'DateTimeDigitized',  # Digitized date/time
+            ]
             
-            # For PNG files, try to get creation time from other metadata
-            if image.format == 'PNG':
-                print("DEBUG: Attempting to extract PNG metadata")
-                # Log all available info from the PNG file
-                for key in sorted(image.info.keys()):
-                    print(f"DEBUG: PNG info - {key}: {image.info[key]}")
+            for tag_id, value in exif_data.items():
+                tag_name = TAGS.get(tag_id, tag_id)
                 
-                # Try to get creation time from tEXt chunks if available
-                if 'Creation Time' in image.info:
-                    creation_time = image.info['Creation Time']
-                    print(f"DEBUG: Found PNG Creation Time: {creation_time}")
+                if tag_name in timestamp_tags:
                     try:
-                        # Try to parse the timestamp (format depends on how it was stored)
-                        parsed_time = dt.strptime(creation_time, "%Y:%m:%d %H:%M:%S")
-                        print(f"DEBUG: Successfully parsed PNG timestamp: {parsed_time}")
-                        return parsed_time
-                    except Exception as e:
-                        print(f"DEBUG: Failed to parse PNG Creation Time: {e}")
-                
-                # Check for iOS-specific metadata
+                        # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
+                        local_timestamp = dt.strptime(value, "%Y:%m:%d %H:%M:%S")
+                        print(f"DEBUG: Found EXIF timestamp - {tag_name}: {local_timestamp}")
+                        break
+                    except (ValueError, TypeError) as e:
+                        print(f"DEBUG: Failed to parse timestamp {value}: {e}")
+                        continue
+        
+        # If no timestamp found in EXIF, try PNG-specific metadata
+        if not local_timestamp and image.format == 'PNG':
+            print("DEBUG: Attempting to extract PNG metadata (no EXIF timestamp found)")
+            # Log all available info from the PNG file
+            for key in sorted(image.info.keys()):
+                print(f"DEBUG: PNG info - {key}: {image.info[key]}")
+            
+            # Try to get creation time from tEXt chunks if available
+            if 'Creation Time' in image.info:
+                creation_time = image.info['Creation Time']
+                print(f"DEBUG: Found PNG Creation Time: {creation_time}")
+                try:
+                    # Try to parse the timestamp (format depends on how it was stored)
+                    local_timestamp = dt.strptime(creation_time, "%Y:%m:%d %H:%M:%S")
+                    print(f"DEBUG: Successfully parsed PNG timestamp: {local_timestamp}")
+                except Exception as e:
+                    print(f"DEBUG: Failed to parse PNG Creation Time: {e}")
+            
+            # Check for iOS-specific metadata
+            if not local_timestamp:
                 for key in image.info:
                     if isinstance(key, str) and 'date' in key.lower():
                         print(f"DEBUG: Found iOS date metadata: {key} = {image.info[key]}")
@@ -114,108 +146,77 @@ def extract_image_timestamp(image_data: bytes) -> Optional[dt]:
                             date_value = str(image.info[key])
                             for date_format in date_formats:
                                 try:
-                                    parsed_time = dt.strptime(date_value, date_format)
-                                    print(f"DEBUG: Successfully parsed iOS timestamp: {parsed_time}")
-                                    return parsed_time
+                                    local_timestamp = dt.strptime(date_value, date_format)
+                                    print(f"DEBUG: Successfully parsed iOS timestamp: {local_timestamp}")
+                                    break
                                 except ValueError:
                                     continue
+                            if local_timestamp:
+                                break
                             print(f"DEBUG: Failed to parse iOS date format: {date_value}")
                         except Exception as e:
                             print(f"DEBUG: Error parsing iOS date: {e}")
-                
-                # For iOS screenshots which often contain the date in the UI
-                # For now, we'll log this situation but future enhancement could use
-                # OCR to extract visible dates from the screenshot UI
-                print("DEBUG: No metadata timestamp found for PNG. iOS screenshots typically don't include EXIF")
-                print("DEBUG: In the future, could extract visible dates from the UI using OCR")
             
-            return None
+            if not local_timestamp:
+                print("DEBUG: No metadata timestamp found for PNG after checking all available metadata")
+                print("DEBUG: PNG screenshots (especially from iOS) typically don't include timestamp metadata")
+                print("DEBUG: Future enhancement: could use OCR to extract visible dates from screenshot UI")
         
-        print(f"DEBUG: EXIF data found with {len(exif_data)} entries")
-            
-        local_timestamp = None
-        gps_info = None
-        timezone_offset = None
-        
-        # Extract timestamp
-        timestamp_tags = [
-            'DateTimeOriginal',   # Original date/time (preferred)
-            'DateTime',           # General date/time
-            'DateTimeDigitized',  # Digitized date/time
-        ]
-        
-        # Log all EXIF tags for debugging
-        for tag_id, value in exif_data.items():
-            tag_name = TAGS.get(tag_id, f"Unknown tag {tag_id}")
-            print(f"DEBUG: EXIF tag - {tag_name}: {value}")
-            
-        for tag_id, value in exif_data.items():
-            tag_name = TAGS.get(tag_id, tag_id)
-            
-            if tag_name in timestamp_tags:
-                try:
-                    # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
-                    local_timestamp = dt.strptime(value, "%Y:%m:%d %H:%M:%S")
-                    print(f"DEBUG: Found EXIF timestamp - {tag_name}: {local_timestamp}")
-                    break
-                except (ValueError, TypeError) as e:
-                    print(f"DEBUG: Failed to parse timestamp {value}: {e}")
-                    continue
-                    
         if not local_timestamp:
-            print("DEBUG: No valid timestamp found in EXIF data")
+            print("DEBUG: No valid timestamp found in any metadata")
             return None
             
-        # Try to extract timezone offset information (newer cameras)
-        timezone_offset_tags = [
-            'OffsetTimeOriginal',  # Timezone offset for DateTimeOriginal
-            'OffsetTime',          # Timezone offset for DateTime  
-            'OffsetTimeDigitized', # Timezone offset for DateTimeDigitized
-        ]
-        
-        for tag_id, value in exif_data.items():
-            tag_name = TAGS.get(tag_id, tag_id)
-            if tag_name in timezone_offset_tags and value:
+        # Try to extract timezone offset information (newer cameras) - only if we have EXIF data
+        if exif_data:
+            timezone_offset_tags = [
+                'OffsetTimeOriginal',  # Timezone offset for DateTimeOriginal
+                'OffsetTime',          # Timezone offset for DateTime  
+                'OffsetTimeDigitized', # Timezone offset for DateTimeDigitized
+            ]
+            
+            for tag_id, value in exif_data.items():
+                tag_name = TAGS.get(tag_id, tag_id)
+                if tag_name in timezone_offset_tags and value:
+                    try:
+                        # Parse timezone offset like "+07:00" or "-05:00"
+                        if isinstance(value, str) and len(value) >= 6:
+                            sign = 1 if value[0] == '+' else -1
+                            hours = int(value[1:3])
+                            minutes = int(value[4:6])
+                            timezone_offset = sign * (hours * 60 + minutes)  # offset in minutes
+                            print(f"DEBUG: Found timezone offset from {tag_name}: {value} ({timezone_offset} minutes)")
+                            break
+                    except (ValueError, TypeError) as e:
+                        print(f"DEBUG: Failed to parse timezone offset {value}: {e}")
+                        
+            # Try to extract GPS coordinates
+            gps_ifd = exif_data.get_ifd(0x8825)  # GPS IFD tag
+            if gps_ifd:
                 try:
-                    # Parse timezone offset like "+07:00" or "-05:00"
-                    if isinstance(value, str) and len(value) >= 6:
-                        sign = 1 if value[0] == '+' else -1
-                        hours = int(value[1:3])
-                        minutes = int(value[4:6])
-                        timezone_offset = sign * (hours * 60 + minutes)  # offset in minutes
-                        print(f"DEBUG: Found timezone offset from {tag_name}: {value} ({timezone_offset} minutes)")
-                        break
-                except (ValueError, TypeError) as e:
-                    print(f"DEBUG: Failed to parse timezone offset {value}: {e}")
+                    lat_ref = gps_ifd.get(1)  # GPSLatitudeRef (N/S)
+                    lat_dms = gps_ifd.get(2)  # GPSLatitude (degrees, minutes, seconds)
+                    lon_ref = gps_ifd.get(3)  # GPSLongitudeRef (E/W)  
+                    lon_dms = gps_ifd.get(4)  # GPSLongitude (degrees, minutes, seconds)
                     
-        # Try to extract GPS coordinates
-        gps_ifd = exif_data.get_ifd(0x8825)  # GPS IFD tag
-        if gps_ifd:
-            try:
-                lat_ref = gps_ifd.get(1)  # GPSLatitudeRef (N/S)
-                lat_dms = gps_ifd.get(2)  # GPSLatitude (degrees, minutes, seconds)
-                lon_ref = gps_ifd.get(3)  # GPSLongitudeRef (E/W)  
-                lon_dms = gps_ifd.get(4)  # GPSLongitude (degrees, minutes, seconds)
-                
-                if all([lat_ref, lat_dms, lon_ref, lon_dms]):
-                    # Convert DMS to decimal degrees
-                    def dms_to_decimal(dms_tuple, ref):
-                        degrees = float(dms_tuple[0])
-                        minutes = float(dms_tuple[1])
-                        seconds = float(dms_tuple[2])
-                        decimal = degrees + minutes/60.0 + seconds/3600.0
-                        if ref in ['S', 'W']:
-                            decimal = -decimal
-                        return decimal
+                    if all([lat_ref, lat_dms, lon_ref, lon_dms]):
+                        # Convert DMS to decimal degrees
+                        def dms_to_decimal(dms_tuple, ref):
+                            degrees = float(dms_tuple[0])
+                            minutes = float(dms_tuple[1])
+                            seconds = float(dms_tuple[2])
+                            decimal = degrees + minutes/60.0 + seconds/3600.0
+                            if ref in ['S', 'W']:
+                                decimal = -decimal
+                            return decimal
+                        
+                        latitude = dms_to_decimal(lat_dms, lat_ref)
+                        longitude = dms_to_decimal(lon_dms, lon_ref)
+                        gps_info = (latitude, longitude)
+                        print(f"DEBUG: Found GPS coordinates: {latitude}, {longitude}")
+                        
+                except Exception as e:
+                    print(f"DEBUG: Error extracting GPS coordinates: {e}")
                     
-                    latitude = dms_to_decimal(lat_dms, lat_ref)
-                    longitude = dms_to_decimal(lon_dms, lon_ref)
-                    gps_info = (latitude, longitude)
-                    print(f"DEBUG: Found GPS coordinates: {latitude}, {longitude}")
-                    
-            except Exception as e:
-                print(f"DEBUG: Error extracting GPS coordinates: {e}")
-                
         # Convert to UTC using available information
         if timezone_offset is not None:
             # Use timezone offset from EXIF
@@ -1131,6 +1132,8 @@ async def upload_and_process_conversation_images(
                     print(f"DEBUG: Parsed filename timestamp: {filename_timestamp}")
                 except Exception as e:
                     print(f"DEBUG: Error parsing filename timestamp: {e}")
+            else:
+                print(f"DEBUG: Filename '{filename}' does not match iOS screenshot pattern")
             
             # Check for other timestamp patterns in filenames
             # Format like "Photo Jun 2, 2025, 2 29 45 AM.png"
@@ -1165,6 +1168,8 @@ async def upload_and_process_conversation_images(
                     print(f"DEBUG: Parsed alternative filename timestamp: {filename_timestamp}")
                 except Exception as e:
                     print(f"DEBUG: Error parsing alternative filename timestamp: {e}")
+            elif not filename_timestamp:
+                print(f"DEBUG: Filename '{filename}' does not match alternative timestamp pattern")
             
             # iOS metadata format seen in screenshots: "Monday • Jun 2, 2025 • 2:29AM"
             ios_metadata_pattern = r"(\w+) • (\w+) (\d+), (\d{4}) • (\d+):(\d+)(AM|PM)"
@@ -1198,6 +1203,8 @@ async def upload_and_process_conversation_images(
                     print(f"DEBUG: Parsed iOS metadata timestamp from filename: {filename_timestamp}")
                 except Exception as e:
                     print(f"DEBUG: Error parsing iOS metadata timestamp: {e}")
+            elif not filename_timestamp:
+                print(f"DEBUG: Filename '{filename}' does not match iOS metadata pattern")
             
             # Check for iOS image patterns like "IMG_4458.PNG" - these don't have direct timestamp info
             # but the number is often sequential and might be useful for relative ordering
@@ -1206,10 +1213,11 @@ async def upload_and_process_conversation_images(
             if img_match:
                 img_number = img_match.group(1)
                 print(f"DEBUG: Found iOS image number in filename: IMG_{img_number}")
-                    
-            # Try to extract metadata directly from the image, which might be visible in the screenshot
-            # For example, look for patterns in the first few lines of the image for iOS screenshots
-            # This would require OCR which we can't implement here, but we can add a note for future enhancement
+            
+            if not filename_timestamp:
+                print(f"DEBUG: No timestamp extracted from filename '{filename}' - will rely on image metadata or current time")
+        else:
+            print("DEBUG: No filename provided for timestamp extraction")
         
         # Read file content to check magic bytes
         file_size = 0
