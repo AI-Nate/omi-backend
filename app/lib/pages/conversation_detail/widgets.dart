@@ -1266,7 +1266,9 @@ class GetSheetMainOptions extends StatelessWidget {
                   onTap: provider.isImageSummaryLoading
                       ? null
                       : () async {
-                          Navigator.pop(context);
+                          debugPrint(
+                              'DEBUG: Add Image to Summary button tapped');
+                          debugPrint('DEBUG: Calling addImageToSummary');
                           provider.addImageToSummary(context);
                         },
                 )

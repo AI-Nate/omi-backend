@@ -398,7 +398,9 @@ class ConversationDetailProvider extends ChangeNotifier
 
           // Update in the provider
           if (conversationProvider != null) {
+            debugPrint('PROVIDER DEBUG: Updating conversation in provider');
             conversationProvider!.updateConversation(conversation);
+            debugPrint('PROVIDER DEBUG: Conversation updated in provider');
           }
 
           loadingEnhancedSummary = false;
@@ -432,18 +434,32 @@ class ConversationDetailProvider extends ChangeNotifier
 
   // Method to handle adding an image to the summary
   Future<void> addImageToSummary(BuildContext context) async {
-    if (!isImageSummaryLoading && conversation != null) {
+    debugPrint('DEBUG: addImageToSummary called');
+    debugPrint('DEBUG: isImageSummaryLoading = $isImageSummaryLoading');
+
+    if (!isImageSummaryLoading) {
+      debugPrint('DEBUG: Not loading, proceeding with image selection');
       try {
         isImageSummaryLoading = true;
         notifyListeners();
+        debugPrint('DEBUG: Set loading state to true');
 
         final ImagePicker picker = ImagePicker();
+        debugPrint('DEBUG: Created ImagePicker instance');
 
         // Allow user to pick multiple images
         final List<XFile> images = await picker.pickMultiImage();
+        debugPrint('DEBUG: Image picker returned ${images.length} images');
+
+        // Close the bottom sheet now that user has made a selection (or cancelled)
+        if (context.mounted) {
+          Navigator.pop(context);
+        }
 
         if (images.isNotEmpty) {
           // Show user prompt dialog for context
+          if (!context.mounted) return;
+
           final userPrompt = await showUserPromptDialog(
             context: context,
             title: 'Add Context to Your Images',
@@ -466,7 +482,7 @@ class ConversationDetailProvider extends ChangeNotifier
 
           // Upload images to backend and get updated conversation with user prompt
           final updatedConversation = await uploadAndProcessConversationImages(
-            conversation!.id,
+            conversation.id,
             imagesData,
             userPrompt: userPrompt.isNotEmpty ? userPrompt : null,
           );
