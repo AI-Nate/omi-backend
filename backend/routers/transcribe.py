@@ -324,7 +324,11 @@ async def _listen(
 
     def stream_transcript(segments):
         nonlocal realtime_segment_buffers
+        print(f"📝 DEBUG: stream_transcript called with {len(segments)} segments")
+        for i, segment in enumerate(segments):
+            print(f"   Segment {i}: {segment}")
         realtime_segment_buffers.extend(segments)
+        print(f"   Buffer now contains {len(realtime_segment_buffers)} total segments")
 
     async def _process_stt():
         nonlocal websocket_close_code
@@ -705,10 +709,19 @@ async def _listen(
 
         timer_start = time.time()
         last_audio_received_time = timer_start
+        audio_chunk_count = 0
+        deepgram_chunk_count = 0
+        
         try:
             while websocket_active:
                 data = await websocket.receive_bytes()
                 last_audio_received_time = time.time()
+                audio_chunk_count += 1
+                
+                # Debug: Log every 50th audio chunk to avoid spam
+                if audio_chunk_count % 50 == 0:
+                    print(f"🎵 DEBUG: Received audio chunk #{audio_chunk_count}, size: {len(data)} bytes")
+                
                 if codec == 'opus' and sample_rate == 16000:
                     data = decoder.decode(bytes(data), frame_size=frame_size)
                     # audio_data.extend(data)
@@ -738,7 +751,12 @@ async def _listen(
 
                     # Handle Deepgram sockets
                     if dg_socket1 is not None:
+                        deepgram_chunk_count += 1
                         dg_socket1.send(data)
+                        
+                        # Debug: Log every 50th Deepgram chunk
+                        if deepgram_chunk_count % 50 == 0:
+                            print(f"🔴 DEBUG: Sent audio chunk #{deepgram_chunk_count} to Deepgram, size: {len(data)} bytes")
 
                 # Send to external trigger
                 if audio_bytes_send is not None:
@@ -751,6 +769,7 @@ async def _listen(
             websocket_close_code = 1011
         finally:
             websocket_active = False
+            print(f"🎵 DEBUG: Audio processing ended. Total chunks: {audio_chunk_count}, Deepgram chunks: {deepgram_chunk_count}")
 
     # Ensure resources are properly cleaned up
     async def cleanup_resources():

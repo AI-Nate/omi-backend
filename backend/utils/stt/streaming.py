@@ -170,11 +170,29 @@ async def process_audio_dg(
                     print("Acquired exclusive lock for nova-3")
 
     def on_message(self, result, **kwargs):
-        # print(f"Received message from Deepgram")  # Log when message is received
+        # Debug logging for transcript reception
+        print(f"🎤 DEBUG: Received message from Deepgram")
+        print(f"   Result type: {type(result)}")
+        print(f"   Has channel: {hasattr(result, 'channel')}")
+        
+        if hasattr(result, 'channel') and hasattr(result.channel, 'alternatives'):
+            print(f"   Alternatives count: {len(result.channel.alternatives)}")
+            if len(result.channel.alternatives) > 0:
+                sentence = result.channel.alternatives[0].transcript
+                print(f"   Raw transcript: '{sentence}'")
+                print(f"   Transcript length: {len(sentence)}")
+                print(f"   Has words: {hasattr(result.channel.alternatives[0], 'words')}")
+                if hasattr(result.channel.alternatives[0], 'words'):
+                    print(f"   Words count: {len(result.channel.alternatives[0].words)}")
+        
+        # Original logic starts here
         sentence = result.channel.alternatives[0].transcript
         # print(sentence)
         if len(sentence) == 0:
+            print("   DEBUG: Empty transcript, returning early")
             return
+        
+        print(f"   DEBUG: Processing non-empty transcript: '{sentence}'")
         # print(sentence)
         segments = []
         for word in result.channel.alternatives[0].words:
@@ -206,7 +224,12 @@ async def process_audio_dg(
                         'person_id': None,
                     })
 
+        print(f"   DEBUG: Created {len(segments)} segments")
+        for i, segment in enumerate(segments):
+            print(f"     Segment {i}: {segment}")
+
         # stream
+        print(f"   DEBUG: Calling stream_transcript with {len(segments)} segments")
         stream_transcript(segments)
 
     def on_error(self, error, **kwargs):
