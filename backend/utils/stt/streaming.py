@@ -170,35 +170,14 @@ async def process_audio_dg(
                     print("Acquired exclusive lock for nova-3")
 
     def on_message(self, result, **kwargs):
-        # Debug logging for transcript reception
-        print(f"🎤 DEBUG: Received message from Deepgram")
-        print(f"   Result type: {type(result)}")
-        print(f"   Has channel: {hasattr(result, 'channel')}")
-        
-        if hasattr(result, 'channel') and hasattr(result.channel, 'alternatives'):
-            print(f"   Alternatives count: {len(result.channel.alternatives)}")
-            if len(result.channel.alternatives) > 0:
-                sentence = result.channel.alternatives[0].transcript
-                print(f"   Raw transcript: '{sentence}'")
-                print(f"   Transcript length: {len(sentence)}")
-                print(f"   Has words: {hasattr(result.channel.alternatives[0], 'words')}")
-                if hasattr(result.channel.alternatives[0], 'words'):
-                    print(f"   Words count: {len(result.channel.alternatives[0].words)}")
-        
-        # Original logic starts here
         sentence = result.channel.alternatives[0].transcript
-        # print(sentence)
         if len(sentence) == 0:
-            print("   DEBUG: Empty transcript, returning early")
             return
         
-        print(f"   DEBUG: Processing non-empty transcript: '{sentence}'")
-        # print(sentence)
         segments = []
         for word in result.channel.alternatives[0].words:
             is_user = True if word.speaker == 0 and preseconds > 0 else False
             if word.start < preseconds:
-                # print('Skipping word', word.start)
                 continue
             if not segments:
                 segments.append({
@@ -224,38 +203,22 @@ async def process_audio_dg(
                         'person_id': None,
                     })
 
-        print(f"   DEBUG: Created {len(segments)} segments")
-        for i, segment in enumerate(segments):
-            print(f"     Segment {i}: {segment}")
-
-        # stream
-        print(f"   DEBUG: Calling stream_transcript with {len(segments)} segments")
         stream_transcript(segments)
 
     def on_speech_started(self, speech_started, **kwargs):
-        print("🗣️ DEBUG: Speech Started - Deepgram detected voice activity")
+        pass
     
     def on_utterance_end(self, utterance_end, **kwargs):
-        print("🔚 DEBUG: Utterance End - Speech segment completed")
-        print(f"   Utterance data: {utterance_end}")
+        pass
     
     def on_unhandled(self, unhandled, **kwargs):
-        print(f"❓ DEBUG: Unhandled Websocket Message: {unhandled}")
-        # Check if this is a VAD event
-        if hasattr(unhandled, 'type'):
-            print(f"   Message type: {unhandled.type}")
-        if hasattr(unhandled, 'speech_final'):
-            print(f"   Speech final: {unhandled.speech_final}")
+        pass
     
     def on_error(self, error, **kwargs):
-        print(f"❌ DEBUG: Deepgram Error: {error}")
-        print(f"   Error type: {type(error)}")
-        if hasattr(error, 'message'):
-            print(f"   Error message: {error.message}")
+        print(f"Deepgram Error: {error}")
     
     def on_close(self, close, **kwargs):
-        print("🔌 DEBUG: Connection Closed")
-        print(f"   Close data: {close}")
+        print("Connection Closed")
         global NOVA3_IN_USE
         if is_nova3:
             # Release nova-3 lock when connection closes
@@ -325,19 +288,13 @@ async def process_audio_dg(
                         print(f"Metadata: {metadata}")
                     
                     def on_speech_started(self, speech_started, **kwargs):
-                        print("🗣️ DEBUG: Speech Started - Deepgram detected voice activity")
+                        pass
                     
                     def on_utterance_end(self, utterance_end, **kwargs):
-                        print("🔚 DEBUG: Utterance End - Speech segment completed")
-                        print(f"   Utterance data: {utterance_end}")
+                        pass
                     
                     def on_unhandled(self, unhandled, **kwargs):
-                        print(f"❓ DEBUG: Unhandled Websocket Message: {unhandled}")
-                        # Check if this is a VAD event
-                        if hasattr(unhandled, 'type'):
-                            print(f"   Message type: {unhandled.type}")
-                        if hasattr(unhandled, 'speech_final'):
-                            print(f"   Speech final: {unhandled.speech_final}")
+                        pass
                     
                     # Register additional event handlers
                     dg_connection.on(LiveTranscriptionEvents.Open, on_open)
@@ -366,13 +323,6 @@ async def process_audio_dg(
                         vad_events=True,  # Enable voice activity detection events
                         utterance_end_ms=1000,  # Shorter utterance end for faster results
                     )
-                    
-                    print(f"DEBUG: Deepgram options configured:")
-                    print(f"   Language: {language if language != 'multi' else 'en'}")
-                    print(f"   Sample rate: {sample_rate}")
-                    print(f"   Encoding: linear16")
-                    print(f"   Interim results: True")
-                    print(f"   VAD events: True")
                     
                     # Start the connection with options
                     try:
