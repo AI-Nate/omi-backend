@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Body, File, UploadFile, Form
 from typing import Optional, List, Dict, Union
-from datetime import datetime, timezone, timedelta
+from datetime import datetime as dt, timezone, timedelta
 from pydantic import BaseModel
 import traceback
 from PIL import Image
@@ -94,7 +94,7 @@ def extract_image_timestamp(image_data: bytes) -> Optional[datetime]:
             if tag_name in timestamp_tags:
                 try:
                     # Parse timestamp format: "YYYY:MM:DD HH:MM:SS"
-                    local_timestamp = datetime.strptime(value, "%Y:%m:%d %H:%M:%S")
+                    local_timestamp = dt.strptime(value, "%Y:%m:%d %H:%M:%S")
                     print(f"DEBUG: Found EXIF timestamp - {tag_name}: {local_timestamp}")
                     break
                 except (ValueError, TypeError) as e:
@@ -303,7 +303,7 @@ def process_in_progress_conversation(uid: str = Depends(auth.get_current_user_ui
 # def process_test_memory(
 #         request: TranscriptRequest, uid: str = Depends(auth.get_current_user_uid)
 # ):
-#   st =  get_transcript_structure(request.transcript, datetime.now(),'en','Asia/Kolkata')
+#   st =  get_transcript_structure(request.transcript, dt.now(),'en','Asia/Kolkata')
 #   return [st.json()]
 
 @router.post('/v1/conversations/{conversation_id}/reprocess', response_model=Conversation, tags=['conversations'])
@@ -618,10 +618,10 @@ def search_conversations_endpoint(search_request: SearchRequest, uid: str = Depe
     end_timestamp = None
 
     if search_request.start_date:
-        start_timestamp = int(datetime.fromisoformat(search_request.start_date).timestamp())
+        start_timestamp = int(dt.fromisoformat(search_request.start_date).timestamp())
 
     if search_request.end_date:
-        end_timestamp = int(datetime.fromisoformat(search_request.end_date).timestamp())
+        end_timestamp = int(dt.fromisoformat(search_request.end_date).timestamp())
 
     return search_conversations(query=search_request.query, page=search_request.page,
                                 per_page=search_request.per_page, uid=uid,
@@ -792,7 +792,7 @@ def process_image_summary(
             for enhanced_event in result.events:
                 try:
                     # Parse the ISO date string
-                    start_datetime = datetime.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
+                    start_datetime = dt.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
                     
                     # Create Event object with user prompt
                     event = Event(
@@ -1112,7 +1112,7 @@ async def upload_and_process_conversation_images(
             print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp} (preserving local time from EXIF)")
         else:
             # Fallback to current time if no EXIF timestamps found
-            conversation_timestamp = datetime.now(timezone.utc)
+            conversation_timestamp = dt.now(timezone.utc)
             print(f"DEBUG: No EXIF timestamps found, using current time: {conversation_timestamp}")
         
         # Get image descriptions using OpenAI
@@ -1339,7 +1339,7 @@ async def upload_and_process_conversation_images(
             for enhanced_event in result.events:
                 try:
                     # Parse the ISO date string
-                    start_datetime = datetime.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
+                    start_datetime = dt.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
                     
                     # Create Event object with user prompt
                     event = Event(
@@ -1506,7 +1506,7 @@ async def create_conversation_from_images(
             print(f"DEBUG: Using earliest image timestamp for conversation: {conversation_timestamp} (preserving local time from EXIF)")
         else:
             # Fallback to current time if no EXIF timestamps found
-            conversation_timestamp = datetime.now(timezone.utc)
+            conversation_timestamp = dt.now(timezone.utc)
             print(f"DEBUG: No EXIF timestamps found, using current time: {conversation_timestamp}")
         
         # Get image descriptions using OpenAI
@@ -1687,7 +1687,7 @@ async def create_conversation_from_images(
             for enhanced_event in result.events:
                 try:
                     # Parse the ISO format datetime
-                    start_time = datetime.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
+                    start_time = dt.fromisoformat(enhanced_event.start.replace('Z', '+00:00'))
                     
                     # Create Event object with user prompt
                     event = Event(
@@ -1702,7 +1702,7 @@ async def create_conversation_from_images(
                 except Exception as e:
                     print(f"ERROR: Failed to process event {enhanced_event.title}: {e}")
                     # Create a default event for tomorrow if parsing fails
-                    default_start = datetime.now() + timedelta(days=1)
+                    default_start = dt.now() + timedelta(days=1)
                     default_start = default_start.replace(hour=10, minute=0, second=0, microsecond=0)
                     
                     event = Event(
