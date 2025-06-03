@@ -170,9 +170,18 @@ async def process_audio_dg(
                     print("Acquired exclusive lock for nova-3")
 
     def on_message(self, result, **kwargs):
+        # Debug logging for monitoring
+        print(f"Deepgram result: is_final={result.is_final}, transcript='{result.channel.alternatives[0].transcript}'")
+        
+        # Only process final results to avoid duplicate transcripts
+        if not result.is_final:
+            return
+            
         sentence = result.channel.alternatives[0].transcript
         if len(sentence) == 0:
             return
+        
+        print(f"Processing final Deepgram transcript: '{sentence}'")
         
         segments = []
         for word in result.channel.alternatives[0].words:
@@ -308,9 +317,9 @@ async def process_audio_dg(
                     options = LiveOptions(
                         punctuate=True,
                         no_delay=True,
-                        endpointing=300,  # Increased from 100 to be less aggressive
+                        endpointing=500,  # Increased to reduce false sentence boundaries
                         language=language if language != 'multi' else 'en',  # Use specific language instead of multi
-                        interim_results=True,  # Enable interim results for faster response
+                        interim_results=True,  # Keep enabled but filter in on_message
                         smart_format=True,
                         profanity_filter=False,
                         diarize=True,
@@ -321,7 +330,7 @@ async def process_audio_dg(
                         sample_rate=sample_rate,
                         encoding='linear16',
                         vad_events=True,  # Enable voice activity detection events
-                        utterance_end_ms=1000,  # Shorter utterance end for faster results
+                        utterance_end_ms=1500,  # Increased for more accurate sentence boundaries
                     )
                     
                     # Start the connection with options
