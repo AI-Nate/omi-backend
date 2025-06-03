@@ -46,37 +46,11 @@ def trace_langchain_llm(llm, project_name: str = DEFAULT_PROJECT, add_console_ca
         return llm
     
     try:
-        # Instead of binding callbacks which causes conflicts,
-        # we'll wrap the LLM methods to add tracing when called
-        class TracedLLM:
-            def __init__(self, original_llm, project_name):
-                self._original_llm = original_llm
-                self._project_name = project_name
-                # Copy all attributes from the original LLM
-                for attr in dir(original_llm):
-                    if not attr.startswith('_') and not callable(getattr(original_llm, attr)):
-                        setattr(self, attr, getattr(original_llm, attr))
-            
-            def __getattr__(self, name):
-                # Delegate to the original LLM for any missing attributes/methods
-                return getattr(self._original_llm, name)
-            
-            def invoke(self, input, config=None, **kwargs):
-                # Use the original LLM's invoke method without callback conflicts
-                return self._original_llm.invoke(input, config=config, **kwargs)
-            
-            def with_structured_output(self, schema, **kwargs):
-                # Return a traced version of the structured output LLM
-                structured_llm = self._original_llm.with_structured_output(schema, **kwargs)
-                return TracedLLM(structured_llm, self._project_name)
-            
-            def bind(self, **kwargs):
-                # Return a traced version of the bound LLM
-                bound_llm = self._original_llm.bind(**kwargs)
-                return TracedLLM(bound_llm, self._project_name)
-        
-        # Return the wrapped LLM that delegates to the original
-        return TracedLLM(llm, project_name)
+        # Instead of wrapping with a custom class that causes compatibility issues,
+        # just return the original LLM with minimal intervention
+        # The tracing will happen at the function level via trace_function decorator
+        logger.info(f"LangSmith tracing is available but skipping LLM wrapping to avoid compatibility issues")
+        return llm
         
     except Exception as e:
         logger.error(f"Error setting up LangChain tracing: {e}")

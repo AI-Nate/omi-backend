@@ -85,6 +85,7 @@ def analyze_image_content(image_data: bytes, user_prompt: Optional[str] = None) 
     Returns:
         str: Description of the image content
     """
+    print(f"DEBUG: analyze_image_content called with image_data size: {len(image_data) if image_data else 0}")
     try:
         # Encode image to base64
         base64_image = base64.b64encode(image_data).decode('utf-8')
@@ -235,26 +236,37 @@ class EnhancedSummaryOutput(BaseModel):
 
 @trace_function(tags=["conversation_summary"])
 def get_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str, uid: str = None) -> Structured:
+    print(f"DEBUG: get_transcript_structure called with uid: {uid}, transcript length: {len(transcript) if transcript else 0}")
+    
     if len(transcript) == 0:
+        print("DEBUG: Empty transcript, returning basic structured output")
         return Structured(title='', overview='')
 
     # Define valid categories
     valid_categories = [cat.value for cat in CategoryEnum]
     valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
     
-    # Get user memories if uid is provided
+    # Initialize variables with defaults
+    user_name = "User"  # Default fallback
+    memories_str = ""
     user_memories_context = ""
+    
+    # Get user memories if uid is provided
     if uid:
+        print(f"DEBUG: Attempting to get memories for uid: {uid}")
         # First try to import the module
         try:
             from utils.llms.memory import get_prompt_memories
+            print("DEBUG: Successfully imported get_prompt_memories")
         except Exception as e:
-            print(f"Error importing get_prompt_memories: {e}")
+            print(f"DEBUG ERROR: Error importing get_prompt_memories: {e}")
             return Structured(title='', overview='')
             
         # Then try to use the imported function
         try:
+            print("DEBUG: Calling get_prompt_memories...")
             user_name, memories_str = get_prompt_memories(uid)
+            print(f"DEBUG: Successfully got memories for user: {user_name}")
             user_memories_context = (
                 f"For personalization context about the user:\n"
                 f"User name: {user_name}\n"
@@ -279,7 +291,10 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
                 f"Be thorough but concise. Prioritize the most important information."
             )
         except Exception as e:
-            print(f"Error retrieving user memories: {e}")
+            print(f"DEBUG ERROR: Error retrieving user memories: {e}")
+            # Keep defaults set above
+    
+    print(f"DEBUG: Using user_name: {user_name}")
     
     prompt = f'''
     You are a personal growth coach and life assistant analyzing a meaningful conversation from {user_name}'s life.
@@ -339,8 +354,10 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     '''.replace('    ', '').strip()
 
     try:
+        print("DEBUG: Invoking LLM with structured output...")
         with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
         response: EnhancedSummaryOutput = with_parser.invoke(prompt)
+        print("DEBUG: Successfully got LLM response")
         
         structured = Structured(
             title=response.title,
@@ -443,9 +460,10 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
                 description=description,
             ))
 
+        print("DEBUG: Successfully processed transcript structure")
         return structured
     except ValidationError as e:
-        print(f"Validation error in get_transcript_structure: {e}")
+        print(f"DEBUG ERROR: Validation error in get_transcript_structure: {e}")
         # Fallback to a basic structured output
         return Structured(
             title="Conversation Summary", 
@@ -453,7 +471,7 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
             category=CategoryEnum.other
         )
     except Exception as e:
-        print(f"Error in get_transcript_structure: {e}")
+        print(f"DEBUG ERROR: Error in get_transcript_structure: {e}")
         # Fallback to a basic structured output
         return Structured(
             title="Conversation Summary", 
@@ -464,26 +482,37 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
 
 def get_reprocess_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str,
                                        title: str, uid: str = None) -> Structured:
+    print(f"DEBUG: get_reprocess_transcript_structure called with uid: {uid}, title: {title}, transcript length: {len(transcript) if transcript else 0}")
+    
     if len(transcript) == 0:
-        return Structured(title='', overview='')
+        print("DEBUG: Empty transcript, returning basic structured output")
+        return Structured(title=title if title else '', overview='')
 
     # Define valid categories
     valid_categories = [cat.value for cat in CategoryEnum]
     valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
     
-    # Get user memories if uid is provided
+    # Initialize variables with defaults
+    user_name = "User"  # Default fallback
+    memories_str = ""
     user_memories_context = ""
+    
+    # Get user memories if uid is provided
     if uid:
+        print(f"DEBUG: Attempting to get memories for uid: {uid}")
         # First try to import the module
         try:
             from utils.llms.memory import get_prompt_memories
+            print("DEBUG: Successfully imported get_prompt_memories")
         except Exception as e:
-            print(f"Error importing get_prompt_memories: {e}")
+            print(f"DEBUG ERROR: Error importing get_prompt_memories: {e}")
             return Structured(title=title if title else '', overview='')
             
         # Then try to use the imported function
         try:
+            print("DEBUG: Calling get_prompt_memories...")
             user_name, memories_str = get_prompt_memories(uid)
+            print(f"DEBUG: Successfully got memories for user: {user_name}")
             user_memories_context = (
                 f"For personalization context about the user:\n"
                 f"User name: {user_name}\n"
@@ -502,7 +531,10 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
                 f"- Focus on knowledge or skills that would have immediate practical value"
             )
         except Exception as e:
-            print(f"Error retrieving user memories: {e}")
+            print(f"DEBUG ERROR: Error retrieving user memories: {e}")
+            # Keep defaults set above
+    
+    print(f"DEBUG: Using user_name: {user_name}")
     
     prompt = f'''
     You are a personal growth coach and life assistant analyzing a meaningful conversation from {user_name}'s life.
@@ -562,8 +594,10 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     '''.replace('    ', '').strip()
 
     try:
+        print("DEBUG: Invoking LLM with structured output...")
         with_parser = llm_medium.with_structured_output(EnhancedSummaryOutput)
         response: EnhancedSummaryOutput = with_parser.invoke(prompt)
+        print("DEBUG: Successfully got LLM response")
 
         # Use existing title if provided, otherwise use generated title
         structured = Structured(
@@ -667,9 +701,10 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
                 description=description,
             ))
 
+        print("DEBUG: Successfully processed reprocess transcript structure")
         return structured
     except ValidationError as e:
-        print(f"Validation error in get_reprocess_transcript_structure: {e}")
+        print(f"DEBUG ERROR: Validation error in get_reprocess_transcript_structure: {e}")
         # Fallback to a basic structured output with the provided title
         return Structured(
             title=title if title else "Conversation Summary", 
@@ -677,7 +712,7 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
             category=CategoryEnum.other
         )
     except Exception as e:
-        print(f"Error in get_reprocess_transcript_structure: {e}")
+        print(f"DEBUG ERROR: Error in get_reprocess_transcript_structure: {e}")
         # Fallback to a basic structured output with the provided title
         return Structured(
             title=title if title else "Conversation Summary", 
@@ -921,7 +956,15 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
 # ************* CHAT BASICS **************
 # ****************************************
 def initial_chat_message(uid: str, plugin: Optional[App] = None, prev_messages_str: str = '') -> str:
-    user_name, memories_str = get_prompt_memories(uid)
+    print(f"DEBUG: initial_chat_message called with uid: {uid}")
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        print(f"DEBUG: Successfully got memories for user: {user_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Error getting memories in initial_chat_message: {e}")
+        user_name = "User"
+        memories_str = ""
+    
     if plugin is None:
         prompt = f"""
 You are 'Omi', a friendly and helpful assistant who aims to make {user_name}'s life better 10x.
@@ -1106,7 +1149,14 @@ def _get_answer_simple_message_prompt(uid: str, messages: List[Message], app: Op
     conversation_history = Message.get_messages_as_string(
         messages, use_user_name_if_available=True, use_plugin_name_if_available=True
     )
-    user_name, memories_str = get_prompt_memories(uid)
+    print(f"DEBUG: _get_answer_simple_message_prompt called with uid: {uid}")
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        print(f"DEBUG: Successfully got memories for user: {user_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Error getting memories in _get_answer_simple_message_prompt: {e}")
+        user_name = "User"
+        memories_str = ""
 
     plugin_info = ""
     if app:
@@ -1185,7 +1235,15 @@ def answer_persona_question_stream(app: App, messages: List[Message], callbacks:
 def _get_qa_rag_prompt(uid: str, question: str, context: str, plugin: Optional[App] = None,
                        cited: Optional[bool] = False,
                        messages: List[Message] = [], tz: Optional[str] = "UTC") -> str:
-    user_name, memories_str = get_prompt_memories(uid)
+    print(f"DEBUG: _get_qa_rag_prompt called with uid: {uid}")
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        print(f"DEBUG: Successfully got memories for user: {user_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Error getting memories in _get_qa_rag_prompt: {e}")
+        user_name = "User"
+        memories_str = ""
+    
     memories_str = '\n'.join(memories_str.split('\n')[1:]).strip()
 
     # Use as template (make sure it varies every time): "If I were you $user_name I would do x, y, z."
@@ -1308,7 +1366,15 @@ def retrieve_memory_context_params(memory: Conversation) -> List[str]:
 
 
 def obtain_emotional_message(uid: str, memory: Conversation, context: str, emotion: str) -> str:
-    user_name, memories_str = get_prompt_memories(uid)
+    print(f"DEBUG: obtain_emotional_message called with uid: {uid}")
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        print(f"DEBUG: Successfully got memories for user: {user_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Error getting memories in obtain_emotional_message: {e}")
+        user_name = "User"
+        memories_str = ""
+    
     transcript = memory.get_transcript(False)
     prompt = f"""
     You are a thoughtful and encouraging Friend.
@@ -2107,7 +2173,15 @@ def select_structured_filters(question: str, filters_available: dict) -> dict:
 
 
 def extract_question_from_transcript(uid: str, segments: List[TranscriptSegment]) -> str:
-    user_name, memories_str = get_prompt_memories(uid)
+    print(f"DEBUG: extract_question_from_transcript called with uid: {uid}")
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        print(f"DEBUG: Successfully got memories for user: {user_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Error getting memories in extract_question_from_transcript: {e}")
+        user_name = "User"
+        memories_str = ""
+        
     prompt = f'''
     {user_name} is having a conversation.
 
@@ -2137,7 +2211,15 @@ class OutputMessage(BaseModel):
 
 
 def provide_advice_message(uid: str, segments: List[TranscriptSegment], context: str) -> str:
-    user_name, memories_str = get_prompt_memories(uid)
+    print(f"DEBUG: provide_advice_message called with uid: {uid}")
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        print(f"DEBUG: Successfully got memories for user: {user_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Error getting memories in provide_advice_message: {e}")
+        user_name = "User"
+        memories_str = ""
+    
     transcript = TranscriptSegment.segments_as_string(segments)
     # TODO: tweak with different type of requests, like this, or roast, or praise or emotional, etc.
 
@@ -2180,7 +2262,14 @@ def provide_advice_message(uid: str, segments: List[TranscriptSegment], context:
 
 def get_proactive_message(uid: str, plugin_prompt: str, params: [str], context: str,
                           chat_messages: List[Message]) -> str:
-    user_name, memories_str = get_prompt_memories(uid)
+    print(f"DEBUG: get_proactive_message called with uid: {uid}")
+    try:
+        user_name, memories_str = get_prompt_memories(uid)
+        print(f"DEBUG: Successfully got memories for user: {user_name}")
+    except Exception as e:
+        print(f"DEBUG ERROR: Error getting memories in get_proactive_message: {e}")
+        user_name = "User"
+        memories_str = ""
 
     prompt = plugin_prompt
     for param in params:
