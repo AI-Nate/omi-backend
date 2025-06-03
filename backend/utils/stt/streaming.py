@@ -170,9 +170,6 @@ async def process_audio_dg(
                     print("Acquired exclusive lock for nova-3")
 
     def on_message(self, result, **kwargs):
-        # Debug logging for monitoring
-        print(f"Deepgram result: is_final={result.is_final}, transcript='{result.channel.alternatives[0].transcript}'")
-        
         # Only process final results to avoid duplicate transcripts
         if not result.is_final:
             return
@@ -180,8 +177,6 @@ async def process_audio_dg(
         sentence = result.channel.alternatives[0].transcript
         if len(sentence) == 0:
             return
-        
-        print(f"Processing final Deepgram transcript: '{sentence}'")
         
         segments = []
         for word in result.channel.alternatives[0].words:
