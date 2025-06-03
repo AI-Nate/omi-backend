@@ -425,16 +425,16 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
             structured.action_items.append(ActionItem(description=item))
 
         for event in response.events:
-            description = event.get('description', '')
-            title = event.get('title', '')
+            description = event.description if event.description else ''
+            title = event.title if event.title else ''
             # Process the start time
             starts_at = None
             try:
-                starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
+                starts_at = datetime.strptime(event.start, '%Y-%m-%dT%H:%M:%S')
             except:
                 starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
 
-            duration = event.get('duration', 30)  # default 30 minutes
+            duration = event.duration if event.duration else 30  # default 30 minutes
 
             structured.events.append(Event(
                 title=title,
@@ -649,16 +649,16 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
             structured.action_items.append(ActionItem(description=item))
 
         for event in response.events:
-            description = event.get('description', '')
-            title = event.get('title', '')
+            description = event.description if event.description else ''
+            title = event.title if event.title else ''
             # Process the start time
             starts_at = None
             try:
-                starts_at = datetime.strptime(event.get('start', ''), '%Y-%m-%dT%H:%M:%S')
+                starts_at = datetime.strptime(event.start, '%Y-%m-%dT%H:%M:%S')
             except:
                 starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
 
-            duration = event.get('duration', 30)  # default 30 minutes
+            duration = event.duration if event.duration else 30  # default 30 minutes
 
             structured.events.append(Event(
                 title=title,
