@@ -22,6 +22,19 @@ except Exception as e:
     logger.warning(f"LangSmith not available: {e}")
     LANGSMITH_AVAILABLE = False
 
+# Import LangChain Runnable for proper inheritance
+try:
+    from langchain_core.runnables import Runnable
+    RUNNABLE_AVAILABLE = True
+except ImportError:
+    try:
+        from langchain.schema.runnable import Runnable
+        RUNNABLE_AVAILABLE = True
+    except ImportError:
+        logger.warning("Could not import LangChain Runnable")
+        RUNNABLE_AVAILABLE = False
+        Runnable = object  # Fallback to object if Runnable is not available
+
 # Default project name
 DEFAULT_PROJECT = os.environ.get("LANGSMITH_PROJECT", "omi-soul-ai")
 
@@ -46,16 +59,25 @@ def trace_langchain_llm(llm, project_name: str = DEFAULT_PROJECT, add_console_ca
         return llm
     
     try:
+        # If Runnable is not available, just return the original LLM
+        if not RUNNABLE_AVAILABLE:
+            logger.warning("LangChain Runnable not available, returning original LLM")
+            return llm
+            
         # Instead of binding callbacks which causes conflicts,
         # we'll wrap the LLM methods to add tracing when called
-        class TracedLLM:
+        class TracedLLM(Runnable):
             def __init__(self, original_llm, project_name):
                 self._original_llm = original_llm
                 self._project_name = project_name
                 # Copy all attributes from the original LLM
                 for attr in dir(original_llm):
                     if not attr.startswith('_') and not callable(getattr(original_llm, attr)):
-                        setattr(self, attr, getattr(original_llm, attr))
+                        try:
+                            setattr(self, attr, getattr(original_llm, attr))
+                        except (AttributeError, TypeError):
+                            # Skip attributes that cannot be set
+                            pass
             
             def __getattr__(self, name):
                 # Delegate to the original LLM for any missing attributes/methods
@@ -74,6 +96,18 @@ def trace_langchain_llm(llm, project_name: str = DEFAULT_PROJECT, add_console_ca
                 # Return a traced version of the bound LLM
                 bound_llm = self._original_llm.bind(**kwargs)
                 return TracedLLM(bound_llm, self._project_name)
+                
+            def stream(self, input, config=None, **kwargs):
+                # Delegate streaming to the original LLM
+                return self._original_llm.stream(input, config=config, **kwargs)
+                
+            def ainvoke(self, input, config=None, **kwargs):
+                # Delegate async invoke to the original LLM
+                return self._original_llm.ainvoke(input, config=config, **kwargs)
+                
+            def astream(self, input, config=None, **kwargs):
+                # Delegate async streaming to the original LLM
+                return self._original_llm.astream(input, config=config, **kwargs)
         
         # Return the wrapped LLM that delegates to the original
         return TracedLLM(llm, project_name)
