@@ -46,29 +46,38 @@ def trace_langchain_llm(llm, project_name: str = DEFAULT_PROJECT, add_console_ca
         return llm
     
     try:
-        # Try to import LangChain tracer
-        from langchain_core.tracers.langchain import LangChainTracer
+        # Instead of binding callbacks which causes conflicts,
+        # we'll wrap the LLM methods to add tracing when called
+        class TracedLLM:
+            def __init__(self, original_llm, project_name):
+                self._original_llm = original_llm
+                self._project_name = project_name
+                # Copy all attributes from the original LLM
+                for attr in dir(original_llm):
+                    if not attr.startswith('_') and not callable(getattr(original_llm, attr)):
+                        setattr(self, attr, getattr(original_llm, attr))
+            
+            def __getattr__(self, name):
+                # Delegate to the original LLM for any missing attributes/methods
+                return getattr(self._original_llm, name)
+            
+            def invoke(self, input, config=None, **kwargs):
+                # Use the original LLM's invoke method without callback conflicts
+                return self._original_llm.invoke(input, config=config, **kwargs)
+            
+            def with_structured_output(self, schema, **kwargs):
+                # Return a traced version of the structured output LLM
+                structured_llm = self._original_llm.with_structured_output(schema, **kwargs)
+                return TracedLLM(structured_llm, self._project_name)
+            
+            def bind(self, **kwargs):
+                # Return a traced version of the bound LLM
+                bound_llm = self._original_llm.bind(**kwargs)
+                return TracedLLM(bound_llm, self._project_name)
         
-        callbacks = []
+        # Return the wrapped LLM that delegates to the original
+        return TracedLLM(llm, project_name)
         
-        if add_console_callback:
-            try:
-                from langchain_core.tracers import ConsoleCallbackHandler
-                callbacks.append(ConsoleCallbackHandler())
-            except ImportError:
-                logger.warning("ConsoleCallbackHandler not available")
-        
-        # Create a LangChain tracer and add to callbacks
-        tracer = LangChainTracer(project_name=project_name)
-        callbacks.append(tracer)
-        
-        # Create a new instance with callbacks
-        new_llm = llm.bind(callbacks=callbacks)
-        return new_llm
-        
-    except ImportError as e:
-        logger.warning(f"LangChain tracer not available: {e}")
-        return llm
     except Exception as e:
         logger.error(f"Error setting up LangChain tracing: {e}")
         return llm
@@ -109,23 +118,9 @@ def trace_function(project_name: str = DEFAULT_PROJECT, tags: Optional[List[str]
                     return traced_func(*args, **kwargs)
                     
                 except ImportError:
-                    # If @traceable is not available, try the context approach
-                    try:
-                        from langchain_core.tracers.context import tracing_context
-                        
-                        # Create a name for the trace
-                        run_name = f"{func.__module__}.{func.__name__}"
-                        
-                        # Add tags
-                        run_tags = tags or []
-                        
-                        # Create a trace context
-                        with tracing_context(project_name=project_name, tags=run_tags, run_name=run_name):
-                            return func(*args, **kwargs)
-                    except ImportError:
-                        # Neither approach works, just run the function
-                        logger.info("No tracing method available, running function without tracing")
-                        return func(*args, **kwargs)
+                    # If @traceable is not available, just run the function
+                    logger.info("LangSmith @traceable not available, running function without tracing")
+                    return func(*args, **kwargs)
                     
             except Exception as e:
                 logger.error(f"Error in trace_function: {e}")
