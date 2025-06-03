@@ -46,27 +46,16 @@ def trace_langchain_llm(llm, project_name: str = DEFAULT_PROJECT, add_console_ca
         return llm
     
     try:
-        # Try to import LangChain's Runnable base class
-        try:
-            from langchain_core.runnables import Runnable
-        except ImportError:
-            logger.warning("LangChain Runnable not available, returning original LLM")
-            return llm
-        
-        # Create a proper wrapper that inherits from Runnable
-        class TracedLLM(Runnable):
+        # Instead of binding callbacks which causes conflicts,
+        # we'll wrap the LLM methods to add tracing when called
+        class TracedLLM:
             def __init__(self, original_llm, project_name):
-                super().__init__()
                 self._original_llm = original_llm
                 self._project_name = project_name
-                
-                # Copy important attributes from the original LLM
-                if hasattr(original_llm, 'model_name'):
-                    self.model_name = original_llm.model_name
-                if hasattr(original_llm, 'temperature'):
-                    self.temperature = original_llm.temperature
-                if hasattr(original_llm, 'streaming'):
-                    self.streaming = original_llm.streaming
+                # Copy all attributes from the original LLM
+                for attr in dir(original_llm):
+                    if not attr.startswith('_') and not callable(getattr(original_llm, attr)):
+                        setattr(self, attr, getattr(original_llm, attr))
             
             def __getattr__(self, name):
                 # Delegate to the original LLM for any missing attributes/methods
@@ -85,16 +74,8 @@ def trace_langchain_llm(llm, project_name: str = DEFAULT_PROJECT, add_console_ca
                 # Return a traced version of the bound LLM
                 bound_llm = self._original_llm.bind(**kwargs)
                 return TracedLLM(bound_llm, self._project_name)
-            
-            @property
-            def InputType(self):
-                return self._original_llm.InputType if hasattr(self._original_llm, 'InputType') else Any
-            
-            @property
-            def OutputType(self):
-                return self._original_llm.OutputType if hasattr(self._original_llm, 'OutputType') else Any
         
-        # Return the wrapped LLM that properly inherits from Runnable
+        # Return the wrapped LLM that delegates to the original
         return TracedLLM(llm, project_name)
         
     except Exception as e:

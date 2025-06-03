@@ -242,12 +242,8 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     valid_categories = [cat.value for cat in CategoryEnum]
     valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
     
-    # Initialize default values
-    user_name = "the user"
-    memories_str = ""
-    user_memories_context = ""
-    
     # Get user memories if uid is provided
+    user_memories_context = ""
     if uid:
         # First try to import the module
         try:
@@ -284,7 +280,6 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
             )
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
-            # Keep default values
     
     prompt = f'''
     You are a personal growth coach and life assistant analyzing a meaningful conversation from {user_name}'s life.
@@ -476,12 +471,8 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     valid_categories = [cat.value for cat in CategoryEnum]
     valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
     
-    # Initialize default values
-    user_name = "the user"
-    memories_str = ""
-    user_memories_context = ""
-    
     # Get user memories if uid is provided
+    user_memories_context = ""
     if uid:
         # First try to import the module
         try:
@@ -512,7 +503,6 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
             )
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
-            # Keep default values
     
     prompt = f'''
     You are a personal growth coach and life assistant analyzing a meaningful conversation from {user_name}'s life.
@@ -931,16 +921,7 @@ def perform_web_search(query: str, search_context_size: str = "medium") -> tuple
 # ************* CHAT BASICS **************
 # ****************************************
 def initial_chat_message(uid: str, plugin: Optional[App] = None, prev_messages_str: str = '') -> str:
-    # Initialize default values
-    user_name = "the user"
-    memories_str = ""
-    
-    try:
-        user_name, memories_str = get_prompt_memories(uid)
-    except Exception as e:
-        print(f"Error getting prompt memories in initial_chat_message: {e}")
-        # Use default values
-    
+    user_name, memories_str = get_prompt_memories(uid)
     if plugin is None:
         prompt = f"""
 You are 'Omi', a friendly and helpful assistant who aims to make {user_name}'s life better 10x.
@@ -1125,16 +1106,7 @@ def _get_answer_simple_message_prompt(uid: str, messages: List[Message], app: Op
     conversation_history = Message.get_messages_as_string(
         messages, use_user_name_if_available=True, use_plugin_name_if_available=True
     )
-    
-    # Initialize default values
-    user_name = "the user"
-    memories_str = ""
-    
-    try:
-        user_name, memories_str = get_prompt_memories(uid)
-    except Exception as e:
-        print(f"Error getting prompt memories in _get_answer_simple_message_prompt: {e}")
-        # Use default values
+    user_name, memories_str = get_prompt_memories(uid)
 
     plugin_info = ""
     if app:
@@ -1213,16 +1185,7 @@ def answer_persona_question_stream(app: App, messages: List[Message], callbacks:
 def _get_qa_rag_prompt(uid: str, question: str, context: str, plugin: Optional[App] = None,
                        cited: Optional[bool] = False,
                        messages: List[Message] = [], tz: Optional[str] = "UTC") -> str:
-    # Initialize default values
-    user_name = "the user"
-    memories_str = ""
-    
-    try:
-        user_name, memories_str = get_prompt_memories(uid)
-    except Exception as e:
-        print(f"Error getting prompt memories in _get_qa_rag_prompt: {e}")
-        # Use default values
-        
+    user_name, memories_str = get_prompt_memories(uid)
     memories_str = '\n'.join(memories_str.split('\n')[1:]).strip()
 
     # Use as template (make sure it varies every time): "If I were you $user_name I would do x, y, z."
@@ -1345,16 +1308,7 @@ def retrieve_memory_context_params(memory: Conversation) -> List[str]:
 
 
 def obtain_emotional_message(uid: str, memory: Conversation, context: str, emotion: str) -> str:
-    # Initialize default values
-    user_name = "the user"
-    memories_str = ""
-    
-    try:
-        user_name, memories_str = get_prompt_memories(uid)
-    except Exception as e:
-        print(f"Error getting prompt memories in obtain_emotional_message: {e}")
-        # Use default values
-        
+    user_name, memories_str = get_prompt_memories(uid)
     transcript = memory.get_transcript(False)
     prompt = f"""
     You are a thoughtful and encouraging Friend.
