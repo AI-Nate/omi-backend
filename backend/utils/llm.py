@@ -427,20 +427,27 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
         for event in response.events:
             description = event.description if event.description else ''
             title = event.title if event.title else ''
+            user_prompt = event.user_prompt if event.user_prompt else ''
             # Process the start time
             starts_at = None
             try:
-                starts_at = datetime.strptime(event.start, '%Y-%m-%dT%H:%M:%S')
-            except:
+                # Handle ISO format with 'Z' suffix
+                start_str = event.start
+                if start_str.endswith('Z'):
+                    start_str = start_str[:-1]  # Remove 'Z'
+                starts_at = datetime.strptime(start_str, '%Y-%m-%dT%H:%M:%S')
+            except Exception as e:
+                print(f"Error parsing event start time '{event.start}': {e}")
                 starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
 
             duration = event.duration if event.duration else 30  # default 30 minutes
 
             structured.events.append(Event(
                 title=title,
-                starts_at=starts_at,
+                start=starts_at,  # Changed from starts_at to start
                 duration=duration,
                 description=description,
+                user_prompt=user_prompt,
             ))
 
         return structured
@@ -651,20 +658,27 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
         for event in response.events:
             description = event.description if event.description else ''
             title = event.title if event.title else ''
+            user_prompt = event.user_prompt if event.user_prompt else ''
             # Process the start time
             starts_at = None
             try:
-                starts_at = datetime.strptime(event.start, '%Y-%m-%dT%H:%M:%S')
-            except:
+                # Handle ISO format with 'Z' suffix
+                start_str = event.start
+                if start_str.endswith('Z'):
+                    start_str = start_str[:-1]  # Remove 'Z'
+                starts_at = datetime.strptime(start_str, '%Y-%m-%dT%H:%M:%S')
+            except Exception as e:
+                print(f"Error parsing event start time '{event.start}': {e}")
                 starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
 
             duration = event.duration if event.duration else 30  # default 30 minutes
 
             structured.events.append(Event(
                 title=title,
-                starts_at=starts_at,
+                start=starts_at,  # Changed from starts_at to start
                 duration=duration,
                 description=description,
+                user_prompt=user_prompt,
             ))
 
         return structured
