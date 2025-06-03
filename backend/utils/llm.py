@@ -27,30 +27,32 @@ from models.trend import TrendEnum, ceo_options, company_options, software_produ
     ai_product_options, TrendType
 from utils.prompts import extract_memories_prompt, extract_learnings_prompt, extract_memories_text_content_prompt
 from utils.llms.memory import get_prompt_memories
+from utils.langsmith_wrapper import trace_langchain_llm, trace_function
 
-llm_mini = ChatOpenAI(model='gpt-4o-mini')
-llm_mini_stream = ChatOpenAI(model='gpt-4o-mini', streaming=True)
-llm_large = ChatOpenAI(model='o1-preview')
-llm_large_stream = ChatOpenAI(model='o1-preview', streaming=True, temperature=1)
-llm_medium = ChatOpenAI(model='gpt-4o')
-llm_medium_experiment = ChatOpenAI(model='gpt-4.1')
-llm_medium_stream = ChatOpenAI(model='gpt-4o', streaming=True)
-llm_persona_mini_stream = ChatOpenAI(
+# Initialize LLM models
+llm_mini = trace_langchain_llm(ChatOpenAI(model='gpt-4o-mini'))
+llm_mini_stream = trace_langchain_llm(ChatOpenAI(model='gpt-4o-mini', streaming=True))
+llm_large = trace_langchain_llm(ChatOpenAI(model='o1-preview'))
+llm_large_stream = trace_langchain_llm(ChatOpenAI(model='o1-preview', streaming=True, temperature=1))
+llm_medium = trace_langchain_llm(ChatOpenAI(model='gpt-4o'))
+llm_medium_experiment = trace_langchain_llm(ChatOpenAI(model='gpt-4.1'))
+llm_medium_stream = trace_langchain_llm(ChatOpenAI(model='gpt-4o', streaming=True))
+llm_persona_mini_stream = trace_langchain_llm(ChatOpenAI(
     temperature=0.8,
     model="google/gemini-flash-1.5-8b",
     api_key=os.environ.get('OPENROUTER_API_KEY'),
     base_url="https://openrouter.ai/api/v1",
     default_headers={"X-Title": "Omi Chat"},
     streaming=True,
-)
-llm_persona_medium_stream = ChatOpenAI(
+))
+llm_persona_medium_stream = trace_langchain_llm(ChatOpenAI(
     temperature=0.8,
     model="anthropic/claude-3.5-sonnet",
     api_key=os.environ.get('OPENROUTER_API_KEY'),
     base_url="https://openrouter.ai/api/v1",
     default_headers={"X-Title": "Omi Chat"},
     streaming=True,
-)
+))
 # Using text-embedding-3-small with 1024 dimensions to match the Pinecone index
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1024)
 parser = PydanticOutputParser(pydantic_object=Structured)
@@ -71,6 +73,7 @@ def num_tokens_from_string(string: str) -> int:
 # *********** IMAGE ANALYSIS ******************
 # **********************************************
 
+@trace_function(tags=["image_analysis"])
 def analyze_image_content(image_data: bytes, user_prompt: Optional[str] = None) -> str:
     """
     Analyze image content using OpenAI Vision API.
@@ -87,7 +90,7 @@ def analyze_image_content(image_data: bytes, user_prompt: Optional[str] = None) 
         base64_image = base64.b64encode(image_data).decode('utf-8')
         
         # Create vision-compatible OpenAI client
-        vision_llm = ChatOpenAI(model='gpt-4o')
+        vision_llm = trace_langchain_llm(ChatOpenAI(model='gpt-4o'))
         
         # Base analysis text
         base_text = "Analyze this image and provide a detailed description of what you see. Focus on the main subjects, activities, objects, text, settings, and any other relevant details that could be useful for understanding the context and content."
@@ -230,6 +233,7 @@ class EnhancedSummaryOutput(BaseModel):
     )
 
 
+@trace_function(tags=["conversation_summary"])
 def get_transcript_structure(transcript: str, started_at: datetime, language_code: str, tz: str, uid: str = None) -> Structured:
     if len(transcript) == 0:
         return Structured(title='', overview='')
@@ -723,6 +727,7 @@ def get_app_result_v1(transcript: str, app: App) -> str:
 # ************* OPENGLASS **************
 # **************************************
 
+@trace_function(tags=["image_only_summary"])
 def summarize_open_glass(photos: List[ConversationPhoto]) -> Structured:
     photos_str = ''
     for i, photo in enumerate(photos):
