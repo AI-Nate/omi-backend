@@ -8,7 +8,8 @@ import 'package:omi/services/services.dart';
 import 'package:omi/services/wals.dart';
 import 'package:omi/utils/analytics/mixpanel.dart';
 
-class ConversationProvider extends ChangeNotifier implements IWalServiceListener, IWalSyncProgressListener {
+class ConversationProvider extends ChangeNotifier
+    implements IWalServiceListener, IWalSyncProgressListener {
   List<ServerConversation> conversations = [];
   List<ServerConversation> searchedConversations = [];
   Map<DateTime, List<ServerConversation>> groupedConversations = {};
@@ -30,8 +31,9 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
 
   List<Wal> get missingWals => _missingWals;
 
-  int get missingWalsInSeconds =>
-      _missingWals.isEmpty ? 0 : _missingWals.map((val) => val.seconds).reduce((a, b) => a + b);
+  int get missingWalsInSeconds => _missingWals.isEmpty
+      ? 0
+      : _missingWals.map((val) => val.seconds).reduce((a, b) => a + b);
 
   double _walsSyncedProgress = 0.0;
 
@@ -58,14 +60,26 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   }
 
   Future updateSearchedConvoDetails(String id, DateTime date, int idx) async {
-    var convo = await getConversationById(id);
-    if (convo != null) {
-      updateSpecificGroupedConvo(convo, date, idx);
+    try {
+      var convo = await getConversationById(id);
+      if (convo != null) {
+        updateSpecificGroupedConvo(convo, date, idx);
+        debugPrint('Successfully updated conversation details for $id');
+      } else {
+        debugPrint(
+            'Failed to fetch conversation details for $id - received null response');
+        // Don't throw an error here, just log it as the conversation might still be accessible from cache
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error updating conversation details for $id: $e');
+      debugPrint('Stack trace: $stackTrace');
+      // Don't rethrow - let the UI handle the cached conversation data
     }
     notifyListeners();
   }
 
-  void updateSpecificGroupedConvo(ServerConversation convo, DateTime date, int idx) {
+  void updateSpecificGroupedConvo(
+      ServerConversation convo, DateTime date, int idx) {
     groupedConversations[date]![idx] = convo;
     notifyListeners();
   }
@@ -82,7 +96,8 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
 
     setIsFetchingConversations(true);
     previousQuery = query;
-    var (convos, current, total) = await searchConversationsServer(query, includeDiscarded: showDiscardedConversations);
+    var (convos, current, total) = await searchConversationsServer(query,
+        includeDiscarded: showDiscardedConversations);
     convos.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     searchedConversations = convos;
     currentSearchPage = current;
@@ -113,9 +128,11 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   }
 
   int groupedSearchConvoIndex(ServerConversation convo) {
-    var date = DateTime(convo.createdAt.year, convo.createdAt.month, convo.createdAt.day);
+    var date = DateTime(
+        convo.createdAt.year, convo.createdAt.month, convo.createdAt.day);
     if (groupedConversations.containsKey(date)) {
-      return groupedConversations[date]!.indexWhere((element) => element.id == convo.id);
+      return groupedConversations[date]!
+          .indexWhere((element) => element.id == convo.id);
     }
     return -1;
   }
@@ -162,9 +179,11 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   }
 
   Future fetchNewConversations() async {
-    List<ServerConversation> newConversations = await getConversationsFromServer();
-    List<ServerConversation> upsertConvos =
-        newConversations.where((c) => conversations.indexWhere((cc) => cc.id == c.id) == -1).toList();
+    List<ServerConversation> newConversations =
+        await getConversationsFromServer();
+    List<ServerConversation> upsertConvos = newConversations
+        .where((c) => conversations.indexWhere((cc) => cc.id == c.id) == -1)
+        .toList();
     if (upsertConvos.isEmpty) {
       return;
     }
@@ -181,9 +200,13 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
 
     conversations = await getConversationsFromServer();
 
-    processingConversations = conversations.where((m) => m.status == ConversationStatus.processing).toList();
+    processingConversations = conversations
+        .where((m) => m.status == ConversationStatus.processing)
+        .toList();
 
-    conversations = conversations.where((m) => m.status == ConversationStatus.completed).toList();
+    conversations = conversations
+        .where((m) => m.status == ConversationStatus.completed)
+        .toList();
     if (conversations.isEmpty) {
       conversations = SharedPreferencesUtil().cachedConversations;
     } else {
@@ -213,7 +236,8 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   void _groupSearchConvosByDateWithoutNotify() {
     groupedConversations = {};
     for (var conversation in _filterOutConvos(searchedConversations)) {
-      var date = DateTime(conversation.createdAt.year, conversation.createdAt.month, conversation.createdAt.day);
+      var date = DateTime(conversation.createdAt.year,
+          conversation.createdAt.month, conversation.createdAt.day);
       if (!groupedConversations.containsKey(date)) {
         groupedConversations[date] = [];
       }
@@ -222,14 +246,16 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
 
     // Sort
     for (final date in groupedConversations.keys) {
-      groupedConversations[date]?.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      groupedConversations[date]
+          ?.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
   }
 
   void _groupConversationsByDateWithoutNotify() {
     groupedConversations = {};
     for (var conversation in _filterOutConvos(conversations)) {
-      var date = DateTime(conversation.createdAt.year, conversation.createdAt.month, conversation.createdAt.day);
+      var date = DateTime(conversation.createdAt.year,
+          conversation.createdAt.month, conversation.createdAt.day);
       if (!groupedConversations.containsKey(date)) {
         groupedConversations[date] = [];
       }
@@ -238,7 +264,8 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
 
     // Sort
     for (final date in groupedConversations.keys) {
-      groupedConversations[date]?.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      groupedConversations[date]
+          ?.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
   }
 
@@ -254,7 +281,8 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
 
   Future getConversationsFromServer() async {
     setLoadingConversations(true);
-    var mem = await getConversations(includeDiscarded: showDiscardedConversations);
+    var mem =
+        await getConversations(includeDiscarded: showDiscardedConversations);
     conversations = mem;
     conversations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     setLoadingConversations(false);
@@ -263,9 +291,16 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   }
 
   void updateActionItemState(String convoId, bool state, int i, DateTime date) {
-    conversations.firstWhere((element) => element.id == convoId).structured.actionItems[i].completed = state;
-    groupedConversations[date]!.firstWhere((element) => element.id == convoId).structured.actionItems[i].completed =
-        state;
+    conversations
+        .firstWhere((element) => element.id == convoId)
+        .structured
+        .actionItems[i]
+        .completed = state;
+    groupedConversations[date]!
+        .firstWhere((element) => element.id == convoId)
+        .structured
+        .actionItems[i]
+        .completed = state;
     notifyListeners();
   }
 
@@ -273,8 +308,9 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
     if (conversations.length % 50 != 0) return;
     if (isLoadingConversations) return;
     setLoadingConversations(true);
-    var newConversations =
-        await getConversations(offset: conversations.length, includeDiscarded: showDiscardedConversations);
+    var newConversations = await getConversations(
+        offset: conversations.length,
+        includeDiscarded: showDiscardedConversations);
     conversations.addAll(newConversations);
     conversations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _groupConversationsByDateWithoutNotify();
@@ -298,9 +334,11 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   }
 
   void updateConversationInSortedList(ServerConversation conversation) {
-    var date = DateTime(conversation.createdAt.year, conversation.createdAt.month, conversation.createdAt.day);
+    var date = DateTime(conversation.createdAt.year,
+        conversation.createdAt.month, conversation.createdAt.day);
     if (groupedConversations.containsKey(date)) {
-      int idx = groupedConversations[date]!.indexWhere((element) => element.id == conversation.id);
+      int idx = groupedConversations[date]!
+          .indexWhere((element) => element.id == conversation.id);
       if (idx != -1) {
         groupedConversations[date]![idx] = conversation;
       }
@@ -308,13 +346,16 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
     notifyListeners();
   }
 
-  (int, DateTime) addConversationWithDateGrouped(ServerConversation conversation) {
+  (int, DateTime) addConversationWithDateGrouped(
+      ServerConversation conversation) {
     conversations.insert(0, conversation);
     conversations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     int idx;
-    var memDate = DateTime(conversation.createdAt.year, conversation.createdAt.month, conversation.createdAt.day);
+    var memDate = DateTime(conversation.createdAt.year,
+        conversation.createdAt.month, conversation.createdAt.day);
     if (groupedConversations.containsKey(memDate)) {
-      idx = groupedConversations[memDate]!.indexWhere((element) => element.createdAt.isBefore(conversation.createdAt));
+      idx = groupedConversations[memDate]!.indexWhere(
+          (element) => element.createdAt.isBefore(conversation.createdAt));
       if (idx == -1) {
         groupedConversations[memDate]!.insert(0, conversation);
         idx = 0;
@@ -323,8 +364,9 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
       }
     } else {
       groupedConversations[memDate] = [conversation];
-      groupedConversations =
-          Map.fromEntries(groupedConversations.entries.toList()..sort((a, b) => b.key.compareTo(a.key)));
+      groupedConversations = Map.fromEntries(
+          groupedConversations.entries.toList()
+            ..sort((a, b) => b.key.compareTo(a.key)));
       idx = 0;
     }
     return (idx, memDate);
@@ -334,7 +376,8 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
     if (index != null) {
       conversations[index] = conversation;
     } else {
-      int i = conversations.indexWhere((element) => element.id == conversation.id);
+      int i =
+          conversations.indexWhere((element) => element.id == conversation.id);
       if (i != -1) {
         conversations[i] = conversation;
       }
@@ -372,10 +415,13 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   String? lastDeletedConversationId;
   Map<String, DateTime> deleteTimestamps = {};
 
-  void deleteConversationLocally(ServerConversation conversation, int index, DateTime date) {
+  void deleteConversationLocally(
+      ServerConversation conversation, int index, DateTime date) {
     if (lastDeletedConversationId != null &&
         memoriesToDelete.containsKey(lastDeletedConversationId) &&
-        DateTime.now().difference(deleteTimestamps[lastDeletedConversationId]!) < const Duration(seconds: 3)) {
+        DateTime.now()
+                .difference(deleteTimestamps[lastDeletedConversationId]!) <
+            const Duration(seconds: 3)) {
       deleteConversationOnServer(lastDeletedConversationId!);
     }
 
@@ -389,7 +435,8 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
     }
     notifyListeners();
     Future.delayed(const Duration(seconds: 3), () {
-      if (memoriesToDelete.containsKey(conversation.id) && lastDeletedConversationId == conversation.id) {
+      if (memoriesToDelete.containsKey(conversation.id) &&
+          lastDeletedConversationId == conversation.id) {
         deleteConversationOnServer(conversation.id);
       }
     });
@@ -461,7 +508,8 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
     setIsSyncing(true);
     var res = await _wal.getSyncs().syncAll(progress: this);
     if (res != null) {
-      if (res.newConversationIds.isNotEmpty || res.updatedConversationIds.isNotEmpty) {
+      if (res.newConversationIds.isNotEmpty ||
+          res.updatedConversationIds.isNotEmpty) {
         await getSyncedConversationsData(res);
       }
     }
@@ -477,8 +525,10 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
     _walsSyncedProgress = 0.0;
     var res = await _wal.getSyncs().syncWal(wal: wal, progress: this);
     if (res != null) {
-      if (res.newConversationIds.isNotEmpty || res.updatedConversationIds.isNotEmpty) {
-        print('Synced memories: ${res.newConversationIds} ${res.updatedConversationIds}');
+      if (res.newConversationIds.isNotEmpty ||
+          res.updatedConversationIds.isNotEmpty) {
+        print(
+            'Synced memories: ${res.newConversationIds} ${res.updatedConversationIds}');
         await getSyncedConversationsData(res);
       }
     }
@@ -500,13 +550,17 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
         newConversations.map((item) => getConversationDetails(item)).toList();
 
     List<Future<ServerConversation?>> updatedConversationsFutures =
-        updatedConversations.map((item) => getConversationDetails(item)).toList();
+        updatedConversations
+            .map((item) => getConversationDetails(item))
+            .toList();
     var syncedConversations = {'new_memories': [], 'updated_memories': []};
     try {
-      final newConversationsResponses = await Future.wait(newConversationsFutures);
+      final newConversationsResponses =
+          await Future.wait(newConversationsFutures);
       syncedConversations['new_memories'] = newConversationsResponses;
 
-      final updatedConversationsResponses = await Future.wait(updatedConversationsFutures);
+      final updatedConversationsResponses =
+          await Future.wait(updatedConversationsFutures);
       syncedConversations['updated_memories'] = updatedConversationsResponses;
       addSyncedConversationsToGroupedConversations(syncedConversations);
       setIsFetchingConversations(false);
@@ -519,61 +573,77 @@ class ConversationProvider extends ChangeNotifier implements IWalServiceListener
   void addSyncedConversationsToGroupedConversations(Map syncedConversations) {
     if (syncedConversations['new_memories'] != []) {
       for (var conversation in syncedConversations['new_memories']!) {
-        if (conversation != null && conversation.status == ConversationStatus.completed) {
+        if (conversation != null &&
+            conversation.status == ConversationStatus.completed) {
           addConversation(conversation);
         }
       }
     }
     if (syncedConversations['updated_memories'] != []) {
       for (var conversation in syncedConversations['updated_memories']!) {
-        if (conversation != null && conversation.status == ConversationStatus.completed) {
+        if (conversation != null &&
+            conversation.status == ConversationStatus.completed) {
           upsertConversation(conversation);
         }
       }
     }
     for (var conversation in syncedConversations['new_memories']!) {
-      if (conversation != null && conversation.status == ConversationStatus.completed) {
+      if (conversation != null &&
+          conversation.status == ConversationStatus.completed) {
         var res = getConversationDateAndIndex(conversation);
         syncedConversationsPointers.add(SyncedConversationPointer(
-            type: SyncedConversationType.newConversation, index: res.$2, key: res.$1, conversation: conversation));
+            type: SyncedConversationType.newConversation,
+            index: res.$2,
+            key: res.$1,
+            conversation: conversation));
       }
     }
     if (syncedConversations['updated_memories'] != []) {
       for (var conversation in syncedConversations['updated_memories']!) {
-        if (conversation != null && conversation.status == ConversationStatus.completed) {
+        if (conversation != null &&
+            conversation.status == ConversationStatus.completed) {
           var res = getConversationDateAndIndex(conversation);
           syncedConversationsPointers.add(SyncedConversationPointer(
-              type: SyncedConversationType.newConversation, index: res.$2, key: res.$1, conversation: conversation));
+              type: SyncedConversationType.newConversation,
+              index: res.$2,
+              key: res.$1,
+              conversation: conversation));
         }
       }
     }
   }
 
-  void updateSyncedConversationPointerIndex(SyncedConversationPointer mem, int index) {
+  void updateSyncedConversationPointerIndex(
+      SyncedConversationPointer mem, int index) {
     var oldIdx = syncedConversationsPointers.indexOf(mem);
     syncedConversationsPointers[oldIdx] = mem.copyWith(index: index);
     notifyListeners();
   }
 
   void updateSyncedConversation(ServerConversation conversation) {
-    var id = syncedConversationsPointers.indexWhere((e) => e.conversation.id == conversation.id);
+    var id = syncedConversationsPointers
+        .indexWhere((e) => e.conversation.id == conversation.id);
     if (id != -1) {
-      syncedConversationsPointers[id] = syncedConversationsPointers[id].copyWith(conversation: conversation);
+      syncedConversationsPointers[id] =
+          syncedConversationsPointers[id].copyWith(conversation: conversation);
     }
     updateConversationInSortedList(conversation);
     notifyListeners();
   }
 
   (DateTime, int) getConversationDateAndIndex(ServerConversation conversation) {
-    var date = DateTime(conversation.createdAt.year, conversation.createdAt.month, conversation.createdAt.day);
-    var idx = groupedConversations[date]!.indexWhere((element) => element.id == conversation.id);
+    var date = DateTime(conversation.createdAt.year,
+        conversation.createdAt.month, conversation.createdAt.day);
+    var idx = groupedConversations[date]!
+        .indexWhere((element) => element.id == conversation.id);
     if (idx == -1 && groupedConversations.containsKey(date)) {
       groupedConversations[date]!.add(conversation);
     }
     return (date, idx);
   }
 
-  Future<ServerConversation?> getConversationDetails(String conversationId) async {
+  Future<ServerConversation?> getConversationDetails(
+      String conversationId) async {
     var conversation = await getConversationById(conversationId);
     return conversation;
   }

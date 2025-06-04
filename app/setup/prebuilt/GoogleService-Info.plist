@@ -3,23 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>1031333818730-dusn243nct6i5rgfpfkj5mchuj1qnmde.apps.googleusercontent.com</string>
+	<string>582836101684-55h9dcldk4mebma22dqq2k0audcvvied.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1031333818730-dusn243nct6i5rgfpfkj5mchuj1qnmde</string>
+	<string>com.googleusercontent.apps.582836101684-55h9dcldk4mebma22dqq2k0audcvvied</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>1031333818730-1cgqp3jc5p8n2rk467pl4t56qc4lnnbr.apps.googleusercontent.com</string>
+	<string>582836101684-2jnhbemacp1iqodk796sn8ih9iaqb7sp.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyBK-G7KmEoC72mR10gmQyb2NFBbZyDvcqM</string>
+	<string>AIzaSyDBYWbx1cbm1u4CLC13VS5AYgBXjiKBoVA</string>
 	<key>GCM_SENDER_ID</key>
-	<string>1031333818730</string>
+	<string>582836101684</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.friend-app-with-wearable.ios12.development</string>
+	<string>com.ai-nate-omi</string>
 	<key>PROJECT_ID</key>
-	<string>based-hardware-dev</string>
+	<string>omi-how-to-learn-fd5fd</string>
 	<key>STORAGE_BUCKET</key>
-	<string>based-hardware-dev.firebasestorage.app</string>
+	<string>omi-how-to-learn-fd5fd.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1031333818730:ios:3bea63d8e4f41dbfafb513</string>
+	<string>1:582836101684:ios:4c6eb935ff62353a15e061</string>
 </dict>
 </plist>

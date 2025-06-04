@@ -97,17 +97,34 @@ Future<bool> deleteConversationServer(String conversationId) async {
 }
 
 Future<ServerConversation?> getConversationById(String conversationId) async {
-  var response = await makeApiCall(
-    url: '${Env.apiBaseUrl}v1/conversations/$conversationId',
-    headers: {},
-    method: 'GET',
-    body: '',
-  );
-  if (response == null) return null;
-  if (response.statusCode == 200) {
-    return ServerConversation.fromJson(jsonDecode(response.body));
+  try {
+    var response = await makeApiCall(
+      url: '${Env.apiBaseUrl}v1/conversations/$conversationId',
+      headers: {},
+      method: 'GET',
+      body: '',
+    );
+    if (response == null) {
+      debugPrint(
+          'getConversationById: API call returned null for conversation $conversationId');
+      return null;
+    }
+    if (response.statusCode == 200) {
+      debugPrint(
+          'getConversationById: Successfully fetched conversation $conversationId');
+      return ServerConversation.fromJson(jsonDecode(response.body));
+    } else {
+      debugPrint(
+          'getConversationById: API returned error ${response.statusCode} for conversation $conversationId');
+      debugPrint('Response body: ${response.body}');
+    }
+    return null;
+  } catch (e, stackTrace) {
+    debugPrint(
+        'getConversationById: Exception occurred for conversation $conversationId: $e');
+    debugPrint('Stack trace: $stackTrace');
+    return null;
   }
-  return null;
 }
 
 Future<bool> updateConversationTitle(

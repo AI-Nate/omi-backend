@@ -43,7 +43,21 @@ class ConversationDetailProvider extends ChangeNotifier
   List<App> get appsList => appProvider?.apps ?? [];
 
   Structured get structured {
-    return conversation.structured;
+    try {
+      debugPrint(
+          'Accessing structured data for conversation: ${conversation.id}');
+      final structuredData = conversation.structured;
+      debugPrint('Structured data accessed successfully');
+      debugPrint('Title: ${structuredData.title}');
+      debugPrint('Overview length: ${structuredData.overview.length}');
+      debugPrint('Key takeaways count: ${structuredData.keyTakeaways.length}');
+      debugPrint('Action items count: ${structuredData.actionItems.length}');
+      return structuredData;
+    } catch (e, stackTrace) {
+      debugPrint('Error accessing structured data: $e');
+      debugPrint('Structured data stack trace: $stackTrace');
+      rethrow;
+    }
   }
 
   ServerConversation? _cachedConversation;
@@ -57,17 +71,37 @@ class ConversationDetailProvider extends ChangeNotifier
     }
 
     // Otherwise, try to get from conversation provider
-    if (conversationProvider == null ||
-        !conversationProvider!.groupedConversations.containsKey(selectedDate) ||
-        conversationProvider!.groupedConversations[selectedDate] == null ||
-        conversationProvider!.groupedConversations[selectedDate]!.length <=
-            conversationIdx) {
-      // Return cached conversation if available, otherwise create an empty one
+    if (conversationProvider == null) {
       if (_cachedConversation == null) {
-        throw StateError("No conversation available");
+        throw StateError(
+            "No conversation provider available and no cached conversation");
       }
+      debugPrint("Warning: Using cached conversation due to missing provider");
       return _cachedConversation!;
     }
+
+    if (!conversationProvider!.groupedConversations.containsKey(selectedDate)) {
+      if (_cachedConversation == null) {
+        throw StateError(
+            "No conversation found for date $selectedDate and no cached conversation available");
+      }
+      debugPrint(
+          "Warning: Using cached conversation - date $selectedDate not found in grouped conversations");
+      return _cachedConversation!;
+    }
+
+    if (conversationProvider!.groupedConversations[selectedDate] == null ||
+        conversationProvider!.groupedConversations[selectedDate]!.length <=
+            conversationIdx) {
+      if (_cachedConversation == null) {
+        throw StateError(
+            "No conversation at index $conversationIdx for date $selectedDate and no cached conversation available");
+      }
+      debugPrint(
+          "Warning: Using cached conversation - index $conversationIdx out of bounds for date $selectedDate");
+      return _cachedConversation!;
+    }
+
     _cachedConversation = conversationProvider!
         .groupedConversations[selectedDate]![conversationIdx];
     return _cachedConversation!;
