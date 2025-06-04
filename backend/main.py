@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from modal import Image, App, asgi_app, Secret
 from routers import workflow, chat, firmware, plugins, transcribe, notifications, \
     speech_profile, agents, users, processing_conversations, trends, sync, apps, custom_auth, \
-    payment, integration, conversations, memories, mcp
+    payment, integration, conversations, memories, mcp, agent_conversations
 
 from utils.other.timeout import TimeoutMiddleware
 
@@ -25,6 +25,7 @@ else:
 app = FastAPI()
 app.include_router(transcribe.router)
 app.include_router(conversations.router)
+app.include_router(agent_conversations.router)
 app.include_router(memories.router)
 app.include_router(chat.router)
 app.include_router(plugins.router)

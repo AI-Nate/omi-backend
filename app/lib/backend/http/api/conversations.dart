@@ -1391,3 +1391,348 @@ Future<ServerConversation?> createConversationFromImages(
     return null;
   }
 }
+
+// Agent-based conversation analysis models
+class AgentAnalysisRequest {
+  final String transcript;
+  final String? conversationId;
+  final String sessionId;
+  final bool stream;
+
+  AgentAnalysisRequest({
+    required this.transcript,
+    this.conversationId,
+    this.sessionId = "default",
+    this.stream = false,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'transcript': transcript,
+      'conversation_id': conversationId,
+      'session_id': sessionId,
+      'stream': stream,
+    };
+  }
+}
+
+class AgentContinueRequest {
+  final String message;
+  final String sessionId;
+
+  AgentContinueRequest({
+    required this.message,
+    this.sessionId = "default",
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'message': message,
+      'session_id': sessionId,
+    };
+  }
+}
+
+class RetrievedConversation {
+  final String id;
+  final String title;
+  final String overview;
+  final String createdAt;
+  final String? category;
+  final List<String> actionItems;
+  final String transcriptPreview;
+
+  RetrievedConversation({
+    required this.id,
+    required this.title,
+    required this.overview,
+    required this.createdAt,
+    this.category,
+    required this.actionItems,
+    required this.transcriptPreview,
+  });
+
+  factory RetrievedConversation.fromJson(Map<String, dynamic> json) {
+    return RetrievedConversation(
+      id: json['id'],
+      title: json['title'],
+      overview: json['overview'],
+      createdAt: json['created_at'],
+      category: json['category'],
+      actionItems: List<String>.from(json['action_items'] ?? []),
+      transcriptPreview: json['transcript_preview'],
+    );
+  }
+}
+
+class AgentAnalysisResponse {
+  final String analysis;
+  final String sessionId;
+  final String timestamp;
+  final String status;
+  final String? error;
+  final List<RetrievedConversation>? retrievedConversations;
+
+  AgentAnalysisResponse({
+    required this.analysis,
+    required this.sessionId,
+    required this.timestamp,
+    required this.status,
+    this.error,
+    this.retrievedConversations,
+  });
+
+  factory AgentAnalysisResponse.fromJson(Map<String, dynamic> json) {
+    return AgentAnalysisResponse(
+      analysis: json['analysis'],
+      sessionId: json['session_id'],
+      timestamp: json['timestamp'],
+      status: json['status'],
+      error: json['error'],
+      retrievedConversations: json['retrieved_conversations'] != null
+          ? (json['retrieved_conversations'] as List)
+              .map((conv) => RetrievedConversation.fromJson(conv))
+              .toList()
+          : null,
+    );
+  }
+}
+
+class AgentContinueResponse {
+  final String response;
+  final String sessionId;
+  final String timestamp;
+  final String status;
+  final String? error;
+
+  AgentContinueResponse({
+    required this.response,
+    required this.sessionId,
+    required this.timestamp,
+    required this.status,
+    this.error,
+  });
+
+  factory AgentContinueResponse.fromJson(Map<String, dynamic> json) {
+    return AgentContinueResponse(
+      response: json['response'],
+      sessionId: json['session_id'],
+      timestamp: json['timestamp'],
+      status: json['status'],
+      error: json['error'],
+    );
+  }
+}
+
+// Agent-based conversation analysis functions
+Future<AgentAnalysisResponse?> analyzeConversationWithAgent({
+  required String transcript,
+  String? conversationId,
+  String sessionId = "default",
+  bool stream = false,
+}) async {
+  debugPrint('Starting agent conversation analysis...');
+
+  final request = AgentAnalysisRequest(
+    transcript: transcript,
+    conversationId: conversationId,
+    sessionId: sessionId,
+    stream: stream,
+  );
+
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/conversations/agent',
+    headers: {'Content-Type': 'application/json'},
+    method: 'POST',
+    body: jsonEncode(request.toJson()),
+  );
+
+  if (response == null) return null;
+
+  debugPrint('Agent analysis response: ${response.statusCode}');
+
+  if (response.statusCode == 200) {
+    try {
+      return AgentAnalysisResponse.fromJson(jsonDecode(response.body));
+    } catch (e) {
+      debugPrint('Error parsing agent analysis response: $e');
+      return null;
+    }
+  } else {
+    debugPrint(
+        'Agent analysis failed: ${response.statusCode} - ${response.body}');
+    return null;
+  }
+}
+
+Future<AgentContinueResponse?> continueAgentConversation({
+  required String message,
+  String sessionId = "default",
+}) async {
+  debugPrint('Continuing agent conversation...');
+
+  final request = AgentContinueRequest(
+    message: message,
+    sessionId: sessionId,
+  );
+
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/conversations/agent/continue',
+    headers: {'Content-Type': 'application/json'},
+    method: 'POST',
+    body: jsonEncode(request.toJson()),
+  );
+
+  if (response == null) return null;
+
+  debugPrint('Agent continue response: ${response.statusCode}');
+
+  if (response.statusCode == 200) {
+    try {
+      return AgentContinueResponse.fromJson(jsonDecode(response.body));
+    } catch (e) {
+      debugPrint('Error parsing agent continue response: $e');
+      return null;
+    }
+  } else {
+    debugPrint(
+        'Agent continue failed: ${response.statusCode} - ${response.body}');
+    return null;
+  }
+}
+
+// Function to process conversation using agent (alternative to processInProgressConversation)
+Future<CreateConversationResponse?>
+    processInProgressConversationWithAgent() async {
+  debugPrint('Processing conversation with agent...');
+
+  // First get the current in-progress conversation transcript
+  // This is a placeholder - you might need to get transcript from capture provider
+  String transcript = ""; // You'll need to get this from your capture system
+
+  if (transcript.isEmpty) {
+    debugPrint('No transcript available for agent processing');
+    return null;
+  }
+
+  // Analyze with agent
+  final agentResponse = await analyzeConversationWithAgent(
+    transcript: transcript,
+    sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
+  );
+
+  if (agentResponse == null || agentResponse.status != 'success') {
+    debugPrint('Agent analysis failed');
+    return null;
+  }
+
+  // Create a mock CreateConversationResponse based on agent analysis
+  // In a real implementation, you might want to create a conversation object
+  // and return the agent analysis as part of the structured data
+
+  debugPrint('Agent analysis completed successfully');
+  debugPrint('Analysis: ${agentResponse.analysis}');
+
+  // For now, return null to indicate we need integration with conversation creation
+  // You can integrate this with your existing conversation creation logic
+  return null;
+}
+
+// Stream-based agent analysis (for real-time updates)
+Stream<Map<String, dynamic>> streamAgentConversationAnalysis({
+  required String transcript,
+  String? conversationId,
+  String sessionId = "default",
+}) async* {
+  debugPrint('Starting streaming agent conversation analysis...');
+
+  final request = AgentAnalysisRequest(
+    transcript: transcript,
+    conversationId: conversationId,
+    sessionId: sessionId,
+    stream: true,
+  );
+
+  try {
+    final client = http.Client();
+    final httpRequest = http.Request(
+      'POST',
+      Uri.parse('${Env.apiBaseUrl}v1/conversations/agent/stream'),
+    );
+
+    httpRequest.headers.addAll({
+      'Content-Type': 'application/json',
+      'Authorization': await getAuthHeader(),
+      'Accept': 'text/event-stream',
+    });
+
+    httpRequest.body = jsonEncode(request.toJson());
+
+    final streamedResponse = await client.send(httpRequest);
+
+    if (streamedResponse.statusCode == 200) {
+      await for (final chunk
+          in streamedResponse.stream.transform(utf8.decoder)) {
+        final lines = chunk.split('\n');
+        for (final line in lines) {
+          if (line.startsWith('data: ')) {
+            final data = line.substring(6);
+            if (data == '[DONE]') {
+              yield {'type': 'done'};
+              return;
+            }
+            try {
+              final eventData = jsonDecode(data);
+              yield eventData;
+            } catch (e) {
+              debugPrint('Error parsing stream data: $e');
+            }
+          }
+        }
+      }
+    } else {
+      yield {
+        'type': 'error',
+        'error': 'HTTP ${streamedResponse.statusCode}',
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+    }
+  } catch (e) {
+    debugPrint('Error in streaming agent analysis: $e');
+    yield {
+      'type': 'error',
+      'error': e.toString(),
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+  }
+}
+
+// Helper function to get session info
+Future<Map<String, dynamic>?> getAgentSessionInfo(String sessionId) async {
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/conversations/agent/sessions/$sessionId',
+    headers: {},
+    method: 'GET',
+    body: '',
+  );
+
+  if (response == null) return null;
+
+  if (response.statusCode == 200) {
+    return jsonDecode(response.body);
+  }
+
+  return null;
+}
+
+// Helper function to clear agent session
+Future<bool> clearAgentSession(String sessionId) async {
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/conversations/agent/sessions/$sessionId',
+    headers: {},
+    method: 'DELETE',
+    body: '',
+  );
+
+  return response?.statusCode == 200;
+}

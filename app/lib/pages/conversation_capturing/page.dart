@@ -21,10 +21,12 @@ class ConversationCapturingPage extends StatefulWidget {
   });
 
   @override
-  State<ConversationCapturingPage> createState() => _ConversationCapturingPageState();
+  State<ConversationCapturingPage> createState() =>
+      _ConversationCapturingPageState();
 }
 
-class _ConversationCapturingPageState extends State<ConversationCapturingPage> with TickerProviderStateMixin {
+class _ConversationCapturingPageState extends State<ConversationCapturingPage>
+    with TickerProviderStateMixin {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   TabController? _controller;
   late bool showSummarizeConfirmation;
@@ -33,7 +35,8 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
   void initState() {
     _controller = TabController(length: 2, vsync: this, initialIndex: 0);
     _controller!.addListener(() => setState(() {}));
-    showSummarizeConfirmation = SharedPreferencesUtil().showSummarizeConfirmation;
+    showSummarizeConfirmation =
+        SharedPreferencesUtil().showSummarizeConfirmation;
     super.initState();
   }
 
@@ -101,6 +104,24 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
                         });
                       },
                       icon: const Icon(Icons.question_answer),
+                    ),
+                  if (SharedPreferencesUtil().devModeEnabled &&
+                      provider.segments.isNotEmpty)
+                    IconButton(
+                      onPressed: () async {
+                        // Test agent analysis without creating a conversation
+                        context
+                            .read<CaptureProvider>()
+                            .analyzeCurrentConversationWithAgent();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Agent analysis started! Check debug logs.'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.psychology, color: Colors.blue),
                     )
                 ],
               ),
@@ -118,9 +139,13 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
                         provider.segments.isEmpty
                             ? Center(
                                 child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 50.0), // Adjust padding to roughly center
+                                  padding: const EdgeInsets.only(
+                                      bottom:
+                                          50.0), // Adjust padding to roughly center
                                   child: Text(
-                                    conversationSource == ConversationSource.omi ? "No transcript" : "Empty",
+                                    conversationSource == ConversationSource.omi
+                                        ? "No transcript"
+                                        : "Empty",
                                   ),
                                 ),
                               )
@@ -137,13 +162,16 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
                         Center(
                           child: Padding(
                             padding:
-                                const EdgeInsets.symmetric(horizontal: 32.0).copyWith(bottom: 50.0), // Adjust padding
+                                const EdgeInsets.symmetric(horizontal: 32.0)
+                                    .copyWith(bottom: 50.0), // Adjust padding
                             child: Text(
                               provider.segments.isEmpty
                                   ? "No summary"
                                   : "Conversation is summarized after 2 minutes of no speech 🤫",
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: provider.segments.isEmpty ? 16 : 22),
+                              style: TextStyle(
+                                  fontSize:
+                                      provider.segments.isEmpty ? 16 : 22),
                             ),
                           ),
                         ),
@@ -153,7 +181,8 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
                 ),
               ],
             ),
-            floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.centerFloat,
             floatingActionButton: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -161,16 +190,31 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
                     ? const SizedBox()
                     : ConversationBottomBar(
                         mode: ConversationBottomBarMode.recording,
-                        selectedTab: _controller!.index == 0 ? ConversationTab.transcript : ConversationTab.summary,
+                        selectedTab: _controller!.index == 0
+                            ? ConversationTab.transcript
+                            : ConversationTab.summary,
                         hasSegments: provider.segments.isNotEmpty,
                         onTabSelected: (tab) {
-                          _controller!.animateTo(tab == ConversationTab.transcript ? 0 : 1);
+                          _controller!.animateTo(
+                              tab == ConversationTab.transcript ? 0 : 1);
                           setState(() {});
                         },
                         onStopPressed: () {
                           if (provider.segments.isNotEmpty) {
                             if (!showSummarizeConfirmation) {
-                              context.read<CaptureProvider>().forceProcessingCurrentConversation();
+                              // Check if agent processing is enabled (you can add a setting for this)
+                              bool useAgentProcessing = SharedPreferencesUtil()
+                                  .devModeEnabled; // Use dev mode as toggle for now
+
+                              if (useAgentProcessing) {
+                                context
+                                    .read<CaptureProvider>()
+                                    .forceProcessingCurrentConversationWithAgent();
+                              } else {
+                                context
+                                    .read<CaptureProvider>()
+                                    .forceProcessingCurrentConversation();
+                              }
                               Navigator.of(context).pop();
                               return;
                             }
@@ -179,6 +223,9 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
                               builder: (context) {
                                 return StatefulBuilder(
                                   builder: (context, setState) {
+                                    bool useAgentProcessing =
+                                        SharedPreferencesUtil().devModeEnabled;
+
                                     return ConfirmationDialog(
                                       title: "Finished Conversation?",
                                       description:
@@ -196,8 +243,19 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage> w
                                         Navigator.of(context).pop();
                                       },
                                       onConfirm: () {
-                                        SharedPreferencesUtil().showSummarizeConfirmation = showSummarizeConfirmation;
-                                        context.read<CaptureProvider>().forceProcessingCurrentConversation();
+                                        SharedPreferencesUtil()
+                                                .showSummarizeConfirmation =
+                                            showSummarizeConfirmation;
+
+                                        if (useAgentProcessing) {
+                                          context
+                                              .read<CaptureProvider>()
+                                              .forceProcessingCurrentConversationWithAgent();
+                                        } else {
+                                          context
+                                              .read<CaptureProvider>()
+                                              .forceProcessingCurrentConversation();
+                                        }
                                         Navigator.of(context).pop();
                                         Navigator.of(context).pop();
                                       },

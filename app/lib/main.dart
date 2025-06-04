@@ -37,6 +37,7 @@ import 'package:omi/providers/home_provider.dart';
 import 'package:omi/providers/timeline_provider.dart';
 import 'package:omi/providers/conversation_provider.dart';
 import 'package:omi/providers/message_provider.dart';
+import 'package:omi/providers/agent_conversation_provider.dart';
 import 'package:omi/providers/onboarding_provider.dart';
 import 'package:omi/pages/payments/payment_method_provider.dart';
 import 'package:omi/providers/speech_profile_provider.dart';
@@ -185,17 +186,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           ChangeNotifierProvider(create: (context) => AuthenticationProvider()),
           ChangeNotifierProvider(create: (context) => ConversationProvider()),
           ListenableProvider(create: (context) => AppProvider()),
+          ChangeNotifierProvider(
+              create: (context) => AgentConversationProvider()),
           ChangeNotifierProxyProvider<AppProvider, MessageProvider>(
             create: (context) => MessageProvider(),
             update: (BuildContext context, value, MessageProvider? previous) =>
                 (previous?..updateAppProvider(value)) ?? MessageProvider(),
           ),
-          ChangeNotifierProxyProvider2<ConversationProvider, MessageProvider,
-              CaptureProvider>(
+          ChangeNotifierProxyProvider3<ConversationProvider, MessageProvider,
+              AgentConversationProvider, CaptureProvider>(
             create: (context) => CaptureProvider(),
-            update: (BuildContext context, conversation, message,
+            update: (BuildContext context, conversation, message, agent,
                     CaptureProvider? previous) =>
-                (previous?..updateProviderInstances(conversation, message)) ??
+                (previous
+                  ?..updateProviderInstances(conversation, message,
+                      agentProvider: agent)) ??
                 CaptureProvider(),
           ),
           ChangeNotifierProxyProvider<CaptureProvider, DeviceProvider>(
