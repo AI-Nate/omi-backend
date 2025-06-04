@@ -213,25 +213,41 @@ def get_agent_tools(uid: str) -> List:
         List of available tools
     """
     # Create tools with bound user context
+    @tool("conversation_retrieval")
     def bound_pinecone_retrieval(query: str, start_timestamp: Optional[int] = None, 
                                 end_timestamp: Optional[int] = None, max_results: int = 5):
+        """
+        Retrieve relevant past conversations based on semantic similarity.
+        Use this when you need to find conversations related to specific topics, people, or events to provide context.
+        
+        Args:
+            query: Search query to find relevant conversations
+            start_timestamp: Optional start timestamp filter (Unix timestamp)
+            end_timestamp: Optional end timestamp filter (Unix timestamp)
+            max_results: Maximum number of conversations to retrieve
+        """
         return pinecone_conversation_retrieval(query, uid, start_timestamp, end_timestamp, max_results)
     
+    @tool("advanced_conversation_search")
     def bound_advanced_retrieval(query: str, people: Optional[List[str]] = None,
                                 topics: Optional[List[str]] = None, entities: Optional[List[str]] = None,
                                 start_timestamp: Optional[int] = None, end_timestamp: Optional[int] = None,
                                 max_results: int = 5):
+        """
+        Advanced conversation search with filtering by people, topics, and entities.
+        Use this when you need more precise filtering of conversation results.
+        
+        Args:
+            query: The search query
+            people: List of people names to filter by
+            topics: List of topics to filter by
+            entities: List of entities to filter by
+            start_timestamp: Start timestamp filter
+            end_timestamp: End timestamp filter
+            max_results: Maximum results to return
+        """
         return advanced_pinecone_retrieval(query, uid, people, topics, entities, 
                                          start_timestamp, end_timestamp, max_results)
-    
-    # Configure tools with descriptions
-    bound_pinecone_retrieval.name = "conversation_retrieval"
-    bound_pinecone_retrieval.description = """Retrieve relevant past conversations based on semantic similarity. 
-    Use this when you need to find conversations related to specific topics, people, or events to provide context."""
-    
-    bound_advanced_retrieval.name = "advanced_conversation_search"  
-    bound_advanced_retrieval.description = """Advanced conversation search with filtering by people, topics, and entities.
-    Use this when you need more precise filtering of conversation results."""
     
     return [
         bound_pinecone_retrieval,
