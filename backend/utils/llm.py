@@ -431,11 +431,18 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
             # Process the start time
             starts_at = None
             try:
-                # Handle ISO format with 'Z' suffix
+                # Handle ISO format with timezone information
                 start_str = event.start
                 if start_str.endswith('Z'):
-                    start_str = start_str[:-1]  # Remove 'Z'
-                starts_at = datetime.strptime(start_str, '%Y-%m-%dT%H:%M:%S')
+                    # UTC timezone
+                    start_str = start_str[:-1] + '+00:00'
+                    starts_at = datetime.fromisoformat(start_str).replace(tzinfo=None)
+                elif '+' in start_str[-6:] or '-' in start_str[-6:]:
+                    # Has timezone offset like "+07:00" or "-07:00"
+                    starts_at = datetime.fromisoformat(start_str).replace(tzinfo=None)
+                else:
+                    # No timezone info, parse as is
+                    starts_at = datetime.strptime(start_str, '%Y-%m-%dT%H:%M:%S')
             except Exception as e:
                 print(f"Error parsing event start time '{event.start}': {e}")
                 starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow
@@ -662,11 +669,18 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
             # Process the start time
             starts_at = None
             try:
-                # Handle ISO format with 'Z' suffix
+                # Handle ISO format with timezone information
                 start_str = event.start
                 if start_str.endswith('Z'):
-                    start_str = start_str[:-1]  # Remove 'Z'
-                starts_at = datetime.strptime(start_str, '%Y-%m-%dT%H:%M:%S')
+                    # UTC timezone
+                    start_str = start_str[:-1] + '+00:00'
+                    starts_at = datetime.fromisoformat(start_str).replace(tzinfo=None)
+                elif '+' in start_str[-6:] or '-' in start_str[-6:]:
+                    # Has timezone offset like "+07:00" or "-07:00"
+                    starts_at = datetime.fromisoformat(start_str).replace(tzinfo=None)
+                else:
+                    # No timezone info, parse as is
+                    starts_at = datetime.strptime(start_str, '%Y-%m-%dT%H:%M:%S')
             except Exception as e:
                 print(f"Error parsing event start time '{event.start}': {e}")
                 starts_at = datetime.now() + timedelta(days=1)  # fallback to tomorrow

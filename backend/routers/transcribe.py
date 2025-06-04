@@ -802,6 +802,7 @@ async def _listen(
     
     
     # Update the main WebSocket handler to call cleanup
+    tasks = []
     try:
         # Init STT
         _send_message_event(MessageServiceStatusEvent(status="stt_initiating", status_text="STT Service Starting"))
@@ -828,13 +829,26 @@ async def _listen(
         _send_message_event(MessageServiceStatusEvent(status="ready"))
 
         tasks = [audio_process_task, stream_transcript_task, heartbeat_task] + pusher_tasks
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     except Exception as e:
         print(f"Error during WebSocket operation: {e}", uid)
     finally:
-        # Ensure resources are cleaned up
+        # Cancel all running tasks properly
         websocket_active = False
+        
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        
+        # Wait for all tasks to be cancelled
+        if tasks:
+            try:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            except Exception as e:
+                print(f"Error during task cancellation: {e}", uid)
+        
+        # Ensure resources are cleaned up
         await cleanup_resources()
         
         # Close the client WebSocket if it's still open
