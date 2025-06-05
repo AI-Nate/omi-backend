@@ -145,19 +145,14 @@ def create_conversation_with_agent(
         )
         print(f"🟦 BACKEND: Structured data extracted - title: {structured_data.get('title')}")
         
-        # Create conversation using existing conversation creation logic
-        from utils.conversations.process_conversation import process_conversation
-        from models.conversation import CreateConversation, ConversationSource
-        
-        # Parse transcript segments from the transcript text
-        # For now, create a simple transcript segment from the text
-        # In a real implementation, you might want to parse actual segments
+        # Create conversation directly without standard processing to avoid duplicate LLM calls
+        from models.conversation import Conversation, ConversationSource
         from models.transcript_segment import TranscriptSegment
+        import uuid
         
         transcript_segments = []
         if request.transcript:
             # Create a single transcript segment from the entire transcript
-            # This is a simplified approach - you might want to parse actual segments
             transcript_segments = [
                 TranscriptSegment(
                     text=request.transcript,
@@ -169,35 +164,36 @@ def create_conversation_with_agent(
                 )
             ]
         
-        # Create a CreateConversation object with the transcript and agent-generated structured data
-        create_conversation = CreateConversation(
-            transcript_segments=transcript_segments,
+        # Create conversation object with agent-generated structured data (skip standard processing)
+        print(f"🟦 BACKEND: Creating conversation directly with agent data (skipping standard processing to avoid duplicate LLM calls)...")
+        conversation = Conversation(
+            id=str(uuid.uuid4()),
+            created_at=datetime.now(),
             started_at=datetime.now(),
             finished_at=datetime.now(),
             source=ConversationSource.omi,
-            language="en"  # TODO: detect language from transcript
+            language="en",
+            structured=Structured(
+                title=structured_data["title"],
+                overview=agent_analysis,
+                category=structured_data["category"],
+                emoji=structured_data.get("emoji", "🧠")
+            ),
+            transcript_segments=transcript_segments,
+            apps_results=[],  # No app processing for agent conversations
+            discarded=False,
+            deleted=False
         )
+        print(f"🟦 BACKEND: Conversation created directly - ID: {conversation.id}")
         
-        # Process the conversation to get structured data
-        print(f"🟦 BACKEND: Processing conversation...")
-        conversation = process_conversation(
-            uid=uid,
-            language_code="en",
-            conversation=create_conversation,
-            force_process=False
-        )
-        print(f"🟦 BACKEND: Conversation processed - ID: {conversation.id}")
+        # Update additional structured data from agent analysis
+        from models.conversation import ActionItem, Event, ResourceItem
         
-        # Override the structured data with agent analysis
-        conversation.structured.title = structured_data["title"]
-        conversation.structured.overview = agent_analysis  # Use full agent analysis as overview
-        conversation.structured.category = structured_data["category"]
-        # Store the full agent analysis (for future use)
+        # Store the full agent analysis
         conversation.structured.agent_analysis = agent_analysis
         
         # Update action items
         if structured_data.get("action_items"):
-            from models.conversation import ActionItem
             conversation.structured.action_items = [
                 ActionItem(description=item["content"]) 
                 for item in structured_data["action_items"]
@@ -207,9 +203,22 @@ def create_conversation_with_agent(
         if structured_data.get("key_takeaways"):
             conversation.structured.key_takeaways = structured_data["key_takeaways"]
         
+        # Update things to improve
+        if structured_data.get("things_to_improve"):
+            conversation.structured.things_to_improve = [
+                ResourceItem(content=item["content"], url=item.get("url", ""), title=item.get("title", ""))
+                for item in structured_data["things_to_improve"]
+            ]
+        
+        # Update things to learn
+        if structured_data.get("things_to_learn"):
+            conversation.structured.things_to_learn = [
+                ResourceItem(content=item["content"], url=item.get("url", ""), title=item.get("title", ""))
+                for item in structured_data["things_to_learn"]
+            ]
+        
         # Update events
         if structured_data.get("events"):
-            from models.conversation import Event
             conversation.structured.events = [
                 Event(
                     title=event["title"],
@@ -220,10 +229,15 @@ def create_conversation_with_agent(
                 for event in structured_data["events"]
             ]
         
-        # Save the updated conversation
-        print(f"🟦 BACKEND: Saving updated conversation to database...")
+        # Save the conversation to database (skip memory/trend extraction to avoid additional LLM calls)
+        print(f"🟦 BACKEND: Saving conversation to database...")
         import database.conversations as conversations_db
-        conversations_db.update_conversation(uid, conversation.id, conversation.dict())
+        conversations_db.upsert_conversation(uid, conversation.dict())
+        
+        # Save structured vector for search
+        from utils.conversations.process_conversation import save_structured_vector
+        save_structured_vector(uid, conversation)
+        
         print(f"🟦 BACKEND: Conversation saved successfully")
         
         response_data = {
