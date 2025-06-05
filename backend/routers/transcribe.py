@@ -38,7 +38,7 @@ from utils.other.storage import get_profile_audio_if_exists
 
 router = APIRouter()
 
-async def _process_conversation_with_agent(conversation: Conversation) -> Conversation:
+async def _process_conversation_with_agent(conversation: Conversation, uid: str) -> Conversation:
     """Process conversation using agent analysis instead of standard pipeline"""
     try:
         from utils.agents.core import create_conversation_agent
@@ -47,7 +47,7 @@ async def _process_conversation_with_agent(conversation: Conversation) -> Conver
         from datetime import datetime
         
         # Create agent for user
-        agent = create_conversation_agent(conversation.uid)
+        agent = create_conversation_agent(uid)
         
         # Get transcript text
         transcript = conversation.get_transcript(False)
@@ -67,7 +67,7 @@ async def _process_conversation_with_agent(conversation: Conversation) -> Conver
             print(f"🔴 TRANSCRIBE: Agent analysis failed for conversation {conversation.id}")
             # Fallback to standard processing
             from utils.conversations.process_conversation import process_conversation
-            return process_conversation(conversation.uid, conversation.language or 'en', conversation)
+            return process_conversation(uid, conversation.language or 'en', conversation)
         
         # Extract structured data from agent analysis
         agent_analysis = result.get('analysis', '')
@@ -134,11 +134,11 @@ async def _process_conversation_with_agent(conversation: Conversation) -> Conver
         conversation.discarded = False
         
         # Save to database
-        conversations_db.upsert_conversation(conversation.uid, conversation.dict())
+        conversations_db.upsert_conversation(uid, conversation.dict())
         
         # Save structured vector for search
         from utils.conversations.process_conversation import save_structured_vector
-        save_structured_vector(conversation.uid, conversation)
+        save_structured_vector(uid, conversation)
         
         print(f"🟢 TRANSCRIBE: Agent processing completed for conversation {conversation.id}")
         return conversation
@@ -147,7 +147,7 @@ async def _process_conversation_with_agent(conversation: Conversation) -> Conver
         print(f"🔴 TRANSCRIBE: Error in agent processing for conversation {conversation.id}: {e}")
         # Fallback to standard processing
         from utils.conversations.process_conversation import process_conversation
-        return process_conversation(conversation.uid, conversation.language or 'en', conversation)
+        return process_conversation(uid, conversation.language or 'en', conversation)
 
 async def handle_websocket_text_message(message_text: str, uid: str):
     """Handle text messages sent over WebSocket (commands, etc.)"""
@@ -316,7 +316,7 @@ async def _listen(
             if use_agent_processing:
                 # Use agent processing for dev mode
                 print(f"🤖 TRANSCRIBE: Processing conversation {conversation.id} with agent")
-                conversation = await _process_conversation_with_agent(conversation)
+                conversation = await _process_conversation_with_agent(conversation, uid)
                 messages = trigger_external_integrations(uid, conversation)
             else:
                 # Use standard processing
@@ -440,7 +440,6 @@ async def _listen(
         started_at = datetime.now(timezone.utc) - timedelta(seconds=segments[0].end - segments[0].start)
         conversation = Conversation(
             id=str(uuid.uuid4()),
-            uid=uid,
             structured=Structured(),
             language=language,
             created_at=started_at,
