@@ -244,6 +244,8 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
     
     # Get user memories if uid is provided
     user_memories_context = ""
+    user_name = "The User"  # Default fallback name
+    
     if uid:
         # First try to import the module
         try:
@@ -280,6 +282,7 @@ def get_transcript_structure(transcript: str, started_at: datetime, language_cod
             )
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
+            # Keep default user_name = "The User" and empty user_memories_context
     
     prompt = f'''
     You are a personal growth coach and life assistant analyzing a meaningful conversation from {user_name}'s life.
@@ -487,6 +490,8 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
     
     # Get user memories if uid is provided
     user_memories_context = ""
+    user_name = "The User"  # Default fallback name
+    
     if uid:
         # First try to import the module
         try:
@@ -517,6 +522,7 @@ def get_reprocess_transcript_structure(transcript: str, started_at: datetime, la
             )
         except Exception as e:
             print(f"Error retrieving user memories: {e}")
+            # Keep default user_name = "The User" and empty user_memories_context
     
     prompt = f'''
     You are a personal growth coach and life assistant analyzing a meaningful conversation from {user_name}'s life.
