@@ -9,12 +9,44 @@ import 'package:omi/backend/schema/structured.dart';
 import 'package:omi/backend/schema/transcript_segment.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+class AgentAnalysisData {
+  final String analysis;
+  final List<dynamic>? retrievedConversations;
+  final String sessionId;
+
+  AgentAnalysisData({
+    required this.analysis,
+    this.retrievedConversations,
+    required this.sessionId,
+  });
+
+  factory AgentAnalysisData.fromJson(Map<String, dynamic> json) {
+    return AgentAnalysisData(
+      analysis: json['analysis'] ?? '',
+      retrievedConversations: json['retrieved_conversations'],
+      sessionId: json['session_id'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'analysis': analysis,
+      'retrieved_conversations': retrievedConversations,
+      'session_id': sessionId,
+    };
+  }
+}
+
 class CreateConversationResponse {
   final List<ServerMessage> messages;
   final ServerConversation? conversation;
+  final AgentAnalysisData? agentAnalysis; // New field for agent analysis
 
-  CreateConversationResponse(
-      {required this.messages, required this.conversation});
+  CreateConversationResponse({
+    required this.messages,
+    required this.conversation,
+    this.agentAnalysis, // Optional agent analysis
+  });
 
   factory CreateConversationResponse.fromJson(Map<String, dynamic> json) {
     return CreateConversationResponse(
@@ -23,6 +55,9 @@ class CreateConversationResponse {
           .toList(),
       conversation: json['memory'] != null
           ? ServerConversation.fromJson(json['memory'])
+          : null,
+      agentAnalysis: json['agent_analysis'] != null
+          ? AgentAnalysisData.fromJson(json['agent_analysis'])
           : null,
     );
   }

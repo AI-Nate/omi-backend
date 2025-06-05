@@ -681,26 +681,38 @@ class CaptureProvider extends ChangeNotifier
 
       // Listen for agent analysis completion
       debugPrint('🟡 CAPTURE_PROVIDER: Setting up analysis stream listener');
-      final subscription =
-          agentConversationProvider!.analysisStream.listen((event) {
-        debugPrint(
-            '🟡 CAPTURE_PROVIDER: Received analysis stream event: ${event['type']}');
-
-        if (event['type'] == 'analysis_complete') {
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: Stream instance = ${agentConversationProvider!.analysisStream}');
+      final subscription = agentConversationProvider!.analysisStream.listen(
+        (event) {
           debugPrint(
-              '🟢 CAPTURE_PROVIDER: Agent analysis completed: ${event['analysis']}');
+              '🟡 CAPTURE_PROVIDER: *** RECEIVED STREAM EVENT *** type: ${event['type']}');
+          debugPrint('🟡 CAPTURE_PROVIDER: Full event data: $event');
 
-          // Create a conversation with agent analysis using saved segments
-          _createConversationFromAgentAnalysis(event, currentSegments);
-        } else if (event['type'] == 'error') {
-          debugPrint(
-              '🔴 CAPTURE_PROVIDER: Agent analysis error: ${event['error']}');
+          if (event['type'] == 'analysis_complete') {
+            debugPrint(
+                '🟢 CAPTURE_PROVIDER: Agent analysis completed: ${event['analysis']}');
+
+            // Create a conversation with agent analysis using saved segments
+            _createConversationFromAgentAnalysis(event, currentSegments);
+          } else if (event['type'] == 'error') {
+            debugPrint(
+                '🔴 CAPTURE_PROVIDER: Agent analysis error: ${event['error']}');
+            conversationProvider!.removeProcessingConversation('0');
+
+            // Fallback to standard processing
+            forceProcessingCurrentConversation();
+          }
+        },
+        onError: (error) {
+          debugPrint('🔴 CAPTURE_PROVIDER: Stream error: $error');
           conversationProvider!.removeProcessingConversation('0');
-
-          // Fallback to standard processing
           forceProcessingCurrentConversation();
-        }
-      });
+        },
+        onDone: () {
+          debugPrint('🟡 CAPTURE_PROVIDER: Stream completed');
+        },
+      );
 
       // Auto-cancel subscription after 2 minutes to prevent memory leaks
       Timer(const Duration(minutes: 2), () {
@@ -746,6 +758,20 @@ class CaptureProvider extends ChangeNotifier
       if (response != null && response.conversation != null) {
         conversationProvider!.removeProcessingConversation('0');
         response.conversation!.isNew = true;
+
+        // Store agent analysis in the conversation for display
+        if (response.agentAnalysis != null) {
+          debugPrint(
+              '🟡 CAPTURE_PROVIDER: Agent analysis available for storage');
+          debugPrint(
+              '🟡 CAPTURE_PROVIDER: Analysis length: ${response.agentAnalysis!.analysis.length}');
+
+          // TODO: Store agent analysis for display in UI
+          // For now, we just log that it's available - the backend already stored it
+          debugPrint(
+              '🟡 CAPTURE_PROVIDER: Agent analysis will be displayed via conversation detail UI');
+        }
+
         _processConversationCreated(response.conversation, response.messages);
 
         debugPrint(

@@ -1691,10 +1691,19 @@ Future<CreateConversationResponse?> createConversationWithAgent({
         conversation: responseData['memory'] != null
             ? ServerConversation.fromJson(responseData['memory'])
             : null,
+        agentAnalysis: responseData['agent_analysis'] != null
+            ? AgentAnalysisData.fromJson(responseData['agent_analysis'])
+            : null,
       );
 
       debugPrint('🟢 API: CreateConversationResponse created successfully');
       debugPrint('🟢 API: Conversation ID: ${result.conversation?.id}');
+      debugPrint(
+          '🟢 API: Agent analysis included: ${result.agentAnalysis != null}');
+      if (result.agentAnalysis != null) {
+        debugPrint(
+            '🟢 API: Agent analysis length: ${result.agentAnalysis!.analysis.length}');
+      }
       return result;
     } catch (e) {
       debugPrint(
