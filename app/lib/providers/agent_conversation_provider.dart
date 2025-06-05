@@ -29,8 +29,14 @@ class AgentConversationProvider extends BaseProvider {
     String? conversationId,
     bool useStreaming = false,
   }) async {
+    debugPrint('🟣 AGENT_PROVIDER: analyzeConversation() called');
+    debugPrint(
+        '🟣 AGENT_PROVIDER: transcriptSegments.length = ${transcriptSegments.length}');
+    debugPrint('🟣 AGENT_PROVIDER: conversationId = $conversationId');
+    debugPrint('🟣 AGENT_PROVIDER: useStreaming = $useStreaming');
+
     if (_isAnalyzing) {
-      debugPrint('Agent analysis already in progress');
+      debugPrint('🔴 AGENT_PROVIDER: Agent analysis already in progress');
       return;
     }
 
@@ -39,11 +45,15 @@ class AgentConversationProvider extends BaseProvider {
 
     // Generate session ID
     _currentSessionId = DateTime.now().millisecondsSinceEpoch.toString();
+    debugPrint('🟣 AGENT_PROVIDER: Generated session ID: $_currentSessionId');
 
     // Convert transcript segments to text
     final transcript = TranscriptSegment.segmentsAsString(transcriptSegments);
+    debugPrint(
+        '🟣 AGENT_PROVIDER: Converted transcript, length = ${transcript.length}');
 
     if (transcript.isEmpty) {
+      debugPrint('🔴 AGENT_PROVIDER: No transcript available for analysis');
       _setError('No transcript available for analysis');
       _setAnalyzing(false);
       return;
@@ -51,18 +61,20 @@ class AgentConversationProvider extends BaseProvider {
 
     try {
       if (useStreaming) {
+        debugPrint('🟣 AGENT_PROVIDER: Starting streaming analysis');
         await _startStreamingAnalysis(
           transcript: transcript,
           conversationId: conversationId,
         );
       } else {
+        debugPrint('🟣 AGENT_PROVIDER: Starting standard analysis');
         await _performStandardAnalysis(
           transcript: transcript,
           conversationId: conversationId,
         );
       }
     } catch (e) {
-      debugPrint('Error during agent analysis: $e');
+      debugPrint('🔴 AGENT_PROVIDER: Error during agent analysis: $e');
       _setError('Analysis failed: ${e.toString()}');
       _setAnalyzing(false);
     }
@@ -73,26 +85,43 @@ class AgentConversationProvider extends BaseProvider {
     required String transcript,
     String? conversationId,
   }) async {
+    debugPrint('🟣 AGENT_PROVIDER: _performStandardAnalysis() called');
+    debugPrint('🟣 AGENT_PROVIDER: Calling analyzeConversationWithAgent API');
+
     final response = await analyzeConversationWithAgent(
       transcript: transcript,
       conversationId: conversationId,
       sessionId: _currentSessionId!,
     );
 
+    debugPrint(
+        '🟣 AGENT_PROVIDER: analyzeConversationWithAgent API response received');
+    debugPrint('🟣 AGENT_PROVIDER: response = $response');
+
     if (response != null && response.status == 'success') {
+      debugPrint('🟢 AGENT_PROVIDER: Agent analysis successful');
       _currentAnalysis = response;
-      _analysisStreamController.add({
+
+      final streamEvent = {
         'type': 'analysis_complete',
         'analysis': response.analysis,
         'retrieved_conversations': response.retrievedConversations,
         'timestamp': response.timestamp,
-      });
-      debugPrint('Agent analysis completed successfully');
+        'session_id': _currentSessionId,
+      };
+
+      debugPrint('🟣 AGENT_PROVIDER: Adding to analysis stream: $streamEvent');
+      _analysisStreamController.add(streamEvent);
+      debugPrint('🟣 AGENT_PROVIDER: Agent analysis completed successfully');
     } else {
+      debugPrint('🔴 AGENT_PROVIDER: Agent analysis failed');
+      debugPrint(
+          '🔴 AGENT_PROVIDER: Error: ${response?.error ?? 'Analysis failed with unknown error'}');
       _setError(response?.error ?? 'Analysis failed with unknown error');
     }
 
     _setAnalyzing(false);
+    debugPrint('🟣 AGENT_PROVIDER: _performStandardAnalysis() completed');
   }
 
   // Streaming analysis

@@ -623,16 +623,26 @@ class CaptureProvider extends ChangeNotifier
   // This is the method you want for the agent button - it creates conversations with agent-generated summaries
   Future<void> forceProcessingCurrentConversationWithAgent(
       {bool useStreaming = false}) async {
+    debugPrint(
+        '🟡 CAPTURE_PROVIDER: forceProcessingCurrentConversationWithAgent() called');
+    debugPrint('🟡 CAPTURE_PROVIDER: segments.length = ${segments.length}');
+    debugPrint(
+        '🟡 CAPTURE_PROVIDER: agentConversationProvider = $agentConversationProvider');
+
     if (agentConversationProvider == null) {
       debugPrint(
-          'Agent conversation provider not available, falling back to standard processing');
+          '🔴 CAPTURE_PROVIDER: Agent conversation provider not available, falling back to standard processing');
       return forceProcessingCurrentConversation();
     }
 
     if (segments.isEmpty) {
-      debugPrint('No transcript segments available for agent processing');
+      debugPrint(
+          '🔴 CAPTURE_PROVIDER: No transcript segments available for agent processing');
       return;
     }
+
+    debugPrint(
+        '🟡 CAPTURE_PROVIDER: Starting agent conversation processing...');
 
     _resetStateVariables();
     conversationProvider!.addProcessingConversation(
@@ -645,22 +655,36 @@ class CaptureProvider extends ChangeNotifier
 
     try {
       // Analyze with agent
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: Calling agentConversationProvider.analyzeConversation()');
+      debugPrint('🟡 CAPTURE_PROVIDER: conversationId = $conversationId');
+      debugPrint('🟡 CAPTURE_PROVIDER: useStreaming = $useStreaming');
+
       await agentConversationProvider!.analyzeConversation(
         transcriptSegments: segments,
         conversationId: conversationId,
         useStreaming: useStreaming,
       );
 
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: analyzeConversation() called successfully');
+
       // Listen for agent analysis completion
+      debugPrint('🟡 CAPTURE_PROVIDER: Setting up analysis stream listener');
       final subscription =
           agentConversationProvider!.analysisStream.listen((event) {
+        debugPrint(
+            '🟡 CAPTURE_PROVIDER: Received analysis stream event: ${event['type']}');
+
         if (event['type'] == 'analysis_complete') {
-          debugPrint('Agent analysis completed: ${event['analysis']}');
+          debugPrint(
+              '🟢 CAPTURE_PROVIDER: Agent analysis completed: ${event['analysis']}');
 
           // Create a conversation with agent analysis
           _createConversationFromAgentAnalysis(event);
         } else if (event['type'] == 'error') {
-          debugPrint('Agent analysis error: ${event['error']}');
+          debugPrint(
+              '🔴 CAPTURE_PROVIDER: Agent analysis error: ${event['error']}');
           conversationProvider!.removeProcessingConversation('0');
 
           // Fallback to standard processing
@@ -684,15 +708,27 @@ class CaptureProvider extends ChangeNotifier
   // Create conversation from agent analysis using the proper backend endpoint
   Future<void> _createConversationFromAgentAnalysis(
       Map<String, dynamic> analysisEvent) async {
+    debugPrint(
+        '🟡 CAPTURE_PROVIDER: _createConversationFromAgentAnalysis() called');
+    debugPrint('🟡 CAPTURE_PROVIDER: analysisEvent = $analysisEvent');
+
     try {
       final transcript = TranscriptSegment.segmentsAsString(segments);
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: transcript length = ${transcript.length}');
 
       // Call the new backend endpoint that creates conversations with agent analysis
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: Calling createConversationWithAgent() API');
       final response = await createConversationWithAgent(
         transcript: transcript,
         sessionId: analysisEvent['session_id'] ??
             DateTime.now().millisecondsSinceEpoch.toString(),
       );
+
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: createConversationWithAgent() API response received');
+      debugPrint('🟡 CAPTURE_PROVIDER: response = $response');
 
       if (response != null && response.conversation != null) {
         conversationProvider!.removeProcessingConversation('0');

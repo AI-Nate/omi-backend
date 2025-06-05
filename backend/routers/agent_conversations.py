@@ -103,30 +103,47 @@ def create_conversation_with_agent(
     3. Creates a conversation with the agent-generated summary
     4. Returns the same format as the standard conversation creation endpoint
     """
+    print(f"🟦 BACKEND: /v1/conversations/agent/create endpoint hit by user {uid}")
+    print(f"🟦 BACKEND: Request - transcript length: {len(request.transcript)}")
+    print(f"🟦 BACKEND: Request - conversation_id: {request.conversation_id}")
+    print(f"🟦 BACKEND: Request - session_id: {request.session_id}")
+    
     try:
         # Create agent for the user
+        print(f"🟦 BACKEND: Creating conversation agent for user {uid}")
         agent = create_conversation_agent(uid)
+        print(f"🟦 BACKEND: Agent created successfully")
         
         # Analyze with agent
+        print(f"🟦 BACKEND: Starting agent analysis...")
         result = agent.analyze_conversation(
             transcript=request.transcript,
             conversation_data=None,
             session_id=request.session_id
         )
+        print(f"🟦 BACKEND: Agent analysis completed")
+        print(f"🟦 BACKEND: Analysis result status: {result.get('status')}")
         
         if result.get('status') != 'success':
-            raise HTTPException(status_code=500, detail=f"Agent analysis failed: {result.get('error', 'Unknown error')}")
+            error_msg = f"Agent analysis failed: {result.get('error', 'Unknown error')}"
+            print(f"🔴 BACKEND: {error_msg}")
+            raise HTTPException(status_code=500, detail=error_msg)
         
         # Transform agent analysis into structured conversation data
         agent_analysis = result.get('analysis', '')
         retrieved_conversations = result.get('retrieved_conversations', [])
         
+        print(f"🟦 BACKEND: Agent analysis length: {len(agent_analysis)}")
+        print(f"🟦 BACKEND: Retrieved conversations count: {len(retrieved_conversations)}")
+        
         # Extract structured data from agent analysis
+        print(f"🟦 BACKEND: Extracting structured data from agent analysis...")
         structured_data = _extract_structured_data_from_agent_analysis(
             agent_analysis, 
             retrieved_conversations,
             request.transcript
         )
+        print(f"🟦 BACKEND: Structured data extracted - title: {structured_data.get('title')}")
         
         # Create conversation using existing conversation creation logic
         from utils.conversations.process_conversation import process_conversation
@@ -162,12 +179,14 @@ def create_conversation_with_agent(
         )
         
         # Process the conversation to get structured data
+        print(f"🟦 BACKEND: Processing conversation...")
         conversation = process_conversation(
             uid=uid,
             language_code="en",
             conversation=create_conversation,
             force_process=False
         )
+        print(f"🟦 BACKEND: Conversation processed - ID: {conversation.id}")
         
         # Override the structured data with agent analysis
         conversation.structured.title = structured_data["title"]
@@ -200,10 +219,12 @@ def create_conversation_with_agent(
             ]
         
         # Save the updated conversation
+        print(f"🟦 BACKEND: Saving updated conversation to database...")
         import database.conversations as conversations_db
         conversations_db.update_conversation(uid, conversation.id, conversation.dict())
+        print(f"🟦 BACKEND: Conversation saved successfully")
         
-        return {
+        response_data = {
             "memory": conversation,
             "messages": [],  # No chat messages for agent-created conversations
             "agent_analysis": {
@@ -213,7 +234,16 @@ def create_conversation_with_agent(
             }
         }
         
+        print(f"🟢 BACKEND: Agent conversation creation completed successfully")
+        print(f"🟢 BACKEND: Returning conversation ID: {conversation.id}")
+        
+        return response_data
+        
     except Exception as e:
+        print(f"🔴 BACKEND: Exception in create_conversation_with_agent: {str(e)}")
+        print(f"🔴 BACKEND: Exception type: {type(e)}")
+        import traceback
+        print(f"🔴 BACKEND: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error creating conversation with agent: {str(e)}")
 
 

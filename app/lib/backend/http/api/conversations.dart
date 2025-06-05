@@ -1645,7 +1645,10 @@ Future<CreateConversationResponse?> createConversationWithAgent({
   String? conversationId,
   String sessionId = "default",
 }) async {
-  debugPrint('Creating conversation with agent analysis...');
+  debugPrint('🟠 API: createConversationWithAgent() called');
+  debugPrint('🟠 API: transcript length = ${transcript.length}');
+  debugPrint('🟠 API: conversationId = $conversationId');
+  debugPrint('🟠 API: sessionId = $sessionId');
 
   final request = AgentAnalysisRequest(
     transcript: transcript,
@@ -1654,6 +1657,9 @@ Future<CreateConversationResponse?> createConversationWithAgent({
     stream: false,
   );
 
+  debugPrint('🟠 API: Request created, calling backend endpoint');
+  debugPrint('🟠 API: URL = ${Env.apiBaseUrl}v1/conversations/agent/create');
+
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/conversations/agent/create',
     headers: {'Content-Type': 'application/json'},
@@ -1661,16 +1667,24 @@ Future<CreateConversationResponse?> createConversationWithAgent({
     body: jsonEncode(request.toJson()),
   );
 
-  if (response == null) return null;
+  debugPrint('🟠 API: Backend response received');
 
-  debugPrint('Agent conversation creation response: ${response.statusCode}');
+  if (response == null) {
+    debugPrint('🔴 API: Backend response is null');
+    return null;
+  }
+
+  debugPrint(
+      '🟠 API: Agent conversation creation response: ${response.statusCode}');
+  debugPrint('🟠 API: Response body: ${response.body}');
 
   if (response.statusCode == 200) {
     try {
       final responseData = jsonDecode(response.body);
+      debugPrint('🟠 API: Response JSON parsed successfully');
 
       // Transform the response to match CreateConversationResponse format
-      return CreateConversationResponse(
+      final result = CreateConversationResponse(
         messages: (responseData['messages'] as List<dynamic>? ?? [])
             .map((message) => ServerMessage.fromJson(message))
             .toList(),
@@ -1678,13 +1692,18 @@ Future<CreateConversationResponse?> createConversationWithAgent({
             ? ServerConversation.fromJson(responseData['memory'])
             : null,
       );
+
+      debugPrint('🟢 API: CreateConversationResponse created successfully');
+      debugPrint('🟢 API: Conversation ID: ${result.conversation?.id}');
+      return result;
     } catch (e) {
-      debugPrint('Error parsing agent conversation creation response: $e');
+      debugPrint(
+          '🔴 API: Error parsing agent conversation creation response: $e');
       return null;
     }
   } else {
     debugPrint(
-        'Agent conversation creation failed: ${response.statusCode} - ${response.body}');
+        '🔴 API: Agent conversation creation failed: ${response.statusCode} - ${response.body}');
     return null;
   }
 }

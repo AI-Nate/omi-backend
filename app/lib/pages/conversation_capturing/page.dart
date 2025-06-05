@@ -109,10 +109,29 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage>
                       provider.segments.isNotEmpty)
                     IconButton(
                       onPressed: () async {
+                        debugPrint(
+                            '🔵 AGENT BUTTON CLICKED: Starting agent conversation processing');
+
                         // Use agent to create conversation with analysis
-                        context
-                            .read<CaptureProvider>()
-                            .forceProcessingCurrentConversationWithAgent();
+                        try {
+                          debugPrint(
+                              '🔵 AGENT BUTTON: Calling forceProcessingCurrentConversationWithAgent()');
+                          await context
+                              .read<CaptureProvider>()
+                              .forceProcessingCurrentConversationWithAgent();
+                          debugPrint(
+                              '🔵 AGENT BUTTON: forceProcessingCurrentConversationWithAgent() completed');
+                        } catch (e) {
+                          debugPrint('🔴 AGENT BUTTON ERROR: $e');
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Agent processing failed: $e'),
+                              duration: const Duration(seconds: 5),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content:
