@@ -2,7 +2,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:gradient_borders/box_borders/gradient_box_border.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:omi/backend/http/api/conversations.dart';
 import 'package:omi/backend/http/webhooks.dart';
 import 'package:omi/backend/preferences.dart';
@@ -678,12 +680,70 @@ class GetAppsWidgets extends StatelessWidget {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 8),
                                 child: SelectionArea(
-                                  child: Text(
-                                    structured.overview,
-                                    style: const TextStyle(
-                                        color: Colors.white,
+                                  child: MarkdownBody(
+                                    data: structured.overview,
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: const TextStyle(
                                         fontSize: 16,
-                                        height: 1.5),
+                                        height: 1.5,
+                                        color: Colors.white,
+                                      ),
+                                      h1: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        height: 1.3,
+                                      ),
+                                      h2: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        height: 1.3,
+                                      ),
+                                      h3: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        height: 1.3,
+                                      ),
+                                      h4: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                        height: 1.3,
+                                      ),
+                                      strong: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                      em: const TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.white,
+                                      ),
+                                      listBullet: const TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.white,
+                                      ),
+                                      blockquote: const TextStyle(
+                                        fontSize: 16,
+                                        fontStyle: FontStyle.italic,
+                                        color: Colors.white70,
+                                      ),
+                                      code: TextStyle(
+                                        fontSize: 14,
+                                        fontFamily: 'monospace',
+                                        backgroundColor: Colors.grey.shade800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    onTapLink: (text, href, title) async {
+                                      if (href != null) {
+                                        final Uri url = Uri.parse(href);
+                                        if (await canLaunchUrl(url)) {
+                                          await launchUrl(url);
+                                        }
+                                      }
+                                    },
                                   ),
                                 ),
                               ),
