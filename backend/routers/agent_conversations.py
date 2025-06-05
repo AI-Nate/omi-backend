@@ -146,7 +146,7 @@ def create_conversation_with_agent(
         print(f"🟦 BACKEND: Structured data extracted - title: {structured_data.get('title')}")
         
         # Create conversation directly without standard processing to avoid duplicate LLM calls
-        from models.conversation import Conversation, ConversationSource
+        from models.conversation import Conversation, ConversationSource, Structured
         from models.transcript_segment import TranscriptSegment
         import uuid
         
@@ -187,7 +187,7 @@ def create_conversation_with_agent(
         print(f"🟦 BACKEND: Conversation created directly - ID: {conversation.id}")
         
         # Update additional structured data from agent analysis
-        from models.conversation import ActionItem, Event, ResourceItem, Structured
+        from models.conversation import ActionItem, Event, ResourceItem
         
         # Store the full agent analysis
         conversation.structured.agent_analysis = agent_analysis
