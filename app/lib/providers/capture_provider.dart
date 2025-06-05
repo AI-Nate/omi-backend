@@ -619,7 +619,8 @@ class CaptureProvider extends ChangeNotifier
     return;
   }
 
-  // New agent-based processing method
+  // Agent-based processing method that creates conversations WITH agent analysis integrated
+  // This is the method you want for the agent button - it creates conversations with agent-generated summaries
   Future<void> forceProcessingCurrentConversationWithAgent(
       {bool useStreaming = false}) async {
     if (agentConversationProvider == null) {
@@ -729,7 +730,8 @@ class CaptureProvider extends ChangeNotifier
     }
   }
 
-  // Method to analyze current conversation without creating a new one
+  // Method to analyze current conversation WITHOUT agent integration (creates standard conversation first, then analyzes)
+  // Note: This does NOT create a conversation with agent analysis - use forceProcessingCurrentConversationWithAgent() for that
   Future<void> analyzeCurrentConversationWithAgent(
       {bool useStreaming = false}) async {
     if (agentConversationProvider == null) {
