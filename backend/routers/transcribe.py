@@ -198,9 +198,33 @@ async def _listen(
         if not processing or len(processing) == 0:
             return
 
+        # Filter out conversations older than 1 hour to prevent processing stale conversations
+        current_time = datetime.now(timezone.utc)
+        recent_processing = []
+        for conv in processing:
+            created_at = conv.get('created_at')
+            if created_at:
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                elif hasattr(created_at, 'timestamp'):
+                    # Handle Firestore timestamp
+                    created_at = datetime.fromtimestamp(created_at.timestamp(), timezone.utc)
+                
+                age_hours = (current_time - created_at).total_seconds() / 3600
+                if age_hours <= 1:  # Only process conversations less than 1 hour old
+                    recent_processing.append(conv)
+                else:
+                    print(f'Skipping old conversation {conv.get("id", "unknown")} - age: {age_hours:.1f} hours', uid)
+        
+        if not recent_processing:
+            print('No recent processing conversations found, skipping processing', uid)
+            return
+            
+        print(f'Processing {len(recent_processing)} recent conversations (filtered from {len(processing)})', uid)
+
         # sleep for 1 second to yeld the network for ws accepted.
         await asyncio.sleep(1)
-        for conversation in processing:
+        for conversation in recent_processing:
             await _create_conversation(conversation)
 
     # Process processing conversations
