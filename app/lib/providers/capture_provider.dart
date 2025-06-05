@@ -644,6 +644,13 @@ class CaptureProvider extends ChangeNotifier
     debugPrint(
         '🟡 CAPTURE_PROVIDER: Starting agent conversation processing...');
 
+    // Save segments BEFORE resetting state variables
+    final currentSegments = List<TranscriptSegment>.from(segments);
+    final currentConversationId = conversationId;
+
+    debugPrint(
+        '🟡 CAPTURE_PROVIDER: Saved ${currentSegments.length} segments before reset');
+
     _resetStateVariables();
     conversationProvider!.addProcessingConversation(
       ServerConversation(
@@ -657,12 +664,15 @@ class CaptureProvider extends ChangeNotifier
       // Analyze with agent
       debugPrint(
           '🟡 CAPTURE_PROVIDER: Calling agentConversationProvider.analyzeConversation()');
-      debugPrint('🟡 CAPTURE_PROVIDER: conversationId = $conversationId');
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: conversationId = $currentConversationId');
       debugPrint('🟡 CAPTURE_PROVIDER: useStreaming = $useStreaming');
+      debugPrint(
+          '🟡 CAPTURE_PROVIDER: Using saved segments count = ${currentSegments.length}');
 
       await agentConversationProvider!.analyzeConversation(
-        transcriptSegments: segments,
-        conversationId: conversationId,
+        transcriptSegments: currentSegments,
+        conversationId: currentConversationId,
         useStreaming: useStreaming,
       );
 
@@ -680,8 +690,8 @@ class CaptureProvider extends ChangeNotifier
           debugPrint(
               '🟢 CAPTURE_PROVIDER: Agent analysis completed: ${event['analysis']}');
 
-          // Create a conversation with agent analysis
-          _createConversationFromAgentAnalysis(event);
+          // Create a conversation with agent analysis using saved segments
+          _createConversationFromAgentAnalysis(event, currentSegments);
         } else if (event['type'] == 'error') {
           debugPrint(
               '🔴 CAPTURE_PROVIDER: Agent analysis error: ${event['error']}');
@@ -707,13 +717,16 @@ class CaptureProvider extends ChangeNotifier
 
   // Create conversation from agent analysis using the proper backend endpoint
   Future<void> _createConversationFromAgentAnalysis(
-      Map<String, dynamic> analysisEvent) async {
+      Map<String, dynamic> analysisEvent,
+      List<TranscriptSegment> savedSegments) async {
     debugPrint(
         '🟡 CAPTURE_PROVIDER: _createConversationFromAgentAnalysis() called');
     debugPrint('🟡 CAPTURE_PROVIDER: analysisEvent = $analysisEvent');
+    debugPrint(
+        '🟡 CAPTURE_PROVIDER: savedSegments.length = ${savedSegments.length}');
 
     try {
-      final transcript = TranscriptSegment.segmentsAsString(segments);
+      final transcript = TranscriptSegment.segmentsAsString(savedSegments);
       debugPrint(
           '🟡 CAPTURE_PROVIDER: transcript length = ${transcript.length}');
 
