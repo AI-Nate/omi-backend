@@ -316,9 +316,30 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
             else:
                 title = lines[0][:100]  # Fallback to first line
     
+    # Remove title from analysis text to prevent duplication
+    cleaned_analysis = analysis
+    if title != "Agent Analysis":
+        # Remove the title line from the beginning of the analysis
+        title_patterns_for_removal = [
+            rf'^#\s*{re.escape(title)}\s*$',  # Exact markdown header match
+            rf'^##\s*{re.escape(title)}\s*$',  # H2 header
+            rf'^{re.escape(title)}\s*$',  # Plain title line
+            rf'^\*\*{re.escape(title)}\*\*\s*$',  # Bold title
+        ]
+        
+        for pattern in title_patterns_for_removal:
+            cleaned_analysis = re.sub(pattern, '', cleaned_analysis, flags=re.MULTILINE | re.IGNORECASE)
+    
+    # Also remove any remaining standalone title lines at the start
+    lines = cleaned_analysis.split('\n')
+    while lines and (not lines[0].strip() or lines[0].strip().startswith('#') or 
+                     (title != "Agent Analysis" and title.lower() in lines[0].lower())):
+        lines.pop(0)
+    cleaned_analysis = '\n'.join(lines).strip()
+    
     # Extract overview (first paragraph or summary section)
-    overview_match = re.search(r'(?:Summary|Overview):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
-    overview = analysis[:500] + "..." if len(analysis) > 500 else analysis  # Default to truncated analysis
+    overview_match = re.search(r'(?:Summary|Overview):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', cleaned_analysis, re.DOTALL | re.IGNORECASE)
+    overview = cleaned_analysis[:500] + "..." if len(cleaned_analysis) > 500 else cleaned_analysis  # Default to cleaned analysis
     if overview_match:
         overview = overview_match.group(1).strip()
     
