@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:omi/backend/http/api/conversations.dart';
 import 'package:omi/backend/schema/conversation.dart';
 import 'package:omi/providers/developer_mode_provider.dart';
+import 'package:omi/providers/capture_provider.dart';
 import 'package:omi/utils/analytics/mixpanel.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
@@ -45,9 +46,24 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                 title: const Text('Developer Settings'),
                 actions: [
                   TextButton(
-                    onPressed: provider.savingSettingsLoading
-                        ? null
-                        : provider.saveSettings,
+                    onPressed: () async {
+                      if (provider.savingSettingsLoading) return;
+
+                      // Save the current dev mode state before saving settings
+                      final oldDevMode = SharedPreferencesUtil().devModeEnabled;
+
+                      // Save the settings
+                      await provider.saveSettings();
+
+                      // Check if dev mode changed and sync with backend if it did
+                      final newDevMode = SharedPreferencesUtil().devModeEnabled;
+                      if (oldDevMode != newDevMode && context.mounted) {
+                        final captureProvider = Provider.of<CaptureProvider>(
+                            context,
+                            listen: false);
+                        captureProvider.syncDevModeWithBackend();
+                      }
+                    },
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.0),
                       child: Text(

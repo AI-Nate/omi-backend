@@ -548,7 +548,9 @@ class CaptureProvider extends ChangeNotifier
 
       debugPrint(
           '📡 CAPTURE_PROVIDER: Sending dev mode state to backend: $devModeEnabled');
+      debugPrint('📡 CAPTURE_PROVIDER: Message content: $message');
       _socket?.send(message);
+      debugPrint('📡 CAPTURE_PROVIDER: Dev mode message sent successfully');
     } catch (e) {
       debugPrint(
           '🔴 CAPTURE_PROVIDER: Error sending dev mode state to backend: $e');
