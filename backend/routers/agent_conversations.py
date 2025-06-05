@@ -187,7 +187,7 @@ def create_conversation_with_agent(
         print(f"🟦 BACKEND: Conversation created directly - ID: {conversation.id}")
         
         # Update additional structured data from agent analysis
-        from models.conversation import ActionItem, Event, ResourceItem
+        from models.conversation import ActionItem, Event, ResourceItem, Structured
         
         # Store the full agent analysis
         conversation.structured.agent_analysis = agent_analysis
