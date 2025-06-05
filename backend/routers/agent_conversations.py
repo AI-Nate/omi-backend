@@ -50,6 +50,7 @@ def analyze_conversation_with_agent(
         if request.conversation_id:
             try:
                 conv_data = conversations_db.get_conversation(uid, request.conversation_id)
+                print(f"[DEBUG] conv_data for {request.conversation_id}:", conv_data)
                 if conv_data:
                     conversation = Conversation(**conv_data)
                     conversation_data = {
@@ -91,11 +92,16 @@ def analyze_conversation_with_agent(
             if request.conversation_id:
                 try:
                     conv_data = conversations_db.get_conversation(uid, request.conversation_id)
+                    print(f"[DEBUG] conv_data for {request.conversation_id}:", conv_data)
                     if conv_data and 'structured' in conv_data:
                         structured = conv_data['structured']
+                        print(f"[DEBUG] structured before update:", structured, type(structured))
                         structured['overview'] = result['analysis']
+                        print(f"[DEBUG] structured after update:", structured)
                         conversations_db.update_conversation_structured(uid, request.conversation_id, structured)
                         print(f"[DEBUG] Updated conversation {request.conversation_id} structured.overview with agent analysis.")
+                    else:
+                        print(f"[DEBUG] structured not found in conv_data for {request.conversation_id}")
                 except Exception as e:
                     print(f"Error updating conversation summary: {e}")
             # --- End save summary ---
