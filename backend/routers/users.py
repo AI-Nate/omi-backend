@@ -272,3 +272,23 @@ def set_preferred_app_for_user(
         raise HTTPException(status_code=500, detail="Failed to store app preference.")
 
     return {"status": "ok", "message": f"App {app_id_to_set} set as preferred app for user {uid}."}
+
+
+# ******************************************************
+# ******************* DEV MODE SYNC ********************
+# ******************************************************
+
+@router.post('/v1/users/developer/dev-mode', tags=['v1'])
+def sync_dev_mode(data: dict, uid: str = Depends(auth.get_current_user_uid)):
+    """HTTP endpoint to sync dev mode state with backend when WebSocket is not available"""
+    try:
+        from database.redis_db import set_user_dev_mode
+        
+        enabled = data.get('enabled', False)
+        print(f"🔄 DEV_MODE: HTTP sync request for user {uid} - enabled: {enabled}")
+        set_user_dev_mode(uid, enabled)
+        print(f"🔄 DEV_MODE: Successfully synced dev mode via HTTP for user {uid}")
+        return {'status': 'ok', 'dev_mode_enabled': enabled}
+    except Exception as e:
+        print(f"❌ DEV_MODE: Error syncing dev mode via HTTP: {e}")
+        return {'status': 'error', 'message': str(e)}

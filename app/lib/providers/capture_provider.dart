@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_provider_utilities/flutter_provider_utilities.dart';
 import 'package:omi/backend/http/api/conversations.dart';
+import 'package:omi/backend/http/api/users.dart' as users_api;
 import 'package:omi/backend/preferences.dart';
 import 'package:omi/backend/schema/bt_device/bt_device.dart';
 import 'package:omi/backend/schema/conversation.dart';
@@ -558,20 +559,32 @@ class CaptureProvider extends ChangeNotifier
   }
 
   /// Send dev mode state to backend when it changes in settings
-  void syncDevModeWithBackend() {
+  void syncDevModeWithBackend() async {
     debugPrint('📡 CAPTURE_PROVIDER: syncDevModeWithBackend() called');
     debugPrint('📡 CAPTURE_PROVIDER: Socket exists: ${_socket != null}');
     debugPrint('📡 CAPTURE_PROVIDER: Socket state: ${_socket?.state}');
 
     if (_socket?.state == SocketServiceState.connected) {
       debugPrint(
-          '📡 CAPTURE_PROVIDER: Socket is connected, sending dev mode state');
+          '📡 CAPTURE_PROVIDER: Socket is connected, sending dev mode state via WebSocket');
       _sendDevModeStateToBackend();
     } else {
       debugPrint(
-          '📡 CAPTURE_PROVIDER: Socket not connected, dev mode sync skipped');
-      debugPrint(
-          '📡 CAPTURE_PROVIDER: Will sync automatically when socket reconnects');
+          '📡 CAPTURE_PROVIDER: Socket not connected, using HTTP API fallback');
+      final devModeEnabled = SharedPreferencesUtil().devModeEnabled;
+      try {
+        final success = await users_api.syncDevModeWithBackend(devModeEnabled);
+        if (success) {
+          debugPrint(
+              '📡 CAPTURE_PROVIDER: Successfully synced dev mode via HTTP API');
+        } else {
+          debugPrint(
+              '❌ CAPTURE_PROVIDER: Failed to sync dev mode via HTTP API');
+        }
+      } catch (e) {
+        debugPrint(
+            '❌ CAPTURE_PROVIDER: Error syncing dev mode via HTTP API: $e');
+      }
     }
   }
 

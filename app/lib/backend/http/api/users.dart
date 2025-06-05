@@ -116,6 +116,18 @@ Future<bool> setRecordingPermission(bool value) async {
   return response.statusCode == 200;
 }
 
+Future<bool> syncDevModeWithBackend(bool enabled) async {
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/users/developer/dev-mode',
+    headers: {'Content-Type': 'application/json'},
+    method: 'POST',
+    body: jsonEncode({'enabled': enabled}),
+  );
+  if (response == null) return false;
+  debugPrint('📡 API: syncDevModeWithBackend response: ${response.body}');
+  return response.statusCode == 200;
+}
+
 Future<bool?> getStoreRecordingPermission() async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/users/store-recording-permission',
