@@ -79,7 +79,7 @@ def pinecone_conversation_retrieval(
                 "category": conv.structured.category if conv.structured else None,
                 "action_items": [item.content if hasattr(item, 'content') else str(item) 
                                for item in (conv.structured.action_items if conv.structured else [])],
-                "transcript_preview": conv.get_transcript()[:200] + "..." if len(conv.get_transcript()) > 200 else conv.get_transcript()
+                "transcript_preview": conv.get_transcript(False)[:200] + "..." if len(conv.get_transcript(False)) > 200 else conv.get_transcript(False)
             })
         
         return {
@@ -166,7 +166,7 @@ def advanced_pinecone_retrieval(
                                for item in (conv.structured.action_items if conv.structured else [])],
                 "people_mentioned": getattr(conv.structured, 'people_mentioned', []) if conv.structured else [],
                 "topics": getattr(conv.structured, 'topics', []) if conv.structured else [],
-                "transcript_preview": conv.get_transcript()[:300] + "..." if len(conv.get_transcript()) > 300 else conv.get_transcript()
+                "transcript_preview": conv.get_transcript(False)[:300] + "..." if len(conv.get_transcript(False)) > 300 else conv.get_transcript(False)
             })
         
         return {
