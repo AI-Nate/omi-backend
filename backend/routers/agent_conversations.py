@@ -192,6 +192,8 @@ def create_conversation_with_agent(
         conversation.structured.title = structured_data["title"]
         conversation.structured.overview = structured_data["overview"]
         conversation.structured.category = structured_data["category"]
+        # Store the full agent analysis
+        conversation.structured.agent_analysis = agent_analysis
         
         # Update action items
         if structured_data.get("action_items"):

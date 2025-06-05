@@ -21,8 +21,14 @@ class Structured {
   // Image URLs for images uploaded to Firebase Storage
   List<String> imageUrls = [];
 
+  // Full agent analysis text with detailed insights
+  String? agentAnalysis;
+
   Structured(this.title, this.overview,
-      {this.id = 0, this.emoji = '', this.category = 'other'});
+      {this.id = 0,
+      this.emoji = '',
+      this.category = 'other',
+      this.agentAnalysis});
 
   getEmoji() {
     try {
@@ -109,6 +115,12 @@ class Structured {
           (imageUrls as List).map<String>((item) => item.toString()).toList();
     }
 
+    // Parse agent analysis
+    if (json['agentAnalysis'] != null || json['agent_analysis'] != null) {
+      structured.agentAnalysis =
+          json['agentAnalysis'] ?? json['agent_analysis'];
+    }
+
     return structured;
   }
 
@@ -169,6 +181,7 @@ class Structured {
       'actionItems': actionItems.map((item) => item.description).toList(),
       'events': events.map((event) => event.toJson()).toList(),
       'imageUrls': imageUrls,
+      'agentAnalysis': agentAnalysis,
     };
   }
 }

@@ -142,6 +142,10 @@ class Structured(BaseModel):
         description="URLs of images uploaded to Firebase Storage that enhance this conversation summary",
         default=[],
     )
+    agent_analysis: Optional[str] = Field(
+        description="Full agent analysis text with detailed insights and recommendations",
+        default=None,
+    )
 
     def __str__(self):
         result = (f"{str(self.title).capitalize()} ({str(self.category.value).capitalize()})\n"
