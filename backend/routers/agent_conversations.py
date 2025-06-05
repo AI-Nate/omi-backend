@@ -190,9 +190,9 @@ def create_conversation_with_agent(
         
         # Override the structured data with agent analysis
         conversation.structured.title = structured_data["title"]
-        conversation.structured.overview = structured_data["overview"]
+        conversation.structured.overview = agent_analysis  # Use full agent analysis as overview
         conversation.structured.category = structured_data["category"]
-        # Store the full agent analysis
+        # Store the full agent analysis (for future use)
         conversation.structured.agent_analysis = agent_analysis
         
         # Update action items
