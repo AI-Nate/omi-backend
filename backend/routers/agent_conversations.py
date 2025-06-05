@@ -146,6 +146,23 @@ def create_conversation_with_agent(
         print(f"🟦 BACKEND: Agent analysis length: {len(agent_analysis)}")
         print(f"🟦 BACKEND: Retrieved conversations count: {len(retrieved_conversations)}")
         
+        # Generate title using the same approach as normal conversations
+        print(f"🔍 AGENT_CREATE: Generating title using normal conversation method...")
+        from utils.llm import get_transcript_structure
+        try:
+            temp_structured = get_transcript_structure(
+                request.transcript, 
+                datetime.now(), 
+                'en',  # Default language
+                'UTC',  # Default timezone
+                uid
+            )
+            generated_title = temp_structured.title if temp_structured else None
+            print(f"🔍 AGENT_CREATE: Generated title: '{generated_title}'")
+        except Exception as e:
+            print(f"🔴 AGENT_CREATE: Error generating title: {e}")
+            generated_title = None
+        
         # Extract structured data from agent analysis
         print(f"🟦 BACKEND: Extracting structured data from agent analysis...")
         structured_data = _extract_structured_data_from_agent_analysis(
@@ -153,7 +170,15 @@ def create_conversation_with_agent(
             retrieved_conversations,
             request.transcript
         )
-        print(f"🟦 BACKEND: Structured data extracted - title: {structured_data.get('title')}")
+        
+        # Use the generated title if available, otherwise use agent extracted title
+        if generated_title and generated_title.strip():
+            structured_data["title"] = generated_title
+            print(f"🔍 AGENT_CREATE: Using normal conversation title: '{structured_data['title']}'")
+        else:
+            print(f"🔍 AGENT_CREATE: Falling back to agent extracted title: '{structured_data.get('title', 'None')}'")
+        
+        print(f"🟦 BACKEND: Final structured data title: {structured_data.get('title')}")
         
         # Create conversation directly without standard processing to avoid duplicate LLM calls
         from models.conversation import Conversation, ConversationSource, Structured
