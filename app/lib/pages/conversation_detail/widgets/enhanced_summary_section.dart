@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:omi/backend/schema/structured.dart';
 import 'package:omi/backend/preferences.dart';
 import 'package:omi/backend/schema/conversation.dart';
@@ -101,13 +102,70 @@ class EnhancedSummarySection extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
-                conversation.structured.overview,
-                style: const TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
-                  color: Colors.white,
+              MarkdownBody(
+                data: conversation.structured.overview,
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: Colors.white,
+                  ),
+                  h1: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    height: 1.3,
+                  ),
+                  h2: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    height: 1.3,
+                  ),
+                  h3: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    height: 1.3,
+                  ),
+                  h4: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    height: 1.3,
+                  ),
+                  strong: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  em: const TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white,
+                  ),
+                  listBullet: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                  blockquote: const TextStyle(
+                    fontSize: 16,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.white70,
+                  ),
+                  code: TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'monospace',
+                    backgroundColor: Colors.grey.shade800,
+                    color: Colors.white,
+                  ),
                 ),
+                onTapLink: (text, href, title) async {
+                  if (href != null) {
+                    final Uri url = Uri.parse(href);
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url);
+                    }
+                  }
+                },
               ),
             ],
           ),
