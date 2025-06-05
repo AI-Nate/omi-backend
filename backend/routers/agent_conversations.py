@@ -82,7 +82,19 @@ def analyze_conversation_with_agent(
                 conversation_data=conversation_data,
                 session_id=request.session_id
             )
-            
+
+            # --- Save summary to conversation if conversation_id is provided ---
+            if request.conversation_id:
+                try:
+                    conv_data = conversations_db.get_conversation(uid, request.conversation_id)
+                    if conv_data and 'structured' in conv_data:
+                        structured = conv_data['structured']
+                        structured['overview'] = result['analysis']
+                        conversations_db.update_conversation_structured(uid, request.conversation_id, structured)
+                except Exception as e:
+                    print(f"Error updating conversation summary: {e}")
+            # --- End save summary ---
+
             return AgentAnalysisResponse(**result)
             
     except Exception as e:
