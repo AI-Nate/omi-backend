@@ -158,17 +158,20 @@ async def handle_websocket_text_message(message_text: str, uid: str):
         # Handle dev mode setting
         if message_data.get('type') == 'dev_mode_setting':
             dev_mode_enabled = message_data.get('enabled', False)
-            print(f"Setting dev mode for user {uid}: {dev_mode_enabled}")
+            print(f"🔄 DEV_MODE: Received dev mode change request for user {uid}")
+            print(f"🔄 DEV_MODE: Current state: {redis_db.get_user_dev_mode(uid)}")
+            print(f"🔄 DEV_MODE: New state: {dev_mode_enabled}")
             redis_db.set_user_dev_mode(uid, dev_mode_enabled)
+            print(f"🔄 DEV_MODE: Successfully updated dev mode for user {uid}")
             
         # Handle other message types here in the future
         # elif message_data.get('type') == 'other_command':
         #     ...
             
     except json.JSONDecodeError:
-        print(f"Invalid JSON message from WebSocket: {message_text}")
+        print(f"❌ DEV_MODE: Invalid JSON message from WebSocket: {message_text}")
     except Exception as e:
-        print(f"Error handling WebSocket text message: {e}")
+        print(f"❌ DEV_MODE: Error handling WebSocket text message: {e}")
 
 async def _listen(
         websocket: WebSocket, uid: str, language: str = 'en', sample_rate: int = 8000, codec: str = 'pcm8',

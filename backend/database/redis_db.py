@@ -579,7 +579,9 @@ def get_user_preferred_app(uid: str) -> Optional[str]:
 @try_catch_decorator
 def set_user_dev_mode(uid: str, enabled: bool, ttl: int = 60 * 60 * 24):
     """Set the user's dev mode state with TTL to prevent stale data"""
+    print(f"🔄 DEV_MODE: Setting dev mode for user {uid} to {enabled} with TTL {ttl}s")
     r.set(f'users:{uid}:dev_mode', str(enabled).lower(), ex=ttl)
+    print(f"🔄 DEV_MODE: Successfully set dev mode in Redis for user {uid}")
 
 
 @try_catch_decorator
@@ -587,11 +589,16 @@ def get_user_dev_mode(uid: str) -> bool:
     """Get the user's dev mode state, defaults to False if not set"""
     dev_mode = r.get(f'users:{uid}:dev_mode')
     if dev_mode is None:
+        print(f"🔄 DEV_MODE: No dev mode setting found for user {uid}, defaulting to False")
         return False
-    return dev_mode.decode().lower() == 'true'
+    result = dev_mode.decode().lower() == 'true'
+    print(f"🔄 DEV_MODE: Retrieved dev mode state for user {uid}: {result}")
+    return result
 
 
 @try_catch_decorator
 def remove_user_dev_mode(uid: str):
     """Remove the user's dev mode state"""
+    print(f"🔄 DEV_MODE: Removing dev mode setting for user {uid}")
     r.delete(f'users:{uid}:dev_mode')
+    print(f"🔄 DEV_MODE: Successfully removed dev mode setting for user {uid}")
