@@ -1638,6 +1638,56 @@ Future<CreateConversationResponse?>
   return null;
 }
 
+// Function to create conversation with agent analysis
+Future<CreateConversationResponse?> createConversationWithAgent({
+  required String transcript,
+  String? conversationId,
+  String sessionId = "default",
+}) async {
+  debugPrint('Creating conversation with agent analysis...');
+
+  final request = AgentAnalysisRequest(
+    transcript: transcript,
+    conversationId: conversationId,
+    sessionId: sessionId,
+    stream: false,
+  );
+
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/conversations/agent/create',
+    headers: {'Content-Type': 'application/json'},
+    method: 'POST',
+    body: jsonEncode(request.toJson()),
+  );
+
+  if (response == null) return null;
+
+  debugPrint('Agent conversation creation response: ${response.statusCode}');
+
+  if (response.statusCode == 200) {
+    try {
+      final responseData = jsonDecode(response.body);
+
+      // Transform the response to match CreateConversationResponse format
+      return CreateConversationResponse(
+        messages: (responseData['messages'] as List<dynamic>? ?? [])
+            .map((message) => ServerMessage.fromJson(message))
+            .toList(),
+        conversation: responseData['memory'] != null
+            ? ServerConversation.fromJson(responseData['memory'])
+            : null,
+      );
+    } catch (e) {
+      debugPrint('Error parsing agent conversation creation response: $e');
+      return null;
+    }
+  } else {
+    debugPrint(
+        'Agent conversation creation failed: ${response.statusCode} - ${response.body}');
+    return null;
+  }
+}
+
 // Stream-based agent analysis (for real-time updates)
 Stream<Map<String, dynamic>> streamAgentConversationAnalysis({
   required String transcript,

@@ -89,6 +89,211 @@ def analyze_conversation_with_agent(
         raise HTTPException(status_code=500, detail=f"Error analyzing conversation: {str(e)}")
 
 
+@router.post("/v1/conversations/agent/create", tags=['agent', 'conversations'])
+def create_conversation_with_agent(
+    request: AgentAnalysisRequest,
+    uid: str = Depends(auth.get_current_user_uid)
+) -> Dict[str, Any]:
+    """
+    Create a conversation using agent analysis to generate structured data.
+    
+    This endpoint:
+    1. Analyzes the transcript with the agent
+    2. Transforms agent results into structured conversation data
+    3. Creates a conversation with the agent-generated summary
+    4. Returns the same format as the standard conversation creation endpoint
+    """
+    try:
+        # Create agent for the user
+        agent = create_conversation_agent(uid)
+        
+        # Analyze with agent
+        result = agent.analyze_conversation(
+            transcript=request.transcript,
+            conversation_data=None,
+            session_id=request.session_id
+        )
+        
+        if result.get('status') != 'success':
+            raise HTTPException(status_code=500, detail=f"Agent analysis failed: {result.get('error', 'Unknown error')}")
+        
+        # Transform agent analysis into structured conversation data
+        agent_analysis = result.get('analysis', '')
+        retrieved_conversations = result.get('retrieved_conversations', [])
+        
+        # Extract structured data from agent analysis
+        structured_data = _extract_structured_data_from_agent_analysis(
+            agent_analysis, 
+            retrieved_conversations,
+            request.transcript
+        )
+        
+        # Create conversation using existing conversation creation logic
+        from utils.conversations.process_conversation import process_conversation
+        from models.conversation import CreateConversation, ConversationSource
+        
+        # Parse transcript segments from the transcript text
+        # For now, create a simple transcript segment from the text
+        # In a real implementation, you might want to parse actual segments
+        from models.transcript_segment import TranscriptSegment
+        
+        transcript_segments = []
+        if request.transcript:
+            # Create a single transcript segment from the entire transcript
+            # This is a simplified approach - you might want to parse actual segments
+            transcript_segments = [
+                TranscriptSegment(
+                    text=request.transcript,
+                    speaker="SPEAKER_0",
+                    speaker_id=0,
+                    is_user=False,
+                    start=0.0,
+                    end=60.0  # Default 1 minute duration
+                )
+            ]
+        
+        # Create a CreateConversation object with the transcript and agent-generated structured data
+        create_conversation = CreateConversation(
+            transcript_segments=transcript_segments,
+            started_at=datetime.now(),
+            finished_at=datetime.now(),
+            source=ConversationSource.omi,
+            language="en"  # TODO: detect language from transcript
+        )
+        
+        # Process the conversation to get structured data
+        conversation = process_conversation(
+            uid=uid,
+            language_code="en",
+            conversation=create_conversation,
+            force_process=False
+        )
+        
+        # Override the structured data with agent analysis
+        conversation.structured.title = structured_data["title"]
+        conversation.structured.overview = structured_data["overview"]
+        conversation.structured.category = structured_data["category"]
+        
+        # Update action items
+        if structured_data.get("action_items"):
+            from models.conversation import ActionItem
+            conversation.structured.action_items = [
+                ActionItem(content=item["content"]) 
+                for item in structured_data["action_items"]
+            ]
+        
+        # Update key takeaways
+        if structured_data.get("key_takeaways"):
+            conversation.structured.key_takeaways = structured_data["key_takeaways"]
+        
+        # Update events
+        if structured_data.get("events"):
+            from models.conversation import Event
+            conversation.structured.events = [
+                Event(
+                    title=event["title"],
+                    description=event["description"],
+                    created_at=datetime.fromisoformat(event["created_at"]),
+                    duration=event["duration"]
+                )
+                for event in structured_data["events"]
+            ]
+        
+        # Save the updated conversation
+        import database.conversations as conversations_db
+        conversations_db.update_conversation(uid, conversation.id, conversation.dict())
+        
+        return {
+            "memory": conversation,
+            "messages": [],  # No chat messages for agent-created conversations
+            "agent_analysis": {
+                "analysis": agent_analysis,
+                "retrieved_conversations": retrieved_conversations,
+                "session_id": request.session_id
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating conversation with agent: {str(e)}")
+
+
+def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conversations: list, transcript: str) -> Dict[str, Any]:
+    """
+    Extract structured conversation data from agent analysis.
+    
+    This function parses the agent's analysis and converts it into the
+    structured format expected by the conversation creation system.
+    """
+    import re
+    
+    # Extract title (look for title-like patterns or use first line)
+    title_match = re.search(r'^#\s*(.+)$|^Title:\s*(.+)$', analysis, re.MULTILINE | re.IGNORECASE)
+    title = "Agent Analysis"
+    if title_match:
+        title = title_match.group(1) or title_match.group(2)
+    else:
+        # Use first meaningful line as title
+        lines = [line.strip() for line in analysis.split('\n') if line.strip()]
+        if lines:
+            title = lines[0][:100]  # Limit title length
+    
+    # Extract overview (first paragraph or summary section)
+    overview_match = re.search(r'(?:Summary|Overview):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
+    overview = analysis[:500] + "..." if len(analysis) > 500 else analysis  # Default to truncated analysis
+    if overview_match:
+        overview = overview_match.group(1).strip()
+    
+    # Extract action items
+    action_items = []
+    action_patterns = [
+        r'(?:Action Items?|Next Steps?|To[- ]?Do|Follow[- ]?up):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)',
+        r'^\s*[-•*]\s*(.+)$',  # Bullet points
+        r'^\s*\d+\.\s*(.+)$'   # Numbered lists
+    ]
+    
+    for pattern in action_patterns:
+        matches = re.finditer(pattern, analysis, re.MULTILINE | re.IGNORECASE | re.DOTALL)
+        for match in matches:
+            text = match.group(1).strip()
+            if len(text) > 10:  # Only meaningful action items
+                # Split multi-line action items
+                items = [item.strip() for item in text.split('\n') if item.strip()]
+                action_items.extend(items[:5])  # Limit to 5 items
+    
+    # Extract key takeaways
+    key_takeaways = []
+    takeaway_match = re.search(r'(?:Key Takeaways?|Insights?|Main Points?):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
+    if takeaway_match:
+        takeaway_text = takeaway_match.group(1).strip()
+        takeaways = [item.strip() for item in re.split(r'[-•*\n]', takeaway_text) if item.strip()]
+        key_takeaways = takeaways[:5]  # Limit to 5 takeaways
+    
+    # Create events if retrieved conversations were used
+    events = []
+    if retrieved_conversations:
+        events.append({
+            "title": f"Found {len(retrieved_conversations)} related conversations",
+            "description": f"Agent analyzed {len(retrieved_conversations)} related past conversations for context",
+            "created_at": datetime.now().isoformat(),
+            "duration": 30  # 30 minutes default duration
+        })
+    
+    return {
+        "title": title,
+        "overview": overview,
+        "category": "ai-agent-analysis",
+        "action_items": [{"content": item} for item in action_items[:10]],  # Limit to 10 items
+        "key_takeaways": key_takeaways,
+        "events": events,
+        # Add metadata about agent processing
+        "metadata": {
+            "processed_by": "ai-agent",
+            "retrieved_conversations_count": len(retrieved_conversations),
+            "analysis_length": len(analysis)
+        }
+    }
+
+
 @router.post("/v1/conversations/agent/stream", tags=['agent', 'conversations'])
 async def stream_conversation_analysis(
     request: AgentAnalysisRequest,

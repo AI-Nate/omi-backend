@@ -680,83 +680,41 @@ class CaptureProvider extends ChangeNotifier
     }
   }
 
-  // Create conversation from agent analysis
-  void _createConversationFromAgentAnalysis(
-      Map<String, dynamic> analysisEvent) {
+  // Create conversation from agent analysis using the proper backend endpoint
+  Future<void> _createConversationFromAgentAnalysis(
+      Map<String, dynamic> analysisEvent) async {
     try {
-      // For now, we'll create a mock conversation with agent analysis
-      // In a full implementation, you might want to send the agent analysis
-      // to a specific endpoint that creates a conversation with the analysis
+      final transcript = TranscriptSegment.segmentsAsString(segments);
 
-      final now = DateTime.now();
-      final agentAnalysis =
-          analysisEvent['analysis'] as String? ?? 'Agent analysis completed';
-      final retrievedConversations =
-          analysisEvent['retrieved_conversations'] as List<dynamic>? ?? [];
-
-      // Create structured data with agent analysis
-      final structured = Structured(
-        'AI Agent Analysis', // title
-        agentAnalysis, // overview from agent
-        category: 'ai-agent-analysis',
+      // Call the new backend endpoint that creates conversations with agent analysis
+      final response = await createConversationWithAgent(
+        transcript: transcript,
+        sessionId: analysisEvent['session_id'] ??
+            DateTime.now().millisecondsSinceEpoch.toString(),
       );
 
-      // Add action items and events after creation
-      structured.actionItems = _extractActionItemsFromAnalysis(agentAnalysis)
-          .map((item) => ActionItem(item))
-          .toList();
+      if (response != null && response.conversation != null) {
+        conversationProvider!.removeProcessingConversation('0');
+        response.conversation!.isNew = true;
+        _processConversationCreated(response.conversation, response.messages);
 
-      if (retrievedConversations.isNotEmpty) {
-        structured.events = [
-          Event(
-            'Related conversations found',
-            DateTime.now(),
-            30, // 30 minutes duration
-            description:
-                '${retrievedConversations.length} related conversations were found and analyzed',
-          )
-        ];
+        debugPrint(
+            'Agent-analyzed conversation created successfully via backend');
+      } else {
+        debugPrint(
+            'Failed to create conversation via agent endpoint, falling back to standard processing');
+        conversationProvider!.removeProcessingConversation('0');
+
+        // Fallback to standard processing
+        forceProcessingCurrentConversation();
       }
-
-      final conversation = ServerConversation(
-        id: conversationId,
-        createdAt: now,
-        structured: structured,
-        status: ConversationStatus.completed,
-        transcriptSegments: segments,
-        // Add metadata to indicate this was processed by agent
-        source: ConversationSource.omi, // Use existing enum value
-      );
-
-      conversationProvider!.removeProcessingConversation('0');
-      conversation.isNew = true;
-      _processConversationCreated(conversation, []);
-
-      debugPrint('Agent-analyzed conversation created successfully');
     } catch (e) {
       debugPrint('Error creating conversation from agent analysis: $e');
       conversationProvider!.removeProcessingConversation('0');
+
+      // Fallback to standard processing
+      forceProcessingCurrentConversation();
     }
-  }
-
-  // Extract action items from agent analysis text
-  List<String> _extractActionItemsFromAnalysis(String analysis) {
-    final actionItems = <String>[];
-
-    // Simple regex to find action items (lines starting with "-", "*", or containing "action")
-    final lines = analysis.split('\n');
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.startsWith('-') ||
-          trimmed.startsWith('*') ||
-          trimmed.toLowerCase().contains('action') ||
-          trimmed.toLowerCase().contains('todo') ||
-          trimmed.toLowerCase().contains('follow up')) {
-        actionItems.add(trimmed);
-      }
-    }
-
-    return actionItems;
   }
 
   // Method to switch between standard and agent processing
@@ -772,7 +730,8 @@ class CaptureProvider extends ChangeNotifier
   }
 
   // Method to analyze current conversation without creating a new one
-  Future<void> analyzeCurrentConversationWithAgent({bool useStreaming = false}) async {
+  Future<void> analyzeCurrentConversationWithAgent(
+      {bool useStreaming = false}) async {
     if (agentConversationProvider == null) {
       debugPrint('Agent conversation provider not available');
       return;
