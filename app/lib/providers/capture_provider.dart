@@ -598,6 +598,17 @@ class CaptureProvider extends ChangeNotifier
   }
 
   Future<void> forceProcessingCurrentConversation() async {
+    // In development mode, use agent processing instead of standard processing
+    if (SharedPreferencesUtil().devModeEnabled) {
+      debugPrint(
+          '🤖 DEV MODE: Using agent processing instead of standard processing');
+      return forceProcessingCurrentConversationWithAgent();
+    }
+
+    return _forceProcessingCurrentConversationStandard();
+  }
+
+  Future<void> _forceProcessingCurrentConversationStandard() async {
     _resetStateVariables();
     conversationProvider!.addProcessingConversation(
       ServerConversation(
@@ -632,7 +643,7 @@ class CaptureProvider extends ChangeNotifier
     if (agentConversationProvider == null) {
       debugPrint(
           '🔴 CAPTURE_PROVIDER: Agent conversation provider not available, falling back to standard processing');
-      return forceProcessingCurrentConversation();
+      return _forceProcessingCurrentConversationStandard();
     }
 
     if (segments.isEmpty) {
@@ -689,7 +700,7 @@ class CaptureProvider extends ChangeNotifier
             conversationProvider!.removeProcessingConversation('0');
 
             // Fallback to standard processing
-            forceProcessingCurrentConversation();
+            _forceProcessingCurrentConversationStandard();
 
             // Cancel subscription after error
             subscription.cancel();
@@ -698,7 +709,7 @@ class CaptureProvider extends ChangeNotifier
         onError: (error) {
           debugPrint('🔴 CAPTURE_PROVIDER: Stream error: $error');
           conversationProvider!.removeProcessingConversation('0');
-          forceProcessingCurrentConversation();
+          _forceProcessingCurrentConversationStandard();
           subscription.cancel();
         },
         onDone: () {
@@ -733,7 +744,7 @@ class CaptureProvider extends ChangeNotifier
       conversationProvider!.removeProcessingConversation('0');
 
       // Fallback to standard processing
-      return forceProcessingCurrentConversation();
+      return _forceProcessingCurrentConversationStandard();
     }
   }
 
@@ -792,14 +803,14 @@ class CaptureProvider extends ChangeNotifier
         conversationProvider!.removeProcessingConversation('0');
 
         // Fallback to standard processing
-        forceProcessingCurrentConversation();
+        _forceProcessingCurrentConversationStandard();
       }
     } catch (e) {
       debugPrint('Error creating conversation from agent analysis: $e');
       conversationProvider!.removeProcessingConversation('0');
 
       // Fallback to standard processing
-      forceProcessingCurrentConversation();
+      _forceProcessingCurrentConversationStandard();
     }
   }
 

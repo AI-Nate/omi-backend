@@ -105,44 +105,6 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage>
                       },
                       icon: const Icon(Icons.question_answer),
                     ),
-                  if (SharedPreferencesUtil().devModeEnabled &&
-                      provider.segments.isNotEmpty)
-                    IconButton(
-                      onPressed: () async {
-                        debugPrint(
-                            '🔵 AGENT BUTTON CLICKED: Starting agent conversation processing');
-
-                        // Use agent to create conversation with analysis
-                        try {
-                          debugPrint(
-                              '🔵 AGENT BUTTON: Calling forceProcessingCurrentConversationWithAgent()');
-                          await context
-                              .read<CaptureProvider>()
-                              .forceProcessingCurrentConversationWithAgent();
-                          debugPrint(
-                              '🔵 AGENT BUTTON: forceProcessingCurrentConversationWithAgent() completed');
-                        } catch (e) {
-                          debugPrint('🔴 AGENT BUTTON ERROR: $e');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Agent processing failed: $e'),
-                              duration: const Duration(seconds: 5),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text('Agent conversation processing started!'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                        Navigator.of(context).pop();
-                      },
-                      icon: const Icon(Icons.psychology, color: Colors.blue),
-                    )
                 ],
               ),
             ),
@@ -222,11 +184,8 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage>
                         onStopPressed: () {
                           if (provider.segments.isNotEmpty) {
                             if (!showSummarizeConfirmation) {
-                              // Check if agent processing is enabled (you can add a setting for this)
-                              bool useAgentProcessing = SharedPreferencesUtil()
-                                  .devModeEnabled; // Use dev mode as toggle for now
-
-                              if (useAgentProcessing) {
+                              // Use agent processing in development mode, normal processing in production
+                              if (SharedPreferencesUtil().devModeEnabled) {
                                 context
                                     .read<CaptureProvider>()
                                     .forceProcessingCurrentConversationWithAgent();
@@ -241,45 +200,42 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage>
                             showDialog(
                               context: context,
                               builder: (context) {
-                                return StatefulBuilder(
-                                  builder: (context, setState) {
-                                    bool useAgentProcessing =
-                                        SharedPreferencesUtil().devModeEnabled;
+                                return ConfirmationDialog(
+                                  title: "Finished Conversation?",
+                                  description: SharedPreferencesUtil()
+                                          .devModeEnabled
+                                      ? "Are you sure you want to stop recording and analyze the conversation with AI?\n\n🤖 Dev Mode: Using enhanced agent analysis"
+                                      : "Are you sure you want to stop recording and summarize the conversation now?\n\nHints: Conversation is summarized after 2 minutes of no speech.",
+                                  checkboxValue: !showSummarizeConfirmation,
+                                  checkboxText: "Don't ask me again",
+                                  onCheckboxChanged: (value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        showSummarizeConfirmation = !value;
+                                      });
+                                    }
+                                  },
+                                  onCancel: () {
+                                    Navigator.of(context).pop();
+                                  },
+                                  onConfirm: () {
+                                    SharedPreferencesUtil()
+                                            .showSummarizeConfirmation =
+                                        showSummarizeConfirmation;
 
-                                    return ConfirmationDialog(
-                                      title: "Finished Conversation?",
-                                      description:
-                                          "Are you sure you want to stop recording and summarize the conversation now?\n\nHints: Conversation is summarized after 2 minutes of no speech.",
-                                      checkboxValue: !showSummarizeConfirmation,
-                                      checkboxText: "Don't ask me again",
-                                      onCheckboxChanged: (value) {
-                                        if (value != null) {
-                                          setState(() {
-                                            showSummarizeConfirmation = !value;
-                                          });
-                                        }
-                                      },
-                                      onCancel: () {
-                                        Navigator.of(context).pop();
-                                      },
-                                      onConfirm: () {
-                                        SharedPreferencesUtil()
-                                                .showSummarizeConfirmation =
-                                            showSummarizeConfirmation;
-
-                                        if (useAgentProcessing) {
-                                          context
-                                              .read<CaptureProvider>()
-                                              .forceProcessingCurrentConversationWithAgent();
-                                        } else {
-                                          context
-                                              .read<CaptureProvider>()
-                                              .forceProcessingCurrentConversation();
-                                        }
-                                        Navigator.of(context).pop();
-                                        Navigator.of(context).pop();
-                                      },
-                                    );
+                                    // Use agent processing in development mode, normal processing in production
+                                    if (SharedPreferencesUtil()
+                                        .devModeEnabled) {
+                                      context
+                                          .read<CaptureProvider>()
+                                          .forceProcessingCurrentConversationWithAgent();
+                                    } else {
+                                      context
+                                          .read<CaptureProvider>()
+                                          .forceProcessingCurrentConversation();
+                                    }
+                                    Navigator.of(context).pop();
+                                    Navigator.of(context).pop();
                                   },
                                 );
                               },
