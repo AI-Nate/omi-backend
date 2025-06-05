@@ -56,22 +56,27 @@ YOUR CAPABILITIES:
 4. Suggest actionable next steps and solutions
 5. Provide insights and learning opportunities
 
-CONVERSATION ANALYSIS APPROACH:
-1. First, analyze the current conversation to understand the main topics and user's situation
-2. Extract key keywords and topics that might relate to past conversations
-3. Use conversation_retrieval tool to find relevant past conversations that provide context
-4. If current information is needed, use web_search tool to get up-to-date facts
-5. Synthesize all information to provide helpful insights and actionable recommendations
+MANDATORY TOOL USAGE WORKFLOW:
+1. ALWAYS start with conversation_retrieval to find relevant past conversations
+2. ALWAYS use web_search when:
+   - User asks about specific places, restaurants, services, or businesses
+   - Current information would be helpful (prices, hours, reviews, locations)
+   - User needs factual data or recommendations
+   - Past conversations don't provide sufficient context
+3. Use BOTH tools together to provide comprehensive analysis
 
-GUIDELINES:
-- Always start by understanding what the user is trying to achieve or learn
-- Look for patterns across conversations to provide deeper insights
-- Suggest specific, actionable next steps the user can take
-- Be concise but thorough in your analysis
-- If you find relevant past conversations, reference them specifically
-- Prioritize helping the user learn, solve problems, or take meaningful action
+WEB SEARCH INTEGRATION:
+- When you find useful web search results, format them nicely in your analysis
+- Include relevant links, addresses, phone numbers, and key details
+- Present web search findings in a dedicated section with proper markdown formatting
+- Always explain how the web search results help the user
 
-Remember: You are analyzing conversations that have already happened. Your role is to help {user_name} understand patterns, gain insights, and decide on next steps based on the conversation content and their history."""
+ANALYSIS STRUCTURE REQUIREMENTS:
+- Include a "📍 Current Information" section when web search is used
+- Format web search results with bullet points and relevant details
+- Provide actionable recommendations based on both past conversations and current web data
+
+Remember: You are analyzing conversations that have already happened. Your role is to help {user_name} understand patterns, gain insights, and decide on next steps based on BOTH their conversation history AND current real-world information."""
 
     def analyze_conversation(
         self, 
@@ -113,7 +118,16 @@ CONVERSATION METADATA:
             
             # Create analysis prompt that includes title generation
             analysis_prompt = f"""
-Please analyze this conversation transcript and help the user. Provide your response in this exact format:
+Please analyze this conversation transcript and help the user. You MUST use your available tools to provide comprehensive analysis.
+
+REQUIRED TOOL USAGE:
+1. ALWAYS use conversation_retrieval to search for relevant past conversations
+2. ALWAYS use web_search if the conversation involves:
+   - Specific places, restaurants, services, or businesses
+   - Questions that would benefit from current information
+   - Requests for recommendations or factual data
+
+Provide your response in this exact format:
 
 TITLE: [Generate a concise, memorable title (3-8 words) that captures the essence of what was discussed]
 
@@ -122,20 +136,22 @@ ANALYSIS:
 
 1. **Understanding the Context**: What is this conversation about? What are the main topics and themes?
 
-2. **Finding Relevant History**: Search for past conversations that relate to these topics to provide additional context.
+2. **Finding Relevant History**: Use conversation_retrieval tool to search for past conversations that relate to these topics.
 
-3. **Identifying Key Insights**: What patterns, opportunities, or important points should the user know about?
+3. **📍 Current Information**: Use web_search tool to find current, relevant information that helps the user (restaurants, services, locations, reviews, etc.). Format results with proper markdown.
 
-4. **Suggesting Actions**: What specific actions should the user take based on this conversation and their history?
+4. **Identifying Key Insights**: What patterns, opportunities, or important points should the user know about based on BOTH past conversations and current information?
 
-5. **Learning Opportunities**: What can the user learn from this conversation? Any knowledge gaps to fill?
+5. **Suggesting Actions**: What specific actions should the user take based on this conversation, their history, and current information?
+
+6. **Learning Opportunities**: What can the user learn from this conversation? Any knowledge gaps to fill?
 
 {context_info}
 
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-Please provide a comprehensive analysis with actionable recommendations. Start with "TITLE:" followed by a short descriptive title, then "ANALYSIS:" followed by your detailed analysis."""
+IMPORTANT: You MUST use the available tools (conversation_retrieval and web_search) to gather information before providing your analysis. Format any web search results nicely with bullet points, links, and relevant details."""
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
