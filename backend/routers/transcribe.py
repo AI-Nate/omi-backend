@@ -73,7 +73,17 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         agent_analysis = result.get('analysis', '')
         retrieved_conversations = result.get('retrieved_conversations', [])
         
-        # Extract structured data using helper function
+        # Generate title using the same approach as normal conversations
+        from utils.llm import get_transcript_structure
+        temp_structured = get_transcript_structure(
+            transcript, 
+            conversation.created_at, 
+            conversation.language or 'en', 
+            'UTC',  # Default timezone
+            uid
+        )
+        
+        # Extract structured data from agent analysis for other fields
         from routers.agent_conversations import _extract_structured_data_from_agent_analysis
         structured_data = _extract_structured_data_from_agent_analysis(
             agent_analysis, 
@@ -81,10 +91,13 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
             transcript
         )
         
+        # Use the title from normal conversation processing
+        structured_data["title"] = temp_structured.title
+        
         # Update conversation with agent-generated structured data
         conversation.structured = Structured(
             title=structured_data["title"],
-            overview=structured_data["overview"],
+            overview=agent_analysis,  # Use agent analysis directly since no title is included
             category=structured_data["category"],
             emoji=structured_data.get("emoji", "🧠")
         )
