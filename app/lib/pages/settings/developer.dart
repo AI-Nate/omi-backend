@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:omi/backend/http/api/conversations.dart';
+import 'package:omi/backend/preferences.dart';
 import 'package:omi/backend/schema/conversation.dart';
 import 'package:omi/providers/developer_mode_provider.dart';
 import 'package:omi/providers/capture_provider.dart';
@@ -179,8 +180,9 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                         ? null
                         : () async {
                             if (provider.loadingExportMemories) return;
-                            setState(
-                                () => provider.loadingExportMemories = true);
+                            setState(() {
+                              provider.loadingExportMemories = true;
+                            });
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
