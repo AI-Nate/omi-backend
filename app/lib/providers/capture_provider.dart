@@ -533,58 +533,26 @@ class CaptureProvider extends ChangeNotifier
   void onConnected() {
     _transcriptServiceReady = true;
 
-    // Send dev mode state to backend when WebSocket connects
-    _sendDevModeStateToBackend();
+    // Dev mode state sync is now handled via HTTP API when settings change
 
     notifyListeners();
-  }
-
-  void _sendDevModeStateToBackend() {
-    try {
-      final devModeEnabled = SharedPreferencesUtil().devModeEnabled;
-      final message = jsonEncode({
-        'type': 'dev_mode_setting',
-        'enabled': devModeEnabled,
-      });
-
-      debugPrint(
-          '📡 CAPTURE_PROVIDER: Sending dev mode state to backend: $devModeEnabled');
-      debugPrint('📡 CAPTURE_PROVIDER: Message content: $message');
-      _socket?.send(message);
-      debugPrint('📡 CAPTURE_PROVIDER: Dev mode message sent successfully');
-    } catch (e) {
-      debugPrint(
-          '🔴 CAPTURE_PROVIDER: Error sending dev mode state to backend: $e');
-    }
   }
 
   /// Send dev mode state to backend when it changes in settings
   void syncDevModeWithBackend() async {
     debugPrint('📡 CAPTURE_PROVIDER: syncDevModeWithBackend() called');
-    debugPrint('📡 CAPTURE_PROVIDER: Socket exists: ${_socket != null}');
-    debugPrint('📡 CAPTURE_PROVIDER: Socket state: ${_socket?.state}');
+    final devModeEnabled = SharedPreferencesUtil().devModeEnabled;
 
-    if (_socket?.state == SocketServiceState.connected) {
-      debugPrint(
-          '📡 CAPTURE_PROVIDER: Socket is connected, sending dev mode state via WebSocket');
-      _sendDevModeStateToBackend();
-    } else {
-      debugPrint(
-          '📡 CAPTURE_PROVIDER: Socket not connected, using HTTP API fallback');
-      final devModeEnabled = SharedPreferencesUtil().devModeEnabled;
-      try {
-        final success = await users_api.syncDevModeWithBackend(devModeEnabled);
-        if (success) {
-          debugPrint(
-              '📡 CAPTURE_PROVIDER: Successfully synced dev mode via HTTP API');
-        } else {
-          debugPrint(
-              '❌ CAPTURE_PROVIDER: Failed to sync dev mode via HTTP API');
-        }
-      } catch (e) {
+    try {
+      final success = await users_api.syncDevModeWithBackend(devModeEnabled);
+      if (success) {
         debugPrint(
-            '❌ CAPTURE_PROVIDER: Error syncing dev mode via HTTP API: $e');
+            '📡 CAPTURE_PROVIDER: Successfully synced dev mode via HTTP API');
+      } else {
+        debugPrint('❌ CAPTURE_PROVIDER: Failed to sync dev mode via HTTP API');
       }
+    } catch (e) {
+      debugPrint('❌ CAPTURE_PROVIDER: Error syncing dev mode via HTTP API: $e');
     }
   }
 
