@@ -113,24 +113,28 @@ CONVERSATION METADATA:
             
             # Create analysis prompt
             analysis_prompt = f"""
-Please analyze this conversation transcript and help the user by:
+Please analyze this conversation transcript and help the user by providing:
 
-1. **Understanding the Context**: What is this conversation about? What are the main topics and themes?
+1. **TITLE**: Start your response with a clear, memorable title (3-8 words) that captures the essence of what was discussed. Format it as "# [Your Title Here]"
 
-2. **Finding Relevant History**: Search for past conversations that relate to these topics to provide additional context.
+2. **Understanding the Context**: What is this conversation about? What are the main topics and themes?
 
-3. **Identifying Key Insights**: What patterns, opportunities, or important points should the user know about?
+3. **Finding Relevant History**: Search for past conversations that relate to these topics to provide additional context.
 
-4. **Suggesting Actions**: What specific actions should the user take based on this conversation and their history?
+4. **Identifying Key Insights**: What patterns, opportunities, or important points should the user know about?
 
-5. **Learning Opportunities**: What can the user learn from this conversation? Any knowledge gaps to fill?
+5. **Suggesting Actions**: What specific actions should the user take based on this conversation and their history?
+
+6. **Learning Opportunities**: What can the user learn from this conversation? Any knowledge gaps to fill?
+
+IMPORTANT: Begin your response with a markdown title (# Title) that concisely describes the conversation's main topic or purpose.
 
 {context_info}
 
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-Please provide a comprehensive analysis with actionable recommendations."""
+Please provide a comprehensive analysis with actionable recommendations, starting with a clear title."""
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
@@ -198,20 +202,23 @@ CONVERSATION METADATA:
 """
             
             analysis_prompt = f"""
-Please analyze this conversation transcript and help the user by:
+Please analyze this conversation transcript and help the user by providing:
 
-1. **Understanding the Context**: What is this conversation about? What are the main topics and themes?
-2. **Finding Relevant History**: Search for past conversations that relate to these topics.
-3. **Identifying Key Insights**: What patterns or important points should the user know?
-4. **Suggesting Actions**: What specific actions should the user take?
-5. **Learning Opportunities**: What can the user learn from this conversation?
+1. **TITLE**: Start your response with a clear, memorable title (3-8 words) that captures the essence of what was discussed. Format it as "# [Your Title Here]"
+2. **Understanding the Context**: What is this conversation about? What are the main topics and themes?
+3. **Finding Relevant History**: Search for past conversations that relate to these topics.
+4. **Identifying Key Insights**: What patterns or important points should the user know?
+5. **Suggesting Actions**: What specific actions should the user take?
+6. **Learning Opportunities**: What can the user learn from this conversation?
+
+IMPORTANT: Begin your response with a markdown title (# Title) that concisely describes the conversation's main topic or purpose.
 
 {context_info}
 
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-Please provide a comprehensive analysis with actionable recommendations."""
+Please provide a comprehensive analysis with actionable recommendations, starting with a clear title."""
 
             config = {"configurable": {"thread_id": session_id}}
             

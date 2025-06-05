@@ -282,16 +282,39 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
     """
     import re
     
-    # Extract title (look for title-like patterns or use first line)
-    title_match = re.search(r'^#\s*(.+)$|^Title:\s*(.+)$', analysis, re.MULTILINE | re.IGNORECASE)
-    title = "Agent Analysis"
-    if title_match:
-        title = title_match.group(1) or title_match.group(2)
-    else:
-        # Use first meaningful line as title
-        lines = [line.strip() for line in analysis.split('\n') if line.strip()]
+    # Extract title (look for markdown headers or title patterns)
+    title_patterns = [
+        r'^#\s*(.+)$',  # Markdown H1 header
+        r'^##\s*(.+)$',  # Markdown H2 header  
+        r'^Title:\s*(.+)$',  # Explicit "Title:" prefix
+        r'^\*\*Title:\*\*\s*(.+)$',  # Bold "Title:" prefix
+        r'^\*\*(.+)\*\*$',  # Bold text on its own line
+    ]
+    
+    title = "Agent Analysis"  # Default fallback
+    
+    for pattern in title_patterns:
+        title_match = re.search(pattern, analysis, re.MULTILINE | re.IGNORECASE)
+        if title_match:
+            extracted_title = title_match.group(1).strip()
+            # Clean up the title (remove extra markdown, quotes, etc.)
+            extracted_title = re.sub(r'[#*"`]', '', extracted_title).strip()
+            if len(extracted_title) > 3:  # Ensure it's not too short
+                title = extracted_title[:100]  # Limit title length
+                break
+    
+    # If no pattern matched, use first meaningful line as title
+    if title == "Agent Analysis":
+        lines = [line.strip() for line in analysis.split('\n') if line.strip() and not line.startswith('#')]
         if lines:
-            title = lines[0][:100]  # Limit title length
+            # Take first line that's not too long and seems title-like
+            for line in lines[:3]:  # Check first 3 lines
+                clean_line = re.sub(r'[#*"`]', '', line).strip()
+                if 3 < len(clean_line) < 80 and not clean_line.lower().startswith(('the ', 'this ', 'based on')):
+                    title = clean_line[:100]
+                    break
+            else:
+                title = lines[0][:100]  # Fallback to first line
     
     # Extract overview (first paragraph or summary section)
     overview_match = re.search(r'(?:Summary|Overview):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
