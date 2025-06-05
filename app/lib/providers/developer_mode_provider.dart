@@ -211,10 +211,18 @@ class DeveloperModeProvider extends BaseProvider {
       Logger.error('Error occurred while updating endpoints: $e');
     }
     // Experimental
+    final wasDevModeChanged = prefs.devModeEnabled != devModeEnabled;
     prefs.localSyncEnabled = localSyncEnabled;
     prefs.devModeJoanFollowUpEnabled = followUpQuestionEnabled;
     prefs.transcriptionDiagnosticEnabled = transcriptionDiagnosticEnabled;
     prefs.devModeEnabled = devModeEnabled;
+
+    // Sync dev mode with backend if it changed
+    if (wasDevModeChanged) {
+      debugPrint(
+          '📡 DEV_MODE_PROVIDER: Dev mode changed to $devModeEnabled, will sync with backend');
+      // The sync will happen automatically when the socket reconnects and sends the updated state
+    }
 
     MixpanelManager().settingsSaved(
       hasWebhookConversationCreated: conversationEventsToggled,

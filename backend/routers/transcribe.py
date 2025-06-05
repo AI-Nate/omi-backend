@@ -38,6 +38,138 @@ from utils.other.storage import get_profile_audio_if_exists
 
 router = APIRouter()
 
+async def _process_conversation_with_agent(conversation: Conversation) -> Conversation:
+    """Process conversation using agent analysis instead of standard pipeline"""
+    try:
+        from utils.agents.core import create_conversation_agent
+        from models.conversation import Structured, ActionItem, Event, ResourceItem
+        import uuid
+        from datetime import datetime
+        
+        # Create agent for user
+        agent = create_conversation_agent(conversation.uid)
+        
+        # Get transcript text
+        transcript = conversation.get_transcript(False)
+        
+        # Analyze with agent
+        result = agent.analyze_conversation(
+            transcript=transcript,
+            conversation_data={
+                "created_at": conversation.created_at.isoformat(),
+                "source": conversation.source.value if conversation.source else "omi",
+                "category": conversation.structured.category if conversation.structured else "unknown"
+            },
+            session_id=f"auto_{conversation.id}"
+        )
+        
+        if result.get('status') != 'success':
+            print(f"🔴 TRANSCRIBE: Agent analysis failed for conversation {conversation.id}")
+            # Fallback to standard processing
+            from utils.conversations.process_conversation import process_conversation
+            return process_conversation(conversation.uid, conversation.language or 'en', conversation)
+        
+        # Extract structured data from agent analysis
+        agent_analysis = result.get('analysis', '')
+        retrieved_conversations = result.get('retrieved_conversations', [])
+        
+        # Extract structured data using helper function
+        from routers.agent_conversations import _extract_structured_data_from_agent_analysis
+        structured_data = _extract_structured_data_from_agent_analysis(
+            agent_analysis, 
+            retrieved_conversations,
+            transcript
+        )
+        
+        # Update conversation with agent-generated structured data
+        conversation.structured = Structured(
+            title=structured_data["title"],
+            overview=agent_analysis,
+            category=structured_data["category"],
+            emoji=structured_data.get("emoji", "🧠")
+        )
+        
+        # Store the full agent analysis
+        conversation.structured.agent_analysis = agent_analysis
+        
+        # Update action items
+        if structured_data.get("action_items"):
+            conversation.structured.action_items = [
+                ActionItem(description=item["content"]) 
+                for item in structured_data["action_items"]
+            ]
+        
+        # Update key takeaways
+        if structured_data.get("key_takeaways"):
+            conversation.structured.key_takeaways = structured_data["key_takeaways"]
+        
+        # Update things to improve
+        if structured_data.get("things_to_improve"):
+            conversation.structured.things_to_improve = [
+                ResourceItem(content=item["content"], url=item.get("url", ""), title=item.get("title", ""))
+                for item in structured_data["things_to_improve"]
+            ]
+        
+        # Update things to learn
+        if structured_data.get("things_to_learn"):
+            conversation.structured.things_to_learn = [
+                ResourceItem(content=item["content"], url=item.get("url", ""), title=item.get("title", ""))
+                for item in structured_data["things_to_learn"]
+            ]
+        
+        # Update events
+        if structured_data.get("events"):
+            conversation.structured.events = [
+                Event(
+                    title=event["title"],
+                    description=event["description"],
+                    start=datetime.fromisoformat(event["created_at"]),
+                    duration=event["duration"]
+                )
+                for event in structured_data["events"]
+            ]
+        
+        # Set conversation as completed
+        conversation.status = ConversationStatus.completed
+        conversation.discarded = False
+        
+        # Save to database
+        conversations_db.upsert_conversation(conversation.uid, conversation.dict())
+        
+        # Save structured vector for search
+        from utils.conversations.process_conversation import save_structured_vector
+        save_structured_vector(conversation.uid, conversation)
+        
+        print(f"🟢 TRANSCRIBE: Agent processing completed for conversation {conversation.id}")
+        return conversation
+        
+    except Exception as e:
+        print(f"🔴 TRANSCRIBE: Error in agent processing for conversation {conversation.id}: {e}")
+        # Fallback to standard processing
+        from utils.conversations.process_conversation import process_conversation
+        return process_conversation(conversation.uid, conversation.language or 'en', conversation)
+
+async def handle_websocket_text_message(message_text: str, uid: str):
+    """Handle text messages sent over WebSocket (dev mode, commands, etc.)"""
+    try:
+        import json
+        message_data = json.loads(message_text)
+        
+        # Handle dev mode setting
+        if message_data.get('type') == 'dev_mode_setting':
+            dev_mode_enabled = message_data.get('enabled', False)
+            print(f"Setting dev mode for user {uid}: {dev_mode_enabled}")
+            redis_db.set_user_dev_mode(uid, dev_mode_enabled)
+            
+        # Handle other message types here in the future
+        # elif message_data.get('type') == 'other_command':
+        #     ...
+            
+    except json.JSONDecodeError:
+        print(f"Invalid JSON message from WebSocket: {message_text}")
+    except Exception as e:
+        print(f"Error handling WebSocket text message: {e}")
+
 async def _listen(
         websocket: WebSocket, uid: str, language: str = 'en', sample_rate: int = 8000, codec: str = 'pcm8',
         channels: int = 1, include_speech_profile: bool = True, stt_service: STTService = None,
@@ -180,8 +312,20 @@ async def _listen(
                 geolocation = Geolocation(**geolocation)
                 conversation.geolocation = get_google_maps_location(geolocation.latitude, geolocation.longitude)
 
-            conversation = process_conversation(uid, language, conversation)
-            messages = trigger_external_integrations(uid, conversation)
+            # Check if user has dev mode enabled for agent processing
+            use_agent_processing = redis_db.get_user_dev_mode(uid)
+            print(f"🤖 TRANSCRIBE: User {uid} dev mode enabled: {use_agent_processing}")
+            
+            if use_agent_processing:
+                # Use agent processing for dev mode
+                print(f"🤖 TRANSCRIBE: Processing conversation {conversation.id} with agent")
+                conversation = await _process_conversation_with_agent(conversation)
+                messages = trigger_external_integrations(uid, conversation)
+            else:
+                # Use standard processing
+                print(f"📝 TRANSCRIBE: Processing conversation {conversation.id} with standard pipeline")
+                conversation = process_conversation(uid, language, conversation)
+                messages = trigger_external_integrations(uid, conversation)
         except Exception as e:
             print(f"Error processing conversation: {e}", uid)
             conversations_db.set_conversation_as_discarded(uid, conversation.id)
@@ -732,8 +876,21 @@ async def _listen(
         
         try:
             while websocket_active:
-                data = await websocket.receive_bytes()
-                last_audio_received_time = time.time()
+                # Handle both text and binary messages
+                message = await websocket.receive()
+                
+                # Handle text messages (dev mode, commands, etc.)
+                if message['type'] == 'websocket.receive' and 'text' in message:
+                    await handle_websocket_text_message(message['text'], uid)
+                    continue
+                
+                # Handle binary audio data
+                if message['type'] == 'websocket.receive' and 'bytes' in message:
+                    data = message['bytes']
+                    last_audio_received_time = time.time()
+                else:
+                    # Skip if no binary data
+                    continue
                 
                 if codec == 'opus' and sample_rate == 16000:
                     data = decoder.decode(bytes(data), frame_size=frame_size)

@@ -570,3 +570,28 @@ def get_user_preferred_app(uid: str) -> Optional[str]:
     key = f'user:{uid}:preferred_app'
     app_id = r.get(key)
     return app_id.decode() if app_id else None
+
+
+# ******************************************************
+# ******************* DEV MODE *************************
+# ******************************************************
+
+@try_catch_decorator
+def set_user_dev_mode(uid: str, enabled: bool, ttl: int = 60 * 60 * 24):
+    """Set the user's dev mode state with TTL to prevent stale data"""
+    r.set(f'users:{uid}:dev_mode', str(enabled).lower(), ex=ttl)
+
+
+@try_catch_decorator
+def get_user_dev_mode(uid: str) -> bool:
+    """Get the user's dev mode state, defaults to False if not set"""
+    dev_mode = r.get(f'users:{uid}:dev_mode')
+    if dev_mode is None:
+        return False
+    return dev_mode.decode().lower() == 'true'
+
+
+@try_catch_decorator
+def remove_user_dev_mode(uid: str):
+    """Remove the user's dev mode state"""
+    r.delete(f'users:{uid}:dev_mode')

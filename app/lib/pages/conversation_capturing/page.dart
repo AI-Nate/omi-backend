@@ -184,16 +184,10 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage>
                         onStopPressed: () {
                           if (provider.segments.isNotEmpty) {
                             if (!showSummarizeConfirmation) {
-                              // Use agent processing in development mode, normal processing in production
-                              if (SharedPreferencesUtil().devModeEnabled) {
-                                context
-                                    .read<CaptureProvider>()
-                                    .forceProcessingCurrentConversationWithAgent();
-                              } else {
-                                context
-                                    .read<CaptureProvider>()
-                                    .forceProcessingCurrentConversation();
-                              }
+                              // NEW: Use immediate UI reset with background processing
+                              context
+                                  .read<CaptureProvider>()
+                                  .forceProcessingWithImmediateUIReset();
                               Navigator.of(context).pop();
                               return;
                             }
@@ -223,17 +217,10 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage>
                                             .showSummarizeConfirmation =
                                         showSummarizeConfirmation;
 
-                                    // Use agent processing in development mode, normal processing in production
-                                    if (SharedPreferencesUtil()
-                                        .devModeEnabled) {
-                                      context
-                                          .read<CaptureProvider>()
-                                          .forceProcessingCurrentConversationWithAgent();
-                                    } else {
-                                      context
-                                          .read<CaptureProvider>()
-                                          .forceProcessingCurrentConversation();
-                                    }
+                                    // NEW: Use immediate UI reset with background processing
+                                    context
+                                        .read<CaptureProvider>()
+                                        .forceProcessingWithImmediateUIReset();
                                     Navigator.of(context).pop();
                                     Navigator.of(context).pop();
                                   },

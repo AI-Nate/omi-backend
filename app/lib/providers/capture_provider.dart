@@ -531,7 +531,35 @@ class CaptureProvider extends ChangeNotifier
   @override
   void onConnected() {
     _transcriptServiceReady = true;
+
+    // Send dev mode state to backend when WebSocket connects
+    _sendDevModeStateToBackend();
+
     notifyListeners();
+  }
+
+  void _sendDevModeStateToBackend() {
+    try {
+      final devModeEnabled = SharedPreferencesUtil().devModeEnabled;
+      final message = jsonEncode({
+        'type': 'dev_mode_setting',
+        'enabled': devModeEnabled,
+      });
+
+      debugPrint(
+          '📡 CAPTURE_PROVIDER: Sending dev mode state to backend: $devModeEnabled');
+      _socket?.send(message);
+    } catch (e) {
+      debugPrint(
+          '🔴 CAPTURE_PROVIDER: Error sending dev mode state to backend: $e');
+    }
+  }
+
+  /// Send dev mode state to backend when it changes in settings
+  void syncDevModeWithBackend() {
+    if (_socket?.state == SocketServiceState.connected) {
+      _sendDevModeStateToBackend();
+    }
   }
 
   void _loadInProgressConversation() async {
@@ -557,20 +585,12 @@ class CaptureProvider extends ChangeNotifier
         return;
       }
 
-      // 🤖 DEV MODE: In dev mode, auto trigger should use agent API instead of waiting for standard backend processing
+      // 🤖 DEV MODE: In dev mode, completely ignore backend auto-processing to prevent duplicates
       if (SharedPreferencesUtil().devModeEnabled) {
         debugPrint(
-            "🤖 DEV MODE: Auto trigger - calling agent processing instead of standard processing");
-
-        // Check if we haven't already manually processed and we're not currently processing
-        if (!_hasManuallyProcessed &&
-            conversationProvider!.processingConversations.isEmpty) {
-          // Use the same agent processing as manual trigger
-          forceProcessingCurrentConversationWithAgent();
-        } else {
-          debugPrint(
-              "🤖 DEV MODE: Already processed manually or currently processing, ignoring auto trigger");
-        }
+            "🤖 DEV MODE: Ignoring backend auto-processing event to prevent duplicate conversations");
+        debugPrint(
+            "🤖 DEV MODE: Use manual 'Stop Recording' button to trigger agent processing");
         return;
       }
 
@@ -748,6 +768,162 @@ class CaptureProvider extends ChangeNotifier
       // Fallback to standard processing
       return _forceProcessingCurrentConversationStandard();
     }
+  }
+
+  /// NEW: Immediate UI reset with background processing
+  /// This method provides instant user feedback by clearing the UI immediately
+  /// while continuing to process the conversation in the background
+  Future<void> forceProcessingWithImmediateUIReset() async {
+    debugPrint(
+        '🚀 CAPTURE_PROVIDER: Starting immediate UI reset with background processing');
+
+    if (segments.isEmpty) {
+      debugPrint(
+          '🔴 CAPTURE_PROVIDER: No transcript segments available for processing');
+      return;
+    }
+
+    // 1. Save current segments for background processing
+    final segmentsToProcess = List<TranscriptSegment>.from(segments);
+    debugPrint(
+        '💾 CAPTURE_PROVIDER: Saved ${segmentsToProcess.length} segments for background processing');
+
+    // 2. Immediately clear UI transcripts for instant feedback
+    _resetStateVariables();
+    debugPrint('✨ CAPTURE_PROVIDER: UI transcripts cleared immediately');
+
+    // 3. Start background processing without affecting UI
+    _processSegmentsInBackground(segmentsToProcess);
+  }
+
+  /// Background processing method that doesn't affect the UI state
+  Future<void> _processSegmentsInBackground(
+      List<TranscriptSegment> segmentsToProcess) async {
+    debugPrint(
+        '🔄 CAPTURE_PROVIDER: Starting background processing of ${segmentsToProcess.length} segments');
+
+    final processingId = 'bg_${DateTime.now().millisecondsSinceEpoch}';
+
+    // Add processing conversation to show in conversations list (but not in capture UI)
+    conversationProvider!.addProcessingConversation(
+      ServerConversation(
+          id: processingId,
+          createdAt: DateTime.now(),
+          structured: Structured('', ''),
+          status: ConversationStatus.processing,
+          transcriptSegments: segmentsToProcess),
+    );
+
+    try {
+      // Set timeout for background processing (2 minutes)
+      final timeoutDuration = const Duration(minutes: 2);
+
+      if (SharedPreferencesUtil().devModeEnabled) {
+        await _processSegmentsWithAgent(segmentsToProcess, processingId)
+            .timeout(timeoutDuration);
+      } else {
+        await _processSegmentsStandard(segmentsToProcess, processingId)
+            .timeout(timeoutDuration);
+      }
+    } on TimeoutException catch (e) {
+      debugPrint('⏰ CAPTURE_PROVIDER: Background processing timed out: $e');
+      conversationProvider!.removeProcessingConversation(processingId);
+    } catch (e) {
+      debugPrint('🔴 CAPTURE_PROVIDER: Background processing failed: $e');
+      conversationProvider!.removeProcessingConversation(processingId);
+    }
+  }
+
+  /// Process segments using agent analysis in background
+  Future<void> _processSegmentsWithAgent(
+      List<TranscriptSegment> segments, String processingId) async {
+    try {
+      final transcript = TranscriptSegment.segmentsAsString(segments);
+      debugPrint(
+          '🤖 CAPTURE_PROVIDER: Background agent processing transcript length: ${transcript.length}');
+
+      final response = await createConversationWithAgent(
+        transcript: transcript,
+        sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
+      );
+
+      if (response != null && response.conversation != null) {
+        conversationProvider!.removeProcessingConversation(processingId);
+        response.conversation!.isNew = true;
+
+        // Process the created conversation (this will add it to the conversations list)
+        conversationProvider?.upsertConversation(response.conversation!);
+        MixpanelManager().conversationCreated(response.conversation!);
+
+        debugPrint(
+            '🟢 CAPTURE_PROVIDER: Background agent processing completed successfully');
+
+        // Optional: Show success notification
+        notifyInfo('CONVERSATION_CREATED_BACKGROUND');
+      } else {
+        debugPrint(
+            '🔴 CAPTURE_PROVIDER: Background agent processing failed, trying standard processing');
+        await _processSegmentsStandard(segments, processingId);
+      }
+    } catch (e) {
+      debugPrint('🔴 CAPTURE_PROVIDER: Background agent processing error: $e');
+      // Fallback to standard processing
+      await _processSegmentsStandard(segments, processingId);
+    }
+  }
+
+  /// Process segments using standard processing in background
+  Future<void> _processSegmentsStandard(
+      List<TranscriptSegment> segments, String processingId) async {
+    try {
+      debugPrint('📝 CAPTURE_PROVIDER: Background standard processing');
+
+      // Note: For proper background processing, we should create a conversation
+      // from the segments directly, but for now we'll use the existing API
+      final result = await processInProgressConversation();
+
+      if (result != null && result.conversation != null) {
+        conversationProvider!.removeProcessingConversation(processingId);
+        result.conversation!.isNew = true;
+
+        conversationProvider?.upsertConversation(result.conversation!);
+        MixpanelManager().conversationCreated(result.conversation!);
+
+        debugPrint(
+            '🟢 CAPTURE_PROVIDER: Background standard processing completed successfully');
+
+        // Optional: Show success notification
+        notifyInfo('CONVERSATION_CREATED_BACKGROUND');
+      } else {
+        debugPrint(
+            '🔴 CAPTURE_PROVIDER: Background standard processing failed');
+        conversationProvider!.removeProcessingConversation(processingId);
+        notifyError('BACKGROUND_PROCESSING_FAILED');
+      }
+    } catch (e) {
+      debugPrint(
+          '🔴 CAPTURE_PROVIDER: Background standard processing error: $e');
+      conversationProvider!.removeProcessingConversation(processingId);
+      notifyError('BACKGROUND_PROCESSING_FAILED');
+    }
+  }
+
+  /// Manually discard any ongoing background processing (useful for user control)
+  void discardBackgroundProcessing() {
+    // Remove all background processing conversations
+    final backgroundProcessingIds = conversationProvider
+            ?.processingConversations
+            .where((conv) => conv.id.startsWith('bg_'))
+            .map((conv) => conv.id)
+            .toList() ??
+        [];
+
+    for (final id in backgroundProcessingIds) {
+      conversationProvider?.removeProcessingConversation(id);
+    }
+
+    debugPrint(
+        '🗑️ CAPTURE_PROVIDER: Discarded ${backgroundProcessingIds.length} background processing conversations');
   }
 
   // Method to switch between standard and agent processing
