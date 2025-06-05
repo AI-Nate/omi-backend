@@ -40,17 +40,14 @@ def analyze_conversation_with_agent(
     - Suggest actionable next steps and insights
     """
     try:
-        print("[DEBUG] Received request to /v1/conversations/agent with data:", request)
         # Create agent for the user
         agent = create_conversation_agent(uid)
-        print("[DEBUG] Created agent for user", uid)
         
         # Get conversation data if conversation_id is provided
         conversation_data = None
         if request.conversation_id:
             try:
                 conv_data = conversations_db.get_conversation(uid, request.conversation_id)
-                print(f"[DEBUG] conv_data for {request.conversation_id}:", conv_data)
                 if conv_data:
                     conversation = Conversation(**conv_data)
                     conversation_data = {
@@ -79,33 +76,13 @@ def analyze_conversation_with_agent(
                 headers={"X-Session-ID": request.session_id}
             )
         else:
-            print("[DEBUG] Invoking agent.analyze_conversation with transcript length:", len(request.transcript))
             # Non-streaming analysis
             result = agent.analyze_conversation(
                 transcript=request.transcript,
                 conversation_data=conversation_data,
                 session_id=request.session_id
             )
-            print("[DEBUG] Agent analysis result:", result)
             
-            # --- Save summary to conversation if conversation_id is provided ---
-            if request.conversation_id:
-                try:
-                    conv_data = conversations_db.get_conversation(uid, request.conversation_id)
-                    print(f"[DEBUG] conv_data for {request.conversation_id}:", conv_data)
-                    if conv_data and 'structured' in conv_data:
-                        structured = conv_data['structured']
-                        print(f"[DEBUG] structured before update:", structured, type(structured))
-                        structured['overview'] = result['analysis']
-                        print(f"[DEBUG] structured after update:", structured)
-                        conversations_db.update_conversation_structured(uid, request.conversation_id, structured)
-                        print(f"[DEBUG] Updated conversation {request.conversation_id} structured.overview with agent analysis.")
-                    else:
-                        print(f"[DEBUG] structured not found in conv_data for {request.conversation_id}")
-                except Exception as e:
-                    print(f"Error updating conversation summary: {e}")
-            # --- End save summary ---
-
             return AgentAnalysisResponse(**result)
             
     except Exception as e:

@@ -772,8 +772,7 @@ class CaptureProvider extends ChangeNotifier
   }
 
   // Method to analyze current conversation without creating a new one
-  Future<void> analyzeCurrentConversationWithAgent(
-      {bool useStreaming = false}) async {
+  Future<void> analyzeCurrentConversationWithAgent({bool useStreaming = false}) async {
     if (agentConversationProvider == null) {
       debugPrint('Agent conversation provider not available');
       return;
@@ -785,9 +784,18 @@ class CaptureProvider extends ChangeNotifier
     }
 
     try {
+      // 1. Create the conversation first
+      final createResponse = await processInProgressConversation();
+      if (createResponse == null || createResponse.conversation == null) {
+        debugPrint('Failed to create conversation before agent analysis');
+        return;
+      }
+      final newConversationId = createResponse.conversation!.id;
+
+      // 2. Now call the agent analysis with the new conversation ID
       await agentConversationProvider!.analyzeConversation(
         transcriptSegments: segments,
-        conversationId: conversationId,
+        conversationId: newConversationId,
         useStreaming: useStreaming,
       );
 

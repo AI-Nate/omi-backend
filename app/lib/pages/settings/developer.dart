@@ -25,7 +25,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
   @override
   void initState() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Provider.of<DeveloperModeProvider>(context, listen: false).initialize();
+      await Provider.of<DeveloperModeProvider>(context, listen: false)
+          .initialize();
     });
     super.initState();
   }
@@ -44,12 +45,17 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                 title: const Text('Developer Settings'),
                 actions: [
                   TextButton(
-                    onPressed: provider.savingSettingsLoading ? null : provider.saveSettings,
+                    onPressed: provider.savingSettingsLoading
+                        ? null
+                        : provider.saveSettings,
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4.0),
                       child: Text(
                         'Save',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 16),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 16),
                       ),
                     ),
                   )
@@ -141,7 +147,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Export Conversations'),
-                    subtitle: const Text('Export all your conversations to a JSON file.'),
+                    subtitle: const Text(
+                        'Export all your conversations to a JSON file.'),
                     trailing: provider.loadingExportMemories
                         ? const SizedBox(
                             height: 16,
@@ -156,28 +163,35 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                         ? null
                         : () async {
                             if (provider.loadingExportMemories) return;
-                            setState(() => provider.loadingExportMemories = true);
+                            setState(
+                                () => provider.loadingExportMemories = true);
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content:
-                                    Text('Conversations Export Started. This may take a few seconds, please wait.'),
+                                content: Text(
+                                    'Conversations Export Started. This may take a few seconds, please wait.'),
                                 duration: Duration(seconds: 3),
                               ),
                             );
                             List<ServerConversation> memories =
-                                await getConversations(limit: 10000, offset: 0); // 10k for now
-                            String json = const JsonEncoder.withIndent("     ").convert(memories);
-                            final directory = await getApplicationDocumentsDirectory();
-                            final file = File('${directory.path}/conversations.json');
+                                await getConversations(
+                                    limit: 10000, offset: 0); // 10k for now
+                            String json = const JsonEncoder.withIndent("     ")
+                                .convert(memories);
+                            final directory =
+                                await getApplicationDocumentsDirectory();
+                            final file =
+                                File('${directory.path}/conversations.json');
                             await file.writeAsString(json);
 
-                            final result =
-                                await Share.shareXFiles([XFile(file.path)], text: 'Exported Conversations from Omi');
+                            final result = await Share.shareXFiles(
+                                [XFile(file.path)],
+                                text: 'Exported Conversations from Omi');
                             if (result.status == ShareResultStatus.success) {
                               debugPrint('Thank you for sharing the picture!');
                             }
                             MixpanelManager().exportMemories();
-                            setState(() => provider.loadingExportMemories = false);
+                            setState(
+                                () => provider.loadingExportMemories = false);
                           },
                   ),
                   // KEEP ME?
@@ -239,12 +253,16 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                     children: [
                       const Text(
                         'Webhooks',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500),
                       ),
                       Spacer(),
                       GestureDetector(
                         onTap: () {
-                          launchUrl(Uri.parse('https://docs.omi.me/docs/developer/apps/Introduction'));
+                          launchUrl(Uri.parse(
+                              'https://docs.omi.me/docs/developer/apps/Introduction'));
                           MixpanelManager().pageOpened('Advanced Mode Docs');
                         },
                         child: const Padding(
@@ -267,7 +285,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   ToggleSectionWidget(
                     isSectionEnabled: provider.conversationEventsToggled,
                     sectionTitle: 'Conversation Events',
-                    sectionDescription: 'Triggers when a new conversation is created.',
+                    sectionDescription:
+                        'Triggers when a new conversation is created.',
                     options: [
                       TextField(
                         controller: provider.webhookOnConversationCreated,
@@ -280,12 +299,14 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    onSectionEnabledChanged: provider.onConversationEventsToggled,
+                    onSectionEnabledChanged:
+                        provider.onConversationEventsToggled,
                   ),
                   ToggleSectionWidget(
                       isSectionEnabled: provider.transcriptsToggled,
                       sectionTitle: 'Real-time Transcript',
-                      sectionDescription: 'Triggers when a new transcript is received.',
+                      sectionDescription:
+                          'Triggers when a new transcript is received.',
                       options: [
                         TextField(
                           controller: provider.webhookOnTranscriptReceived,
@@ -302,7 +323,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   ToggleSectionWidget(
                       isSectionEnabled: provider.audioBytesToggled,
                       sectionTitle: 'Realtime Audio Bytes',
-                      sectionDescription: 'Triggers when audio bytes are received.',
+                      sectionDescription:
+                          'Triggers when audio bytes are received.',
                       options: [
                         TextField(
                           controller: provider.webhookAudioBytes,
@@ -320,7 +342,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                           enabled: true,
                           enableSuggestions: false,
                           keyboardType: TextInputType.number,
-                          decoration: _getTextFieldDecoration('Every x seconds'),
+                          decoration:
+                              _getTextFieldDecoration('Every x seconds'),
                           style: const TextStyle(color: Colors.white),
                         ),
                         const SizedBox(height: 16),
@@ -329,7 +352,8 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   ToggleSectionWidget(
                     isSectionEnabled: provider.daySummaryToggled,
                     sectionTitle: 'Day Summary',
-                    sectionDescription: 'Triggers when day summary is generated.',
+                    sectionDescription:
+                        'Triggers when day summary is generated.',
                     options: [
                       TextField(
                         controller: provider.webhookDaySummary,
@@ -363,12 +387,32 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   const SizedBox(height: 32),
                   const Text(
                     'Experimental',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Try the latest experimental features from Omi Team.',
                     style: TextStyle(color: Colors.grey.shade200, fontSize: 14),
+                  ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    contentPadding: const EdgeInsets.all(0),
+                    title: const Text(
+                      'Developer Mode',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text(
+                      'Enable AI agent conversation analysis and advanced developer features',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    value: provider.devModeEnabled,
+                    onChanged: provider.onDevModeChanged,
                   ),
                   const SizedBox(height: 16.0),
                   CheckboxListTile(
@@ -397,7 +441,10 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   const SizedBox(height: 36),
                   const Text(
                     'Pilot Features',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -423,7 +470,10 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
     );
   }
 
-  _getTextFieldDecoration(String label, {IconButton? suffixIcon, bool canBeDisabled = false, String hintText = ''}) {
+  _getTextFieldDecoration(String label,
+      {IconButton? suffixIcon,
+      bool canBeDisabled = false,
+      String hintText = ''}) {
     return InputDecoration(
       labelText: label,
       enabled: true && canBeDisabled,

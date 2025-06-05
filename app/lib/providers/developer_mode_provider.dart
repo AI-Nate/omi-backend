@@ -8,8 +8,10 @@ import 'package:omi/utils/logger.dart';
 import 'package:omi/utils/other/validators.dart';
 
 class DeveloperModeProvider extends BaseProvider {
-  final TextEditingController webhookOnConversationCreated = TextEditingController();
-  final TextEditingController webhookOnTranscriptReceived = TextEditingController();
+  final TextEditingController webhookOnConversationCreated =
+      TextEditingController();
+  final TextEditingController webhookOnTranscriptReceived =
+      TextEditingController();
   final TextEditingController webhookAudioBytes = TextEditingController();
   final TextEditingController webhookAudioBytesDelay = TextEditingController();
   final TextEditingController webhookWsAudioBytes = TextEditingController();
@@ -28,6 +30,7 @@ class DeveloperModeProvider extends BaseProvider {
   bool localSyncEnabled = false;
   bool followUpQuestionEnabled = false;
   bool transcriptionDiagnosticEnabled = false;
+  bool devModeEnabled = false;
 
   void onConversationEventsToggled(bool value) {
     conversationEventsToggled = value;
@@ -82,7 +85,8 @@ class DeveloperModeProvider extends BaseProvider {
       audioBytesToggled = res['audio_bytes'];
       daySummaryToggled = res['day_summary'];
     }
-    SharedPreferencesUtil().conversationEventsToggled = conversationEventsToggled;
+    SharedPreferencesUtil().conversationEventsToggled =
+        conversationEventsToggled;
     SharedPreferencesUtil().transcriptsToggled = transcriptsToggled;
     SharedPreferencesUtil().audioBytesToggled = audioBytesToggled;
     SharedPreferencesUtil().daySummaryToggled = daySummaryToggled;
@@ -92,13 +96,20 @@ class DeveloperModeProvider extends BaseProvider {
   Future initialize() async {
     setIsLoading(true);
     localSyncEnabled = SharedPreferencesUtil().localSyncEnabled;
-    webhookOnConversationCreated.text = SharedPreferencesUtil().webhookOnConversationCreated;
-    webhookOnTranscriptReceived.text = SharedPreferencesUtil().webhookOnTranscriptReceived;
+    webhookOnConversationCreated.text =
+        SharedPreferencesUtil().webhookOnConversationCreated;
+    webhookOnTranscriptReceived.text =
+        SharedPreferencesUtil().webhookOnTranscriptReceived;
     webhookAudioBytes.text = SharedPreferencesUtil().webhookAudioBytes;
-    webhookAudioBytesDelay.text = SharedPreferencesUtil().webhookAudioBytesDelay;
-    followUpQuestionEnabled = SharedPreferencesUtil().devModeJoanFollowUpEnabled;
-    transcriptionDiagnosticEnabled = SharedPreferencesUtil().transcriptionDiagnosticEnabled;
-    conversationEventsToggled = SharedPreferencesUtil().conversationEventsToggled;
+    webhookAudioBytesDelay.text =
+        SharedPreferencesUtil().webhookAudioBytesDelay;
+    followUpQuestionEnabled =
+        SharedPreferencesUtil().devModeJoanFollowUpEnabled;
+    transcriptionDiagnosticEnabled =
+        SharedPreferencesUtil().transcriptionDiagnosticEnabled;
+    devModeEnabled = SharedPreferencesUtil().devModeEnabled;
+    conversationEventsToggled =
+        SharedPreferencesUtil().conversationEventsToggled;
     transcriptsToggled = SharedPreferencesUtil().transcriptsToggled;
     audioBytesToggled = SharedPreferencesUtil().audioBytesToggled;
     daySummaryToggled = SharedPreferencesUtil().daySummaryToggled;
@@ -115,7 +126,8 @@ class DeveloperModeProvider extends BaseProvider {
           webhookAudioBytesDelay.text = '5';
         }
         SharedPreferencesUtil().webhookAudioBytes = webhookAudioBytes.text;
-        SharedPreferencesUtil().webhookAudioBytesDelay = webhookAudioBytesDelay.text;
+        SharedPreferencesUtil().webhookAudioBytesDelay =
+            webhookAudioBytesDelay.text;
       }),
       getUserWebhookUrl(type: 'realtime_transcript').then((url) {
         webhookOnTranscriptReceived.text = url;
@@ -140,25 +152,30 @@ class DeveloperModeProvider extends BaseProvider {
     setIsLoading(true);
     final prefs = SharedPreferencesUtil();
 
-    if (webhookAudioBytes.text.isNotEmpty && !isValidUrl(webhookAudioBytes.text)) {
+    if (webhookAudioBytes.text.isNotEmpty &&
+        !isValidUrl(webhookAudioBytes.text)) {
       AppSnackbar.showSnackbarError('Invalid audio bytes webhook URL');
       setIsLoading(false);
       return;
     }
-    if (webhookAudioBytes.text.isNotEmpty && webhookAudioBytesDelay.text.isEmpty) {
+    if (webhookAudioBytes.text.isNotEmpty &&
+        webhookAudioBytesDelay.text.isEmpty) {
       webhookAudioBytesDelay.text = '5';
     }
-    if (webhookOnTranscriptReceived.text.isNotEmpty && !isValidUrl(webhookOnTranscriptReceived.text)) {
+    if (webhookOnTranscriptReceived.text.isNotEmpty &&
+        !isValidUrl(webhookOnTranscriptReceived.text)) {
       AppSnackbar.showSnackbarError('Invalid realtime transcript webhook URL');
       setIsLoading(false);
       return;
     }
-    if (webhookOnConversationCreated.text.isNotEmpty && !isValidUrl(webhookOnConversationCreated.text)) {
+    if (webhookOnConversationCreated.text.isNotEmpty &&
+        !isValidUrl(webhookOnConversationCreated.text)) {
       AppSnackbar.showSnackbarError('Invalid conversation created webhook URL');
       setIsLoading(false);
       return;
     }
-    if (webhookDaySummary.text.isNotEmpty && !isValidUrl(webhookDaySummary.text)) {
+    if (webhookDaySummary.text.isNotEmpty &&
+        !isValidUrl(webhookDaySummary.text)) {
       AppSnackbar.showSnackbarError('Invalid day summary webhook URL');
       setIsLoading(false);
       return;
@@ -172,11 +189,16 @@ class DeveloperModeProvider extends BaseProvider {
     // }
     var w1 = setUserWebhookUrl(
       type: 'audio_bytes',
-      url: '${webhookAudioBytes.text.trim()},${webhookAudioBytesDelay.text.trim()}',
+      url:
+          '${webhookAudioBytes.text.trim()},${webhookAudioBytesDelay.text.trim()}',
     );
-    var w2 = setUserWebhookUrl(type: 'realtime_transcript', url: webhookOnTranscriptReceived.text.trim());
-    var w3 = setUserWebhookUrl(type: 'memory_created', url: webhookOnConversationCreated.text.trim());
-    var w4 = setUserWebhookUrl(type: 'day_summary', url: webhookDaySummary.text.trim());
+    var w2 = setUserWebhookUrl(
+        type: 'realtime_transcript',
+        url: webhookOnTranscriptReceived.text.trim());
+    var w3 = setUserWebhookUrl(
+        type: 'memory_created', url: webhookOnConversationCreated.text.trim());
+    var w4 = setUserWebhookUrl(
+        type: 'day_summary', url: webhookDaySummary.text.trim());
     // var w4 = setUserWebhookUrl(type: 'audio_bytes_websocket', url: webhookWsAudioBytes.text.trim());
     try {
       Future.wait([w1, w2, w3, w4]);
@@ -192,6 +214,7 @@ class DeveloperModeProvider extends BaseProvider {
     prefs.localSyncEnabled = localSyncEnabled;
     prefs.devModeJoanFollowUpEnabled = followUpQuestionEnabled;
     prefs.transcriptionDiagnosticEnabled = transcriptionDiagnosticEnabled;
+    prefs.devModeEnabled = devModeEnabled;
 
     MixpanelManager().settingsSaved(
       hasWebhookConversationCreated: conversationEventsToggled,
@@ -219,6 +242,11 @@ class DeveloperModeProvider extends BaseProvider {
 
   void onTranscriptionDiagnosticChanged(var value) {
     transcriptionDiagnosticEnabled = value;
+    notifyListeners();
+  }
+
+  void onDevModeChanged(var value) {
+    devModeEnabled = value;
     notifyListeners();
   }
 }
