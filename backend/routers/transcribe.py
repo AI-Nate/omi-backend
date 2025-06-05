@@ -84,7 +84,7 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         # Update conversation with agent-generated structured data
         conversation.structured = Structured(
             title=structured_data["title"],
-            overview=agent_analysis,
+            overview=structured_data["overview"],
             category=structured_data["category"],
             emoji=structured_data.get("emoji", "🧠")
         )
