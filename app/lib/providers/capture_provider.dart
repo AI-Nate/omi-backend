@@ -559,8 +559,19 @@ class CaptureProvider extends ChangeNotifier
 
   /// Send dev mode state to backend when it changes in settings
   void syncDevModeWithBackend() {
+    debugPrint('📡 CAPTURE_PROVIDER: syncDevModeWithBackend() called');
+    debugPrint('📡 CAPTURE_PROVIDER: Socket exists: ${_socket != null}');
+    debugPrint('📡 CAPTURE_PROVIDER: Socket state: ${_socket?.state}');
+
     if (_socket?.state == SocketServiceState.connected) {
+      debugPrint(
+          '📡 CAPTURE_PROVIDER: Socket is connected, sending dev mode state');
       _sendDevModeStateToBackend();
+    } else {
+      debugPrint(
+          '📡 CAPTURE_PROVIDER: Socket not connected, dev mode sync skipped');
+      debugPrint(
+          '📡 CAPTURE_PROVIDER: Will sync automatically when socket reconnects');
     }
   }
 

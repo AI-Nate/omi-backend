@@ -52,17 +52,22 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
 
                       // Save the current dev mode state before saving settings
                       final oldDevMode = SharedPreferencesUtil().devModeEnabled;
+                      final newDevMode = provider.devModeEnabled;
 
                       // Save the settings
                       await provider.saveSettings();
 
                       // Check if dev mode changed and sync with backend if it did
-                      final newDevMode = SharedPreferencesUtil().devModeEnabled;
                       if (oldDevMode != newDevMode && context.mounted) {
+                        print(
+                            '📡 DEVELOPER_SETTINGS: Dev mode changed from $oldDevMode to $newDevMode, syncing with backend');
                         final captureProvider = Provider.of<CaptureProvider>(
                             context,
                             listen: false);
                         captureProvider.syncDevModeWithBackend();
+                      } else {
+                        print(
+                            '📡 DEVELOPER_SETTINGS: No dev mode change detected (old: $oldDevMode, new: $newDevMode)');
                       }
                     },
                     child: const Padding(
