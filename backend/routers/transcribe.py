@@ -883,13 +883,14 @@ async def _listen(
                 message = await websocket.receive()
                 
                 # Handle text messages (dev mode, commands, etc.)
-                if message['type'] == 'websocket.receive' and 'text' in message:
-                    await handle_websocket_text_message(message['text'], uid)
+                if isinstance(message, str):
+                    print(f"🔄 DEV_MODE: Received text message: {message}")
+                    await handle_websocket_text_message(message, uid)
                     continue
                 
                 # Handle binary audio data
-                if message['type'] == 'websocket.receive' and 'bytes' in message:
-                    data = message['bytes']
+                if isinstance(message, bytes):
+                    data = message
                     last_audio_received_time = time.time()
                 else:
                     # Skip if no binary data
