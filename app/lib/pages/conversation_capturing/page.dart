@@ -109,17 +109,18 @@ class _ConversationCapturingPageState extends State<ConversationCapturingPage>
                       provider.segments.isNotEmpty)
                     IconButton(
                       onPressed: () async {
-                        // Test agent analysis without creating a conversation
+                        // Use agent to create conversation with analysis
                         context
                             .read<CaptureProvider>()
-                            .analyzeCurrentConversationWithAgent();
+                            .forceProcessingCurrentConversationWithAgent();
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text(
-                                'Agent analysis started! Check debug logs.'),
+                            content:
+                                Text('Agent conversation processing started!'),
                             duration: Duration(seconds: 2),
                           ),
                         );
+                        Navigator.of(context).pop();
                       },
                       icon: const Icon(Icons.psychology, color: Colors.blue),
                     )
