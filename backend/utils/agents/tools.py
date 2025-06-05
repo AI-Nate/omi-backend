@@ -226,7 +226,7 @@ def get_agent_tools(uid: str) -> List:
             end_timestamp: Optional end timestamp filter (Unix timestamp)
             max_results: Maximum number of conversations to retrieve
         """
-        return pinecone_conversation_retrieval(query, uid, start_timestamp, end_timestamp, max_results)
+        return pinecone_conversation_retrieval.func(query, uid, start_timestamp, end_timestamp, max_results)
     
     @tool("advanced_conversation_search")
     def bound_advanced_retrieval(query: str, people: Optional[List[str]] = None,
@@ -246,7 +246,7 @@ def get_agent_tools(uid: str) -> List:
             end_timestamp: End timestamp filter
             max_results: Maximum results to return
         """
-        return advanced_pinecone_retrieval(query, uid, people, topics, entities, 
+        return advanced_pinecone_retrieval.func(query, uid, people, topics, entities, 
                                          start_timestamp, end_timestamp, max_results)
     
     return [
