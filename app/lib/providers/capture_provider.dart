@@ -547,6 +547,23 @@ class CaptureProvider extends ChangeNotifier
             "Conversation data not received in event. Content is: $event");
         return;
       }
+
+      // 🤖 DEV MODE: In dev mode, auto trigger should use agent API instead of waiting for standard backend processing
+      if (SharedPreferencesUtil().devModeEnabled) {
+        debugPrint(
+            "🤖 DEV MODE: Auto trigger - calling agent processing instead of standard processing");
+
+        // Check if we're not already processing to avoid duplicates
+        if (conversationProvider!.processingConversations.isEmpty) {
+          // Use the same agent processing as manual trigger
+          forceProcessingCurrentConversationWithAgent();
+        } else {
+          debugPrint("🤖 DEV MODE: Already processing, ignoring auto trigger");
+        }
+        return;
+      }
+
+      // Normal mode: just set processing state, actual processing handled by backend
       conversationProvider!.addProcessingConversation(event.conversation!);
       _resetStateVariables();
       return;
@@ -631,20 +648,12 @@ class CaptureProvider extends ChangeNotifier
   }
 
   // Agent-based processing method that creates conversations WITH agent analysis integrated
-  // This is the method you want for the agent button - it creates conversations with agent-generated summaries
+  // This method directly calls the backend to create conversations with agent analysis
   Future<void> forceProcessingCurrentConversationWithAgent(
       {bool useStreaming = false}) async {
     debugPrint(
         '🟡 CAPTURE_PROVIDER: forceProcessingCurrentConversationWithAgent() called');
     debugPrint('🟡 CAPTURE_PROVIDER: segments.length = ${segments.length}');
-    debugPrint(
-        '🟡 CAPTURE_PROVIDER: agentConversationProvider = $agentConversationProvider');
-
-    if (agentConversationProvider == null) {
-      debugPrint(
-          '🔴 CAPTURE_PROVIDER: Agent conversation provider not available, falling back to standard processing');
-      return _forceProcessingCurrentConversationStandard();
-    }
 
     if (segments.isEmpty) {
       debugPrint(
@@ -657,7 +666,6 @@ class CaptureProvider extends ChangeNotifier
 
     // Save segments BEFORE resetting state variables
     final currentSegments = List<TranscriptSegment>.from(segments);
-    final currentConversationId = conversationId;
 
     debugPrint(
         '🟡 CAPTURE_PROVIDER: Saved ${currentSegments.length} segments before reset');
@@ -672,104 +680,17 @@ class CaptureProvider extends ChangeNotifier
     );
 
     try {
-      // Set up stream listener BEFORE starting analysis to catch events
-      debugPrint(
-          '🟡 CAPTURE_PROVIDER: Setting up analysis stream listener FIRST');
-      debugPrint(
-          '🟡 CAPTURE_PROVIDER: Stream instance = ${agentConversationProvider!.analysisStream}');
-
-      late StreamSubscription subscription;
-      subscription = agentConversationProvider!.analysisStream.listen(
-        (event) {
-          debugPrint(
-              '🟡 CAPTURE_PROVIDER: *** RECEIVED STREAM EVENT *** type: ${event['type']}');
-          debugPrint('🟡 CAPTURE_PROVIDER: Full event data: $event');
-
-          if (event['type'] == 'analysis_complete') {
-            debugPrint(
-                '🟢 CAPTURE_PROVIDER: Agent analysis completed: ${event['analysis']}');
-
-            // Create a conversation with agent analysis using saved segments
-            _createConversationFromAgentAnalysis(event, currentSegments);
-
-            // Cancel subscription after processing
-            subscription.cancel();
-          } else if (event['type'] == 'error') {
-            debugPrint(
-                '🔴 CAPTURE_PROVIDER: Agent analysis error: ${event['error']}');
-            conversationProvider!.removeProcessingConversation('0');
-
-            // Fallback to standard processing
-            _forceProcessingCurrentConversationStandard();
-
-            // Cancel subscription after error
-            subscription.cancel();
-          }
-        },
-        onError: (error) {
-          debugPrint('🔴 CAPTURE_PROVIDER: Stream error: $error');
-          conversationProvider!.removeProcessingConversation('0');
-          _forceProcessingCurrentConversationStandard();
-          subscription.cancel();
-        },
-        onDone: () {
-          debugPrint('🟡 CAPTURE_PROVIDER: Stream completed');
-        },
-      );
-
-      // NOW start the agent analysis with listener ready
-      debugPrint(
-          '🟡 CAPTURE_PROVIDER: Calling agentConversationProvider.analyzeConversation()');
-      debugPrint(
-          '🟡 CAPTURE_PROVIDER: conversationId = $currentConversationId');
-      debugPrint('🟡 CAPTURE_PROVIDER: useStreaming = $useStreaming');
-      debugPrint(
-          '🟡 CAPTURE_PROVIDER: Using saved segments count = ${currentSegments.length}');
-
-      await agentConversationProvider!.analyzeConversation(
-        transcriptSegments: currentSegments,
-        conversationId: currentConversationId,
-        useStreaming: useStreaming,
-      );
-
-      debugPrint(
-          '🟡 CAPTURE_PROVIDER: analyzeConversation() called successfully');
-
-      // Auto-cancel subscription after 2 minutes to prevent memory leaks
-      Timer(const Duration(minutes: 2), () {
-        subscription.cancel();
-      });
-    } catch (e) {
-      debugPrint('Error in agent processing: $e');
-      conversationProvider!.removeProcessingConversation('0');
-
-      // Fallback to standard processing
-      return _forceProcessingCurrentConversationStandard();
-    }
-  }
-
-  // Create conversation from agent analysis using the proper backend endpoint
-  Future<void> _createConversationFromAgentAnalysis(
-      Map<String, dynamic> analysisEvent,
-      List<TranscriptSegment> savedSegments) async {
-    debugPrint(
-        '🟡 CAPTURE_PROVIDER: _createConversationFromAgentAnalysis() called');
-    debugPrint('🟡 CAPTURE_PROVIDER: analysisEvent = $analysisEvent');
-    debugPrint(
-        '🟡 CAPTURE_PROVIDER: savedSegments.length = ${savedSegments.length}');
-
-    try {
-      final transcript = TranscriptSegment.segmentsAsString(savedSegments);
+      // Create transcript and call agent conversation creation directly
+      final transcript = TranscriptSegment.segmentsAsString(currentSegments);
       debugPrint(
           '🟡 CAPTURE_PROVIDER: transcript length = ${transcript.length}');
 
-      // Call the new backend endpoint that creates conversations with agent analysis
+      // Call the backend endpoint that creates conversations with agent analysis directly
       debugPrint(
-          '🟡 CAPTURE_PROVIDER: Calling createConversationWithAgent() API');
+          '🟡 CAPTURE_PROVIDER: Calling createConversationWithAgent() API directly (eliminates duplicate calls)');
       final response = await createConversationWithAgent(
         transcript: transcript,
-        sessionId: analysisEvent['session_id'] ??
-            DateTime.now().millisecondsSinceEpoch.toString(),
+        sessionId: DateTime.now().millisecondsSinceEpoch.toString(),
       );
 
       debugPrint(
@@ -787,8 +708,6 @@ class CaptureProvider extends ChangeNotifier
           debugPrint(
               '🟡 CAPTURE_PROVIDER: Analysis length: ${response.agentAnalysis!.analysis.length}');
 
-          // TODO: Store agent analysis for display in UI
-          // For now, we just log that it's available - the backend already stored it
           debugPrint(
               '🟡 CAPTURE_PROVIDER: Agent analysis will be displayed via conversation detail UI');
         }
@@ -796,21 +715,21 @@ class CaptureProvider extends ChangeNotifier
         _processConversationCreated(response.conversation, response.messages);
 
         debugPrint(
-            'Agent-analyzed conversation created successfully via backend');
+            '🟢 CAPTURE_PROVIDER: Agent-analyzed conversation created successfully via backend');
       } else {
         debugPrint(
-            'Failed to create conversation via agent endpoint, falling back to standard processing');
+            '🔴 CAPTURE_PROVIDER: Failed to create conversation via agent endpoint, falling back to standard processing');
         conversationProvider!.removeProcessingConversation('0');
 
         // Fallback to standard processing
         _forceProcessingCurrentConversationStandard();
       }
     } catch (e) {
-      debugPrint('Error creating conversation from agent analysis: $e');
+      debugPrint('🔴 CAPTURE_PROVIDER: Error in agent processing: $e');
       conversationProvider!.removeProcessingConversation('0');
 
       // Fallback to standard processing
-      _forceProcessingCurrentConversationStandard();
+      return _forceProcessingCurrentConversationStandard();
     }
   }
 
