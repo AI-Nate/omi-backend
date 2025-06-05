@@ -103,6 +103,16 @@ def create_conversation_with_agent(
     3. Creates a conversation with the agent-generated summary
     4. Returns the same format as the standard conversation creation endpoint
     """
+    print(f"🔥 DUPLICATE_DEBUG: /v1/conversations/agent/create endpoint ENTRY - user {uid}")
+    print(f"🔥 DUPLICATE_DEBUG: Request details - transcript length: {len(request.transcript)}")
+    print(f"🔥 DUPLICATE_DEBUG: Request details - conversation_id: {request.conversation_id}")
+    print(f"🔥 DUPLICATE_DEBUG: Request details - session_id: {request.session_id}")
+    print(f"🔥 DUPLICATE_DEBUG: Request details - stream: {request.stream}")
+    
+    import traceback
+    print(f"🔥 DUPLICATE_DEBUG: Call stack trace:")
+    traceback.print_stack()
+    
     print(f"🟦 BACKEND: /v1/conversations/agent/create endpoint hit by user {uid}")
     print(f"🟦 BACKEND: Request - transcript length: {len(request.transcript)}")
     print(f"🟦 BACKEND: Request - conversation_id: {request.conversation_id}")

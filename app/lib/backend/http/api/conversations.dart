@@ -1532,6 +1532,20 @@ Future<AgentAnalysisResponse?> analyzeConversationWithAgent({
   String sessionId = "default",
   bool stream = false,
 }) async {
+  debugPrint('🔥 DUPLICATE_DEBUG: API.analyzeConversationWithAgent() ENTRY');
+  debugPrint('🔥 DUPLICATE_DEBUG: - transcript length: ${transcript.length}');
+  debugPrint('🔥 DUPLICATE_DEBUG: - conversationId: $conversationId');
+  debugPrint('🔥 DUPLICATE_DEBUG: - sessionId: $sessionId');
+  debugPrint('🔥 DUPLICATE_DEBUG: - stream: $stream');
+
+  // Check current stack trace to see who called this
+  try {
+    throw Exception('Stack trace for debugging');
+  } catch (e, stackTrace) {
+    debugPrint('🔥 DUPLICATE_DEBUG: analyzeConversationWithAgent call stack:');
+    debugPrint(stackTrace.toString());
+  }
+
   debugPrint('Starting agent conversation analysis...');
 
   final request = AgentAnalysisRequest(
@@ -1645,6 +1659,19 @@ Future<CreateConversationResponse?> createConversationWithAgent({
   String? conversationId,
   String sessionId = "default",
 }) async {
+  debugPrint('🔥 DUPLICATE_DEBUG: API.createConversationWithAgent() ENTRY');
+  debugPrint('🔥 DUPLICATE_DEBUG: - transcript length: ${transcript.length}');
+  debugPrint('🔥 DUPLICATE_DEBUG: - conversationId: $conversationId');
+  debugPrint('🔥 DUPLICATE_DEBUG: - sessionId: $sessionId');
+
+  // Check current stack trace to see who called this
+  try {
+    throw Exception('Stack trace for debugging');
+  } catch (e, stackTrace) {
+    debugPrint('🔥 DUPLICATE_DEBUG: createConversationWithAgent call stack:');
+    debugPrint(stackTrace.toString());
+  }
+
   debugPrint('🟠 API: createConversationWithAgent() called');
   debugPrint('🟠 API: transcript length = ${transcript.length}');
   debugPrint('🟠 API: conversationId = $conversationId');

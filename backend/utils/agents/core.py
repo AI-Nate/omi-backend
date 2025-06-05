@@ -90,6 +90,16 @@ Remember: You are analyzing conversations that have already happened. Your role 
         Returns:
             Analysis results with insights and suggested actions
         """
+        print(f"🔥 DUPLICATE_DEBUG: ConversationAgent.analyze_conversation() ENTRY")
+        print(f"🔥 DUPLICATE_DEBUG: - uid: {self.uid}")
+        print(f"🔥 DUPLICATE_DEBUG: - transcript length: {len(transcript)}")
+        print(f"🔥 DUPLICATE_DEBUG: - session_id: {session_id}")
+        print(f"🔥 DUPLICATE_DEBUG: - conversation_data: {conversation_data}")
+        
+        import traceback
+        print(f"🔥 DUPLICATE_DEBUG: Agent analyze_conversation call stack:")
+        traceback.print_stack()
+        
         try:
             # Prepare conversation context
             context_info = ""
@@ -125,11 +135,19 @@ Please provide a comprehensive analysis with actionable recommendations."""
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
             
+            print(f"🔥 DUPLICATE_DEBUG: About to call self.agent.invoke() - this will trigger LangGraph")
+            print(f"🔥 DUPLICATE_DEBUG: - session_id: {session_id}")
+            print(f"🔥 DUPLICATE_DEBUG: - config: {config}")
+            
             # Run the agent
             result = self.agent.invoke(
                 {"messages": [{"role": "user", "content": analysis_prompt}]},
                 config=config
             )
+            
+            print(f"🔥 DUPLICATE_DEBUG: self.agent.invoke() completed successfully")
+            print(f"🔥 DUPLICATE_DEBUG: - result type: {type(result)}")
+            print(f"🔥 DUPLICATE_DEBUG: - result keys: {result.keys() if isinstance(result, dict) else 'not a dict'}")
             
             # Extract the final response
             final_message = result["messages"][-1].content

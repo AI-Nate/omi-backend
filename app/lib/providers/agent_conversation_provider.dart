@@ -85,6 +85,12 @@ class AgentConversationProvider extends BaseProvider {
     required String transcript,
     String? conversationId,
   }) async {
+    debugPrint(
+        '🔥 DUPLICATE_DEBUG: AGENT_PROVIDER._performStandardAnalysis() ENTRY');
+    debugPrint('🔥 DUPLICATE_DEBUG: - transcript length: ${transcript.length}');
+    debugPrint('🔥 DUPLICATE_DEBUG: - conversationId: $conversationId');
+    debugPrint('🔥 DUPLICATE_DEBUG: - sessionId: $_currentSessionId');
+
     debugPrint('🟣 AGENT_PROVIDER: _performStandardAnalysis() called');
     debugPrint('🟣 AGENT_PROVIDER: Calling analyzeConversationWithAgent API');
 
