@@ -111,7 +111,10 @@ class AgentConversationProvider extends BaseProvider {
       };
 
       debugPrint('🟣 AGENT_PROVIDER: Adding to analysis stream: $streamEvent');
+      debugPrint(
+          '🟣 AGENT_PROVIDER: Stream controller has ${_analysisStreamController.hasListener ? 'listeners' : 'NO listeners'}');
       _analysisStreamController.add(streamEvent);
+      debugPrint('🟣 AGENT_PROVIDER: Stream event sent successfully');
       debugPrint('🟣 AGENT_PROVIDER: Agent analysis completed successfully');
     } else {
       debugPrint('🔴 AGENT_PROVIDER: Agent analysis failed');
