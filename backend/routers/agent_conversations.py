@@ -146,22 +146,9 @@ def create_conversation_with_agent(
         print(f"🟦 BACKEND: Agent analysis length: {len(agent_analysis)}")
         print(f"🟦 BACKEND: Retrieved conversations count: {len(retrieved_conversations)}")
         
-        # Generate title using the same approach as normal conversations
-        print(f"🔍 AGENT_CREATE: Generating title using normal conversation method...")
-        from utils.llm import get_transcript_structure
-        try:
-            temp_structured = get_transcript_structure(
-                request.transcript, 
-                datetime.now(), 
-                'en',  # Default language
-                'UTC',  # Default timezone
-                uid
-            )
-            generated_title = temp_structured.title if temp_structured else None
-            print(f"🔍 AGENT_CREATE: Generated title: '{generated_title}'")
-        except Exception as e:
-            print(f"🔴 AGENT_CREATE: Error generating title: {e}")
-            generated_title = None
+        # Extract title from agent analysis result (title is now included in analyze_conversation)
+        agent_title = result.get('title', '')
+        print(f"🔍 AGENT_CREATE: Agent generated title: '{agent_title}'")
         
         # Extract structured data from agent analysis
         print(f"🟦 BACKEND: Extracting structured data from agent analysis...")
@@ -171,12 +158,12 @@ def create_conversation_with_agent(
             request.transcript
         )
         
-        # Use the generated title if available, otherwise use agent extracted title
-        if generated_title and generated_title.strip():
-            structured_data["title"] = generated_title
-            print(f"🔍 AGENT_CREATE: Using normal conversation title: '{structured_data['title']}'")
+        # Use the agent generated title if available, otherwise use extracted title
+        if agent_title and agent_title.strip():
+            structured_data["title"] = agent_title
+            print(f"🔍 AGENT_CREATE: Using agent generated title: '{structured_data['title']}'")
         else:
-            print(f"🔍 AGENT_CREATE: Falling back to agent extracted title: '{structured_data.get('title', 'None')}'")
+            print(f"🔍 AGENT_CREATE: Falling back to extracted title: '{structured_data.get('title', 'None')}'")
         
         print(f"🟦 BACKEND: Final structured data title: {structured_data.get('title')}")
         

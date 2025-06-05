@@ -111,9 +111,14 @@ CONVERSATION METADATA:
 - Category: {conversation_data.get('category', 'Unknown')}
 """
             
-            # Create analysis prompt
+            # Create analysis prompt that includes title generation
             analysis_prompt = f"""
-Please analyze this conversation transcript and help the user by providing:
+Please analyze this conversation transcript and help the user. Provide your response in this exact format:
+
+TITLE: [Generate a concise, memorable title (3-8 words) that captures the essence of what was discussed]
+
+ANALYSIS:
+[Your comprehensive analysis covering the following areas:]
 
 1. **Understanding the Context**: What is this conversation about? What are the main topics and themes?
 
@@ -130,7 +135,7 @@ Please analyze this conversation transcript and help the user by providing:
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-Please provide a comprehensive analysis with actionable recommendations. Do NOT include a title or header - start directly with your analysis content."""
+Please provide a comprehensive analysis with actionable recommendations. Start with "TITLE:" followed by a short descriptive title, then "ANALYSIS:" followed by your detailed analysis."""
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
@@ -152,9 +157,46 @@ Please provide a comprehensive analysis with actionable recommendations. Do NOT 
             # Extract the final response
             final_message = result["messages"][-1].content
             
+            # Parse title and analysis from the response
+            title = "Conversation"  # Default fallback
+            analysis = final_message  # Default to full response
+            
+            import re
+            
+            # Try to extract title and analysis
+            title_match = re.search(r'TITLE:\s*(.+?)(?:\n|$)', final_message, re.IGNORECASE)
+            if title_match:
+                title = title_match.group(1).strip()
+                # Clean up the title
+                title = re.sub(r'^["\']|["\']$', '', title)  # Remove quotes
+                title = re.sub(r'^#+ ', '', title)  # Remove markdown headers
+                title = title.strip()
+                
+                # Validate title length
+                if len(title) > 100:
+                    title = title[:97] + "..."
+                elif len(title) < 3:
+                    title = "Conversation"
+                
+                print(f"🔍 AGENT: Extracted title from response: '{title}'")
+            
+            # Extract analysis part (everything after "ANALYSIS:")
+            analysis_match = re.search(r'ANALYSIS:\s*(.+)', final_message, re.DOTALL | re.IGNORECASE)
+            if analysis_match:
+                analysis = analysis_match.group(1).strip()
+                print(f"🔍 AGENT: Extracted analysis (length: {len(analysis)})")
+            else:
+                # If no ANALYSIS: marker found, use everything after TITLE:
+                if title_match:
+                    analysis = final_message[title_match.end():].strip()
+                    # Remove any remaining "ANALYSIS:" markers
+                    analysis = re.sub(r'^\s*ANALYSIS:\s*', '', analysis, flags=re.IGNORECASE)
+                print(f"🔍 AGENT: Using fallback analysis extraction (length: {len(analysis)})")
+            
             # Parse and structure the response
             return {
-                "analysis": final_message,
+                "title": title,
+                "analysis": analysis,
                 "session_id": session_id,
                 "timestamp": datetime.now().isoformat(),
                 "status": "success"

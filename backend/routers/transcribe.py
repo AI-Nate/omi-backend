@@ -73,22 +73,9 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         agent_analysis = result.get('analysis', '')
         retrieved_conversations = result.get('retrieved_conversations', [])
         
-        # Generate title using the same approach as normal conversations
-        print(f"🔍 TRANSCRIBE: Generating title for conversation {conversation.id}")
-        from utils.llm import get_transcript_structure
-        try:
-            temp_structured = get_transcript_structure(
-                transcript, 
-                conversation.created_at, 
-                conversation.language or 'en', 
-                'UTC',  # Default timezone
-                uid
-            )
-            print(f"🔍 TRANSCRIBE: Generated title: '{temp_structured.title}'")
-        except Exception as e:
-            print(f"🔴 TRANSCRIBE: Error generating title: {e}")
-            # Fallback to a simple title
-            temp_structured = None
+        # Extract title from agent analysis result (title is now included in analyze_conversation)
+        agent_title = result.get('title', '')
+        print(f"🔍 TRANSCRIBE: Agent generated title: '{agent_title}'")
         
         # Extract structured data from agent analysis for other fields
         from routers.agent_conversations import _extract_structured_data_from_agent_analysis
@@ -99,10 +86,10 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         )
         print(f"🔍 TRANSCRIBE: Agent analysis title: '{structured_data.get('title', 'None')}'")
         
-        # Use the title from normal conversation processing if available
-        if temp_structured and temp_structured.title:
-            structured_data["title"] = temp_structured.title
-            print(f"🔍 TRANSCRIBE: Using normal conversation title: '{structured_data['title']}'")
+        # Use the agent generated title if available
+        if agent_title and agent_title.strip():
+            structured_data["title"] = agent_title
+            print(f"🔍 TRANSCRIBE: Using agent generated title: '{structured_data['title']}'")
         else:
             print(f"🔍 TRANSCRIBE: Falling back to agent extracted title: '{structured_data.get('title', 'None')}')")
         
