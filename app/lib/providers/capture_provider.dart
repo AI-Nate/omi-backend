@@ -134,9 +134,15 @@ class CaptureProvider extends ChangeNotifier
   }
 
   Future _resetStateVariables() async {
+    debugPrint('🔄 CAPTURE_PROVIDER: _resetStateVariables() called');
+    debugPrint('🔄 CAPTURE_PROVIDER: Clearing ${segments.length} segments');
     segments = [];
     conversationId = const Uuid().v4();
     hasTranscripts = false;
+    _hasManuallyProcessed =
+        false; // Reset manual processing flag for new recording session
+    debugPrint(
+        '🔄 CAPTURE_PROVIDER: State variables reset completed - new conversationId: $conversationId');
     notifyListeners();
   }
 
@@ -540,6 +546,9 @@ class CaptureProvider extends ChangeNotifier
   }
 
   @override
+  // Track if we've already manually processed to prevent duplicate processing
+  bool _hasManuallyProcessed = false;
+
   void onMessageEventReceived(ServerMessageEvent event) {
     if (event.type == MessageEventType.conversationProcessingStarted) {
       if (event.conversation == null) {
@@ -553,12 +562,14 @@ class CaptureProvider extends ChangeNotifier
         debugPrint(
             "🤖 DEV MODE: Auto trigger - calling agent processing instead of standard processing");
 
-        // Check if we're not already processing to avoid duplicates
-        if (conversationProvider!.processingConversations.isEmpty) {
+        // Check if we haven't already manually processed and we're not currently processing
+        if (!_hasManuallyProcessed &&
+            conversationProvider!.processingConversations.isEmpty) {
           // Use the same agent processing as manual trigger
           forceProcessingCurrentConversationWithAgent();
         } else {
-          debugPrint("🤖 DEV MODE: Already processing, ignoring auto trigger");
+          debugPrint(
+              "🤖 DEV MODE: Already processed manually or currently processing, ignoring auto trigger");
         }
         return;
       }
@@ -570,11 +581,14 @@ class CaptureProvider extends ChangeNotifier
     }
 
     if (event.type == MessageEventType.conversationCreated) {
+      debugPrint('🟢 CAPTURE_PROVIDER: Received conversationCreated event');
       if (event.conversation == null) {
         debugPrint(
             "Conversation data not received in event. Content is: $event");
         return;
       }
+      debugPrint(
+          '🟢 CAPTURE_PROVIDER: Processing conversation created - ID: ${event.conversation!.id}');
       event.conversation!.isNew = true;
       conversationProvider!
           .removeProcessingConversation(event.conversation!.id);
@@ -626,7 +640,8 @@ class CaptureProvider extends ChangeNotifier
   }
 
   Future<void> _forceProcessingCurrentConversationStandard() async {
-    _resetStateVariables();
+    _hasManuallyProcessed =
+        true; // Mark manual processing to prevent duplicates
     conversationProvider!.addProcessingConversation(
       ServerConversation(
           id: '0',
@@ -661,6 +676,9 @@ class CaptureProvider extends ChangeNotifier
       return;
     }
 
+    // Mark that we've manually processed to prevent automatic duplicate processing
+    _hasManuallyProcessed = true;
+
     debugPrint(
         '🟡 CAPTURE_PROVIDER: Starting agent conversation processing...');
 
@@ -668,9 +686,8 @@ class CaptureProvider extends ChangeNotifier
     final currentSegments = List<TranscriptSegment>.from(segments);
 
     debugPrint(
-        '🟡 CAPTURE_PROVIDER: Saved ${currentSegments.length} segments before reset');
+        '🟡 CAPTURE_PROVIDER: Saved ${currentSegments.length} segments before processing');
 
-    _resetStateVariables();
     conversationProvider!.addProcessingConversation(
       ServerConversation(
           id: '0',
@@ -786,6 +803,11 @@ class CaptureProvider extends ChangeNotifier
     if (conversation == null) return;
     conversationProvider?.upsertConversation(conversation);
     MixpanelManager().conversationCreated(conversation);
+
+    // Reset the recording state so UI is ready for next recording
+    await _resetStateVariables();
+    debugPrint(
+        '🟢 CAPTURE_PROVIDER: Recording state reset after conversation created - ready for new recording');
   }
 
   Future<void> _handleLastConvoEvent(String memoryId) async {
