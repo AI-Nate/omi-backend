@@ -197,7 +197,7 @@ def create_conversation_with_agent(
         if structured_data.get("action_items"):
             from models.conversation import ActionItem
             conversation.structured.action_items = [
-                ActionItem(content=item["content"]) 
+                ActionItem(description=item["content"]) 
                 for item in structured_data["action_items"]
             ]
         
@@ -212,7 +212,7 @@ def create_conversation_with_agent(
                 Event(
                     title=event["title"],
                     description=event["description"],
-                    created_at=datetime.fromisoformat(event["created_at"]),
+                    start=datetime.fromisoformat(event["created_at"]),
                     duration=event["duration"]
                 )
                 for event in structured_data["events"]
@@ -311,7 +311,7 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
     return {
         "title": title,
         "overview": overview,
-        "category": "ai-agent-analysis",
+        "category": "other",  # Use valid category from CategoryEnum
         "action_items": [{"content": item} for item in action_items[:10]],  # Limit to 10 items
         "key_takeaways": key_takeaways,
         "events": events,
