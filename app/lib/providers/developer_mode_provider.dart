@@ -147,7 +147,7 @@ class DeveloperModeProvider extends BaseProvider {
     notifyListeners();
   }
 
-  void saveSettings() async {
+  Future<void> saveSettings() async {
     if (savingSettingsLoading) return;
     setIsLoading(true);
     final prefs = SharedPreferencesUtil();
