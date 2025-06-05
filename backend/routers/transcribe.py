@@ -74,14 +74,21 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         retrieved_conversations = result.get('retrieved_conversations', [])
         
         # Generate title using the same approach as normal conversations
+        print(f"🔍 TRANSCRIBE: Generating title for conversation {conversation.id}")
         from utils.llm import get_transcript_structure
-        temp_structured = get_transcript_structure(
-            transcript, 
-            conversation.created_at, 
-            conversation.language or 'en', 
-            'UTC',  # Default timezone
-            uid
-        )
+        try:
+            temp_structured = get_transcript_structure(
+                transcript, 
+                conversation.created_at, 
+                conversation.language or 'en', 
+                'UTC',  # Default timezone
+                uid
+            )
+            print(f"🔍 TRANSCRIBE: Generated title: '{temp_structured.title}'")
+        except Exception as e:
+            print(f"🔴 TRANSCRIBE: Error generating title: {e}")
+            # Fallback to a simple title
+            temp_structured = None
         
         # Extract structured data from agent analysis for other fields
         from routers.agent_conversations import _extract_structured_data_from_agent_analysis
@@ -90,9 +97,14 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
             retrieved_conversations,
             transcript
         )
+        print(f"🔍 TRANSCRIBE: Agent analysis title: '{structured_data.get('title', 'None')}'")
         
-        # Use the title from normal conversation processing
-        structured_data["title"] = temp_structured.title
+        # Use the title from normal conversation processing if available
+        if temp_structured and temp_structured.title:
+            structured_data["title"] = temp_structured.title
+            print(f"🔍 TRANSCRIBE: Using normal conversation title: '{structured_data['title']}'")
+        else:
+            print(f"🔍 TRANSCRIBE: Falling back to agent extracted title: '{structured_data.get('title', 'None')}')")
         
         # Update conversation with agent-generated structured data
         conversation.structured = Structured(

@@ -306,15 +306,18 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
     # If no pattern matched, use first meaningful line as title
     if title == "Agent Analysis":
         lines = [line.strip() for line in analysis.split('\n') if line.strip() and not line.startswith('#')]
+        print(f"🔍 AGENT: No title pattern found, using fallback. First 3 lines: {lines[:3]}")
         if lines:
             # Take first line that's not too long and seems title-like
             for line in lines[:3]:  # Check first 3 lines
                 clean_line = re.sub(r'[#*"`]', '', line).strip()
                 if 3 < len(clean_line) < 80 and not clean_line.lower().startswith(('the ', 'this ', 'based on')):
                     title = clean_line[:100]
+                    print(f"🔍 AGENT: Selected title from analysis: '{title}'")
                     break
             else:
                 title = lines[0][:100]  # Fallback to first line
+                print(f"🔍 AGENT: Using first line as title: '{title}'")
     
     # Remove title from analysis text to prevent duplication
     cleaned_analysis = analysis
