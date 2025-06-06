@@ -3,8 +3,10 @@ Agent tools for conversation analysis and retrieval
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import os
 from langchain.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_openai import AzureChatOpenAI
 from pydantic import BaseModel, Field
 
 from database.vector_db import query_vectors, query_vectors_by_metadata
@@ -24,6 +26,14 @@ class PineconeRetrievalInput(BaseModel):
 class WebSearchInput(BaseModel):
     """Input for web search tool"""
     query: str = Field(description="Search query for web search")
+
+
+class AzureAgentInput(BaseModel):
+    """Input for Azure OpenAI agent tool"""
+    system_prompt: str = Field(description="System prompt to define the agent's role and capabilities")
+    user_message: str = Field(description="The specific task or question for the agent to handle")
+    temperature: Optional[float] = Field(0.1, description="Temperature for response generation (0.0 to 1.0)")
+    max_tokens: Optional[int] = Field(1000, description="Maximum tokens for the response")
 
 
 @tool("pinecone_conversation_retrieval", args_schema=PineconeRetrievalInput)
@@ -202,6 +212,58 @@ def web_search_tool(query: str) -> str:
         return f"Error performing web search: {str(e)}"
 
 
+@tool("azure_agent", args_schema=AzureAgentInput)
+def azure_agent_tool(
+    system_prompt: str, 
+    user_message: str, 
+    temperature: Optional[float] = 0.1,
+    max_tokens: Optional[int] = 1000
+) -> str:
+    """
+    Delegate a specific task to a specialized Azure OpenAI agent with custom system prompt.
+    
+    Use this tool when you need to:
+    - Create a specialized agent for a specific task (research, analysis, planning, etc.)
+    - Generate content with specific expertise or perspective
+    - Perform complex reasoning or analysis tasks
+    - Get detailed information or recommendations on specific topics
+    
+    Args:
+        system_prompt: Define the agent's role, expertise, and behavior
+        user_message: The specific task or question for the agent
+        temperature: Controls randomness (0.0 = deterministic, 1.0 = creative)
+        max_tokens: Maximum length of the response
+        
+    Returns:
+        The specialized agent's response
+    """
+    try:
+        # Initialize Azure OpenAI with the same configuration as core agent
+        azure_agent = AzureChatOpenAI(
+            deployment_name="gpt-4.1",
+            model_name="gpt-4.1",
+            temperature=temperature,
+            max_tokens=max_tokens,
+            api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=os.getenv("AZURE_OPENAI_API_KEY")
+        )
+        
+        # Create messages with system prompt and user message
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+        
+        # Get response from the specialized agent
+        response = azure_agent.invoke(messages)
+        
+        return response.content
+        
+    except Exception as e:
+        return f"Error with Azure agent: {str(e)}"
+
+
 def get_agent_tools(uid: str) -> List:
     """
     Get all available tools for the agent with user context.
@@ -252,5 +314,6 @@ def get_agent_tools(uid: str) -> List:
     return [
         bound_pinecone_retrieval,
         bound_advanced_retrieval,
-        web_search_tool
+        web_search_tool,
+        azure_agent_tool
     ] 

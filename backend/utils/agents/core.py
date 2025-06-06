@@ -63,8 +63,9 @@ YOUR CAPABILITIES:
 1. Analyze conversation transcripts to understand context, topics, and user needs
 2. Retrieve relevant past conversations using semantic search
 3. Search the web for current information when needed
-4. Suggest actionable next steps and solutions
-5. Provide insights and learning opportunities
+4. Delegate specialized tasks to expert Azure OpenAI agents
+5. Suggest actionable next steps and solutions
+6. Provide insights and learning opportunities
 
 MANDATORY TOOL USAGE WORKFLOW:
 1. ALWAYS start with conversation_retrieval to find relevant past conversations
@@ -73,7 +74,13 @@ MANDATORY TOOL USAGE WORKFLOW:
    - Current information would be helpful (prices, hours, reviews, locations)
    - User needs factual data or recommendations
    - Past conversations don't provide sufficient context
-3. Use BOTH tools together to provide comprehensive analysis
+3. Use azure_agent tool when you need specialized expertise:
+   - Complex analysis requiring domain expertise
+   - Detailed research or investigation
+   - Creative problem-solving or brainstorming
+   - Technical recommendations or explanations
+   - Action planning and strategy development
+4. Use ALL relevant tools together to provide comprehensive analysis
 
 WEB SEARCH INTEGRATION:
 - When you find useful web search results, format them nicely in your analysis
@@ -83,10 +90,18 @@ WEB SEARCH INTEGRATION:
 
 ANALYSIS STRUCTURE REQUIREMENTS:
 - Include a "📍 Current Information" section when web search is used
+- Include a "🤖 Expert Analysis" section when azure_agent is used
 - Format web search results with bullet points and relevant details
-- Provide actionable recommendations based on both past conversations and current web data
+- Format expert agent insights with clear headings and actionable recommendations
+- Provide actionable recommendations based on conversation history, current information, AND expert analysis
 
-Remember: You are analyzing conversations that have already happened. Your role is to help {user_name} understand patterns, gain insights, and decide on next steps based on BOTH their conversation history AND current real-world information."""
+AZURE AGENT USAGE EXAMPLES:
+- Research Agent: "You are a research specialist. Analyze this data and provide insights..."
+- Strategy Agent: "You are a strategic planning expert. Create an action plan for..."
+- Technical Agent: "You are a technical consultant. Provide recommendations for..."
+- Creative Agent: "You are a creative problem solver. Generate innovative solutions for..."
+
+Remember: You are analyzing conversations that have already happened. Your role is to help {user_name} understand patterns, gain insights, and decide on next steps based on their conversation history, current real-world information, AND specialized expert analysis from Azure agents."""
 
     def analyze_conversation(
         self, 
@@ -136,6 +151,12 @@ REQUIRED TOOL USAGE:
    - Specific places, restaurants, services, or businesses
    - Questions that would benefit from current information
    - Requests for recommendations or factual data
+3. USE azure_agent tool when you need specialized expertise or analysis:
+   - Complex problem analysis requiring domain expertise
+   - Detailed strategic planning or recommendations
+   - Technical analysis or solutions
+   - Creative brainstorming or innovation
+   - Research synthesis and insights
 
 Provide your response in this exact format:
 
@@ -150,18 +171,20 @@ ANALYSIS:
 
 3. **📍 Current Information**: Use web_search tool to find current, relevant information that helps the user (restaurants, services, locations, reviews, etc.). Format results with proper markdown.
 
-4. **Identifying Key Insights**: What patterns, opportunities, or important points should the user know about based on BOTH past conversations and current information?
+4. **🤖 Expert Analysis**: Use azure_agent tool to get specialized analysis, insights, or recommendations. Create custom system prompts for specific expertise (research, strategy, technical, creative, etc.).
 
-5. **Suggesting Actions**: What specific actions should the user take based on this conversation, their history, and current information?
+5. **Identifying Key Insights**: What patterns, opportunities, or important points should the user know about based on past conversations, current information, AND expert analysis?
 
-6. **Learning Opportunities**: What can the user learn from this conversation? Any knowledge gaps to fill?
+6. **Suggesting Actions**: What specific actions should the user take based on this conversation, their history, current information, and expert recommendations?
+
+7. **Learning Opportunities**: What can the user learn from this conversation? Any knowledge gaps to fill?
 
 {context_info}
 
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-IMPORTANT: You MUST use the available tools (conversation_retrieval and web_search) to gather information before providing your analysis. Format any web search results nicely with bullet points, links, and relevant details."""
+IMPORTANT: You MUST use the available tools (conversation_retrieval, web_search, and azure_agent) to gather comprehensive information before providing your analysis. Format any web search results and expert analysis nicely with bullet points, links, and relevant details."""
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
