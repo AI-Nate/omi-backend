@@ -4,8 +4,9 @@ Core agent implementation for conversation analysis and action taking
 from typing import List, Dict, Any, Optional, Generator
 from datetime import datetime
 import json
+import os
 
-from langchain_openai import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.prebuilt import create_react_agent
@@ -22,9 +23,18 @@ class ConversationAgent:
     AI Agent for analyzing conversations and taking actions
     """
     
-    def __init__(self, uid: str, model_name: str = "gpt-4o-mini"):
+    def __init__(self, uid: str, model_name: str = "gpt-4.1"):
         self.uid = uid
-        self.llm = ChatOpenAI(model=model_name, temperature=0.1)
+        
+        # Initialize Azure OpenAI with environment variables
+        self.llm = AzureChatOpenAI(
+            deployment_name="gpt-4.1",  # Your Azure deployment name
+            model_name=model_name,
+            temperature=0.1,
+            api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=os.getenv("AZURE_OPENAI_API_KEY")
+        )
         self.tools = get_agent_tools(uid)
         self.memory = MemorySaver()
         
