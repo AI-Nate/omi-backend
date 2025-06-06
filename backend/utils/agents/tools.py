@@ -7,6 +7,8 @@ import os
 from langchain.tools import tool
 from langchain_community.tools import DuckDuckGoSearchRun
 from langchain_openai import AzureChatOpenAI
+from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field
 
 from database.vector_db import query_vectors, query_vectors_by_metadata
@@ -212,6 +214,17 @@ def web_search_tool(query: str) -> str:
         return f"Error performing web search: {str(e)}"
 
 
+def get_azure_agent_tools() -> List:
+    """
+    Get tools available for Azure agent tool.
+    Currently includes web search capability.
+    
+    Returns:
+        List of tools for Azure agent
+    """
+    return [web_search_tool]
+
+
 @tool("azure_agent", args_schema=AzureAgentInput)
 def azure_agent_tool(
     system_prompt: str, 
@@ -220,12 +233,18 @@ def azure_agent_tool(
     max_tokens: Optional[int] = 1000
 ) -> str:
     """
-    Delegate a specific task to a specialized Azure OpenAI agent with custom system prompt.
+    Delegate a specific task to a specialized Azure OpenAI agent with custom system prompt and web search capability.
+    
+    This agent can:
+    - Use web search to find current information when needed
+    - Perform specialized analysis with domain expertise
+    - Combine web research with custom reasoning
+    - Generate comprehensive, well-researched responses
     
     Use this tool when you need to:
     - Create a specialized agent for a specific task (research, analysis, planning, etc.)
     - Generate content with specific expertise or perspective
-    - Perform complex reasoning or analysis tasks
+    - Perform complex reasoning or analysis tasks requiring current information
     - Get detailed information or recommendations on specific topics
     
     Args:
@@ -235,11 +254,11 @@ def azure_agent_tool(
         max_tokens: Maximum length of the response
         
     Returns:
-        The specialized agent's response
+        The specialized agent's response (may include web search results)
     """
     try:
-        # Initialize Azure OpenAI with the same configuration as core agent
-        azure_agent = AzureChatOpenAI(
+        # Initialize Azure OpenAI LLM
+        azure_llm = AzureChatOpenAI(
             deployment_name="gpt-4.1",
             model_name="gpt-4.1",
             temperature=temperature,
@@ -249,16 +268,59 @@ def azure_agent_tool(
             api_key=os.getenv("AZURE_OPENAI_API_KEY")
         )
         
-        # Create messages with system prompt and user message
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
+        # Get tools for the Azure agent
+        azure_tools = get_azure_agent_tools()
         
-        # Get response from the specialized agent
-        response = azure_agent.invoke(messages)
+        # Create memory for the Azure agent
+        azure_memory = MemorySaver()
         
-        return response.content
+        # Create the Azure agent with tools
+        azure_agent = create_react_agent(
+            azure_llm,
+            azure_tools,
+            checkpointer=azure_memory
+        )
+        
+        # Enhanced system prompt that includes tool usage instructions
+        enhanced_system_prompt = f"""{system_prompt}
+
+AVAILABLE TOOLS:
+- web_search: Use this to find current, real-time information from the internet when your task requires:
+  * Current facts, data, or statistics
+  * Recent news or developments
+  * Specific information about places, businesses, or services
+  * Prices, reviews, or ratings
+  * Contact information or addresses
+  * Any information that might have changed recently
+
+TOOL USAGE GUIDELINES:
+- Use web_search when the user's request would benefit from current, real-world information
+- Always explain how the web search results help answer the user's question
+- Format web search findings clearly with bullet points and relevant details
+- Combine web search results with your specialized expertise to provide comprehensive analysis
+
+Remember: You have access to web search, so use it strategically to enhance your specialized knowledge with current information."""
+
+        # Create the analysis prompt for the Azure agent
+        agent_prompt = f"""System: {enhanced_system_prompt}
+
+User: {user_message}
+
+Please provide a comprehensive response using your specialized expertise. Use web search when current information would enhance your analysis."""
+
+        # Configure the Azure agent
+        config = {"configurable": {"thread_id": f"azure_agent_{hash(user_message)}"}}
+        
+        # Run the Azure agent
+        result = azure_agent.invoke(
+            {"messages": [{"role": "user", "content": agent_prompt}]},
+            config=config
+        )
+        
+        # Extract the final response
+        final_response = result["messages"][-1].content
+        
+        return final_response
         
     except Exception as e:
         return f"Error with Azure agent: {str(e)}"
