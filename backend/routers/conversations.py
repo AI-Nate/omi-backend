@@ -526,29 +526,6 @@ def delete_conversation(conversation_id: str, uid: str = Depends(auth.get_curren
     return {"status": "Ok"}
 
 
-@router.delete("/v1/conversations/in-progress/clear", status_code=204, tags=['conversations'])
-def clear_in_progress_conversation(uid: str = Depends(auth.get_current_user_uid)):
-    """
-    Clear the current in-progress conversation to prevent duplicate auto-processing.
-    This is useful when manual processing has already been triggered.
-    """
-    print(f'🧹 CONVERSATIONS: Clearing in-progress conversation for user {uid}')
-    
-    # Remove from Redis
-    redis_db.remove_in_progress_conversation_id(uid)
-    
-    # Also update any in-progress conversations in the database to completed status
-    in_progress_conversation = retrieve_in_progress_conversation(uid)
-    if in_progress_conversation:
-        conversation_id = in_progress_conversation['id']
-        conversations_db.update_conversation_status(uid, conversation_id, ConversationStatus.completed)
-        print(f'✅ CONVERSATIONS: Cleared in-progress conversation {conversation_id} for user {uid}')
-    else:
-        print(f'ℹ️ CONVERSATIONS: No in-progress conversation found for user {uid}')
-    
-    return {"status": "Ok"}
-
-
 @router.get("/v1/conversations/{conversation_id}/recording", response_model=dict, tags=['conversations'])
 def conversation_has_audio_recording(conversation_id: str, uid: str = Depends(auth.get_current_user_uid)):
     _get_conversation_by_id(uid, conversation_id)
