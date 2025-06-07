@@ -260,7 +260,7 @@ def create_conversation_with_agent(
         conversations_db.upsert_conversation(uid, conversation.dict())
         
         # Clear in-progress conversation from Redis to prevent auto-processing
-        import database.redis as redis_db
+        import database.redis_db as redis_db
         redis_db.remove_in_progress_conversation_id(uid)
         print(f"🟦 BACKEND: Cleared in-progress conversation from Redis to prevent duplicate processing")
         
