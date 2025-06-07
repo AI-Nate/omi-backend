@@ -118,6 +118,23 @@ def create_conversation_with_agent(
     print(f"🟦 BACKEND: Request - conversation_id: {request.conversation_id}")
     print(f"🟦 BACKEND: Request - session_id: {request.session_id}")
     
+    # 🧹 EARLY CLEAR: Clear in-progress conversation immediately to prevent race conditions
+    try:
+        import database.redis_db as redis_db
+        from utils.conversations.process_conversation import retrieve_in_progress_conversation
+        
+        # Check if there's an in-progress conversation before clearing
+        in_progress_conversation = retrieve_in_progress_conversation(uid)
+        if in_progress_conversation:
+            conversation_id = in_progress_conversation['id']
+            print(f"🧹 BACKEND: Found in-progress conversation {conversation_id}, clearing immediately to prevent duplication")
+            redis_db.remove_in_progress_conversation_id(uid)
+            print(f"✅ BACKEND: Cleared in-progress conversation {conversation_id} from Redis")
+        else:
+            print(f"ℹ️ BACKEND: No in-progress conversation found for user {uid}")
+    except Exception as clear_error:
+        print(f"⚠️ BACKEND: Error during early clear (continuing anyway): {clear_error}")
+    
     try:
         # Create agent for the user
         print(f"🟦 BACKEND: Creating conversation agent for user {uid}")

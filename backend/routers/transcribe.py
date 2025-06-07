@@ -304,16 +304,23 @@ async def _listen(
 
             # recheck session
             conversation = retrieve_in_progress_conversation(uid)
-            if not conversation or conversation['finished_at'] > finished_at:
-                print("_trigger_create_conversation_with_delay not conversation or not last session", uid)
+            if not conversation:
+                print(f"🔄 AUTO_PROCESSING: No in-progress conversation found for user {uid}, auto-processing cancelled")
+                return
+            if conversation['finished_at'] > finished_at:
+                print(f"🔄 AUTO_PROCESSING: Newer conversation detected for user {uid}, auto-processing cancelled")
                 return
             
             # 🤖 DEV MODE: Check if conversation was already processed manually
             # This prevents duplicate processing when user manually stops recording in dev mode
             conversation_obj = Conversation(**conversation)
+            print(f"🔄 AUTO_PROCESSING: Found in-progress conversation {conversation_obj.id} with status: {conversation_obj.status}")
+            
             if conversation_obj.status == ConversationStatus.completed:
-                print(f"🤖 TRANSCRIBE: Conversation {conversation_obj.id} already completed, skipping auto-processing", uid)
+                print(f"✅ AUTO_PROCESSING: Conversation {conversation_obj.id} already completed, skipping auto-processing for user {uid}")
                 return
+            
+            print(f"▶️ AUTO_PROCESSING: Proceeding with auto-processing of conversation {conversation_obj.id} for user {uid}")
             
             await _create_current_conversation()
         except asyncio.CancelledError:
