@@ -42,6 +42,33 @@ Future<CreateConversationResponse?> processInProgressConversation() async {
   return null;
 }
 
+/// Clear in-progress conversation to prevent duplicate auto-processing
+Future<bool> clearInProgressConversation() async {
+  try {
+    debugPrint(
+        '🧹 CONVERSATIONS: Clearing in-progress conversation to prevent duplicates');
+    var response = await makeApiCall(
+      url: '${Env.apiBaseUrl}v1/conversations/in-progress/clear',
+      headers: {},
+      method: 'DELETE',
+      body: '',
+    );
+
+    if (response?.statusCode == 200 || response?.statusCode == 204) {
+      debugPrint(
+          '✅ CONVERSATIONS: Successfully cleared in-progress conversation');
+      return true;
+    } else {
+      debugPrint(
+          '❌ CONVERSATIONS: Failed to clear in-progress conversation: ${response?.statusCode}');
+      return false;
+    }
+  } catch (e) {
+    debugPrint('❌ CONVERSATIONS: Error clearing in-progress conversation: $e');
+    return false;
+  }
+}
+
 Future<List<ServerConversation>> getConversations(
     {int limit = 50,
     int offset = 0,
