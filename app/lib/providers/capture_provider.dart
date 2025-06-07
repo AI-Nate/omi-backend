@@ -736,33 +736,66 @@ class CaptureProvider extends ChangeNotifier
         conversationProvider!.removeProcessingConversation('0');
         response.conversation!.isNew = true;
 
-        // Store agent analysis in the conversation for display
-        if (response.agentAnalysis != null) {
+        // Check if the conversation is discarded
+        if (response.conversation!.discarded) {
           debugPrint(
-              '🟡 CAPTURE_PROVIDER: Agent analysis available for storage');
+              '🗑️ CAPTURE_PROVIDER: Received discarded conversation - clearing transcript state');
+
+          // For discarded conversations, we still add them to the conversation list
+          // but we also need to clear the transcript state immediately
+          conversationProvider?.upsertConversation(response.conversation!);
+          MixpanelManager().conversationCreated(response.conversation!);
+
+          // Clear transcript state like when stopping recording for discarded conversations
+          await _resetStateVariables();
           debugPrint(
-              '🟡 CAPTURE_PROVIDER: Analysis length: ${response.agentAnalysis!.analysis.length}');
+              '🗑️ CAPTURE_PROVIDER: Transcript state cleared for discarded conversation');
+
+          // Also clear in-progress conversation from backend
+          try {
+            await clearInProgressConversation();
+            debugPrint(
+                '✅ CAPTURE_PROVIDER: Successfully cleared in-progress conversation for discard');
+          } catch (e) {
+            debugPrint(
+                '❌ CAPTURE_PROVIDER: Failed to clear in-progress conversation for discard: $e');
+          }
 
           debugPrint(
-              '🟡 CAPTURE_PROVIDER: Agent analysis will be displayed via conversation detail UI');
+              '🗑️ CAPTURE_PROVIDER: Discarded conversation processed successfully');
+        } else {
+          // For regular conversations, process normally
+          debugPrint(
+              '🟢 CAPTURE_PROVIDER: Processing regular (non-discarded) conversation');
+
+          // Store agent analysis in the conversation for display
+          if (response.agentAnalysis != null) {
+            debugPrint(
+                '🟡 CAPTURE_PROVIDER: Agent analysis available for storage');
+            debugPrint(
+                '🟡 CAPTURE_PROVIDER: Analysis length: ${response.agentAnalysis!.analysis.length}');
+
+            debugPrint(
+                '🟡 CAPTURE_PROVIDER: Agent analysis will be displayed via conversation detail UI');
+          }
+
+          _processConversationCreated(response.conversation, response.messages);
+
+          // 🧹 CLEAR TRANSCRIPT: Clear in-progress conversation to prevent duplicate auto-processing
+          debugPrint(
+              '🧹 CAPTURE_PROVIDER: Clearing in-progress conversation to prevent duplicate processing');
+          try {
+            await clearInProgressConversation();
+            debugPrint(
+                '✅ CAPTURE_PROVIDER: Successfully cleared in-progress conversation');
+          } catch (e) {
+            debugPrint(
+                '❌ CAPTURE_PROVIDER: Failed to clear in-progress conversation: $e');
+          }
+
+          debugPrint(
+              '🟢 CAPTURE_PROVIDER: Agent-analyzed conversation created successfully via backend');
         }
-
-        _processConversationCreated(response.conversation, response.messages);
-
-        // 🧹 CLEAR TRANSCRIPT: Clear in-progress conversation to prevent duplicate auto-processing
-        debugPrint(
-            '🧹 CAPTURE_PROVIDER: Clearing in-progress conversation to prevent duplicate processing');
-        try {
-          await clearInProgressConversation();
-          debugPrint(
-              '✅ CAPTURE_PROVIDER: Successfully cleared in-progress conversation');
-        } catch (e) {
-          debugPrint(
-              '❌ CAPTURE_PROVIDER: Failed to clear in-progress conversation: $e');
-        }
-
-        debugPrint(
-            '🟢 CAPTURE_PROVIDER: Agent-analyzed conversation created successfully via backend');
       } else {
         debugPrint(
             '🔴 CAPTURE_PROVIDER: Failed to create conversation via agent endpoint, falling back to standard processing');
@@ -864,6 +897,17 @@ class CaptureProvider extends ChangeNotifier
         // Process the created conversation (this will add it to the conversations list)
         conversationProvider?.upsertConversation(response.conversation!);
         MixpanelManager().conversationCreated(response.conversation!);
+
+        // Check if the conversation is discarded and handle appropriately
+        if (response.conversation!.discarded) {
+          debugPrint(
+              '🗑️ CAPTURE_PROVIDER: Background processing created discarded conversation');
+          // Note: For background processing, transcript state is already cleared
+          // so we don't need to call _resetStateVariables again
+        } else {
+          debugPrint(
+              '🟢 CAPTURE_PROVIDER: Background processing created regular conversation');
+        }
 
         debugPrint(
             '🟢 CAPTURE_PROVIDER: Background agent processing completed successfully');

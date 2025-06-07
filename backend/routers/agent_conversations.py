@@ -342,6 +342,22 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
         
         print(f"🗑️ BACKEND: Creating discarded conversation for user {uid}")
         
+        # 🧹 EARLY CLEAR: Clear in-progress conversation immediately to prevent auto-processing
+        try:
+            from utils.conversations.process_conversation import retrieve_in_progress_conversation
+            
+            # Check if there's an in-progress conversation before clearing
+            in_progress_conversation = retrieve_in_progress_conversation(uid)
+            if in_progress_conversation:
+                conversation_id = in_progress_conversation['id']
+                print(f"🧹 BACKEND: Found in-progress conversation {conversation_id}, clearing for discard")
+                redis_db.remove_in_progress_conversation_id(uid)
+                print(f"✅ BACKEND: Cleared in-progress conversation {conversation_id} from Redis for discard")
+            else:
+                print(f"ℹ️ BACKEND: No in-progress conversation found for user {uid} during discard")
+        except Exception as clear_error:
+            print(f"⚠️ BACKEND: Error during early clear for discard (continuing anyway): {clear_error}")
+        
         # Create transcript segments
         transcript_segments = []
         if transcript:
@@ -383,9 +399,9 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
         print(f"🗑️ BACKEND: Saving discarded conversation to database...")
         conversations_db.upsert_conversation(uid, conversation.dict())
         
-        # Clear in-progress conversation from Redis to prevent auto-processing
+        # 🧹 FINAL CLEAR: Ensure Redis is completely clean after discarded conversation is saved
         redis_db.remove_in_progress_conversation_id(uid)
-        print(f"🗑️ BACKEND: Cleared in-progress conversation from Redis")
+        print(f"🗑️ BACKEND: Final clear - removed in-progress conversation from Redis after discard save")
         
         # Return response in same format as successful agent processing
         response_data = {
