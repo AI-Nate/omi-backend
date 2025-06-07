@@ -749,6 +749,18 @@ class CaptureProvider extends ChangeNotifier
 
         _processConversationCreated(response.conversation, response.messages);
 
+        // 🧹 CLEAR TRANSCRIPT: Clear in-progress conversation to prevent duplicate auto-processing
+        debugPrint(
+            '🧹 CAPTURE_PROVIDER: Clearing in-progress conversation to prevent duplicate processing');
+        try {
+          await clearInProgressConversation();
+          debugPrint(
+              '✅ CAPTURE_PROVIDER: Successfully cleared in-progress conversation');
+        } catch (e) {
+          debugPrint(
+              '❌ CAPTURE_PROVIDER: Failed to clear in-progress conversation: $e');
+        }
+
         debugPrint(
             '🟢 CAPTURE_PROVIDER: Agent-analyzed conversation created successfully via backend');
       } else {
