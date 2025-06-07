@@ -286,20 +286,61 @@ def create_conversation_with_agent(
         import database.conversations as conversations_db
         conversations_db.upsert_conversation(uid, conversation.dict())
         
+        # 🚀 STEP 1: Trigger apps (following POST /v1/conversations pattern)
+        print(f"🔧 BACKEND: Triggering apps for agent-created conversation...")
+        if not conversation.discarded:
+            from utils.conversations.process_conversation import _trigger_apps
+            _trigger_apps(uid, conversation, is_reprocess=False, app_id=None)
+            print(f"✅ BACKEND: Apps triggered successfully - {len(conversation.apps_results)} app results")
+        else:
+            print(f"⏭️ BACKEND: Skipping app triggering for discarded conversation")
+        
+        # 🚀 STEP 2: Extract memories (following POST /v1/conversations pattern)
+        print(f"🧠 BACKEND: Extracting memories for agent-created conversation...")
+        if not conversation.discarded:
+            import threading
+            from utils.conversations.process_conversation import _extract_memories
+            threading.Thread(target=_extract_memories, args=(uid, conversation)).start()
+            print(f"✅ BACKEND: Memory extraction started in background thread")
+        else:
+            print(f"⏭️ BACKEND: Skipping memory extraction for discarded conversation")
+        
+        # 🚀 STEP 3: Save structured vector for search (already exists)
+        from utils.conversations.process_conversation import save_structured_vector
+        threading.Thread(target=save_structured_vector, args=(uid, conversation)).start()
+        print(f"✅ BACKEND: Vector embedding started in background thread")
+        
         # Clear in-progress conversation from Redis to prevent auto-processing
         import database.redis_db as redis_db
         redis_db.remove_in_progress_conversation_id(uid)
         print(f"🟦 BACKEND: Cleared in-progress conversation from Redis to prevent duplicate processing")
         
-        # Save structured vector for search
-        from utils.conversations.process_conversation import save_structured_vector
-        save_structured_vector(uid, conversation)
+        # 🚀 STEP 4: Trigger external integrations (following POST /v1/conversations pattern)
+        print(f"🔗 BACKEND: Triggering external integrations for agent-created conversation...")
+        from utils.app_integrations import trigger_external_integrations
+        messages = trigger_external_integrations(uid, conversation)
+        print(f"✅ BACKEND: External integrations triggered - {len(messages)} messages generated")
+        
+        # 🚀 STEP 5: Update personas (following POST /v1/conversations pattern)
+        print(f"👤 BACKEND: Updating personas for agent-created conversation...")
+        if not conversation.discarded:
+            from utils.apps import update_personas_async
+            threading.Thread(target=update_personas_async, args=(uid,)).start()
+            print(f"✅ BACKEND: Persona updates started in background thread")
+        else:
+            print(f"⏭️ BACKEND: Skipping persona updates for discarded conversation")
+        
+        # 🚀 STEP 6: Trigger conversation created webhook (following POST /v1/conversations pattern)
+        print(f"🪝 BACKEND: Triggering conversation created webhook...")
+        from utils.webhooks import conversation_created_webhook
+        threading.Thread(target=conversation_created_webhook, args=(uid, conversation)).start()
+        print(f"✅ BACKEND: Conversation created webhook started in background thread")
         
         print(f"🟦 BACKEND: Conversation saved successfully")
         
         response_data = {
             "memory": conversation,
-            "messages": [],  # No chat messages for agent-created conversations
+            "messages": messages,  # Include external integration messages like standard endpoint
             "agent_analysis": {
                 "analysis": agent_analysis,
                 "retrieved_conversations": retrieved_conversations,
@@ -399,14 +440,26 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
         print(f"🗑️ BACKEND: Saving discarded conversation to database...")
         conversations_db.upsert_conversation(uid, conversation.dict())
         
+        # 🚀 APPS/MEMORIES: Discarded conversations skip app triggering and memory extraction
+        # Following POST /v1/conversations pattern: if discarded, skip apps and memories
+        print(f"⏭️ BACKEND: Skipping app triggering for discarded conversation")
+        print(f"⏭️ BACKEND: Skipping memory extraction for discarded conversation")
+        print(f"⏭️ BACKEND: Skipping vector embedding for discarded conversation")
+        
         # 🧹 FINAL CLEAR: Ensure Redis is completely clean after discarded conversation is saved
         redis_db.remove_in_progress_conversation_id(uid)
         print(f"🗑️ BACKEND: Final clear - removed in-progress conversation from Redis after discard save")
         
+        # 🚀 EXTERNAL INTEGRATIONS: Even discarded conversations may trigger notifications
+        print(f"🔗 BACKEND: Triggering external integrations for discarded conversation...")
+        from utils.app_integrations import trigger_external_integrations
+        messages = trigger_external_integrations(uid, conversation)
+        print(f"✅ BACKEND: External integrations triggered - {len(messages)} messages generated")
+        
         # Return response in same format as successful agent processing
         response_data = {
             "memory": conversation,
-            "messages": [],  # No chat messages for discarded conversations
+            "messages": messages,  # Include external integration messages like standard endpoint
             "agent_analysis": {
                 "analysis": "This conversation was automatically discarded as it did not contain significant content worthy of saving as a memory.",
                 "retrieved_conversations": [],
