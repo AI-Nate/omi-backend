@@ -18,6 +18,7 @@ from models.agent import (
 )
 from models.conversation import Conversation
 from utils.agents.core import create_conversation_agent
+from utils.llm import should_discard_conversation
 from utils.other import endpoints as auth
 
 router = APIRouter()
@@ -136,6 +137,15 @@ def create_conversation_with_agent(
         print(f"⚠️ BACKEND: Error during early clear (continuing anyway): {clear_error}")
     
     try:
+        # Check if conversation should be discarded before processing
+        print(f"🔍 BACKEND: Checking if transcript should be discarded...")
+        should_discard = should_discard_conversation(request.transcript)
+        print(f"🔍 BACKEND: Discard decision: {should_discard}")
+        
+        if should_discard:
+            print(f"🗑️ BACKEND: Transcript should be discarded, creating discarded conversation...")
+            return _create_discarded_conversation(uid, request.transcript)
+        
         # Create agent for the user
         print(f"🟦 BACKEND: Creating conversation agent for user {uid}")
         agent = create_conversation_agent(uid)
@@ -308,6 +318,96 @@ def create_conversation_with_agent(
         import traceback
         print(f"🔴 BACKEND: Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Error creating conversation with agent: {str(e)}")
+
+
+def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
+    """
+    Create a discarded conversation when the transcript should not be processed.
+    
+    Args:
+        uid: User ID
+        transcript: The transcript that was determined to be discarded
+        
+    Returns:
+        Response data in the same format as create_conversation_with_agent
+    """
+    try:
+        from models.conversation import Conversation, ConversationSource, ConversationStatus, Structured
+        from models.transcript_segment import TranscriptSegment
+        import database.conversations as conversations_db
+        import database.redis_db as redis_db
+        from datetime import datetime
+        import uuid
+        import random
+        
+        print(f"🗑️ BACKEND: Creating discarded conversation for user {uid}")
+        
+        # Create transcript segments
+        transcript_segments = []
+        if transcript:
+            transcript_segments = [
+                TranscriptSegment(
+                    text=transcript,
+                    speaker="SPEAKER_0",
+                    speaker_id=0,
+                    is_user=False,
+                    start=0.0,
+                    end=60.0  # Default 1 minute duration
+                )
+            ]
+        
+        # Create discarded conversation
+        conversation = Conversation(
+            id=str(uuid.uuid4()),
+            created_at=datetime.now(),
+            started_at=datetime.now(),
+            finished_at=datetime.now(),
+            source=ConversationSource.omi,
+            language="en",
+            structured=Structured(
+                title="",  # Empty title for discarded conversations
+                overview="",  # Empty overview for discarded conversations
+                category="other",
+                emoji=random.choice(['🧠', '🎉'])  # Same as standard discard logic
+            ),
+            transcript_segments=transcript_segments,
+            apps_results=[],  # No app processing for discarded conversations
+            discarded=True,  # Mark as discarded
+            deleted=False
+        )
+        
+        # Mark conversation as completed
+        conversation.status = ConversationStatus.completed
+        
+        # Save the conversation to database
+        print(f"🗑️ BACKEND: Saving discarded conversation to database...")
+        conversations_db.upsert_conversation(uid, conversation.dict())
+        
+        # Clear in-progress conversation from Redis to prevent auto-processing
+        redis_db.remove_in_progress_conversation_id(uid)
+        print(f"🗑️ BACKEND: Cleared in-progress conversation from Redis")
+        
+        # Return response in same format as successful agent processing
+        response_data = {
+            "memory": conversation,
+            "messages": [],  # No chat messages for discarded conversations
+            "agent_analysis": {
+                "analysis": "This conversation was automatically discarded as it did not contain significant content worthy of saving as a memory.",
+                "retrieved_conversations": [],
+                "session_id": "discarded"
+            }
+        }
+        
+        print(f"🗑️ BACKEND: Discarded conversation creation completed successfully")
+        print(f"🗑️ BACKEND: Returning discarded conversation ID: {conversation.id}")
+        
+        return response_data
+        
+    except Exception as e:
+        print(f"🔴 BACKEND: Exception in _create_discarded_conversation: {str(e)}")
+        import traceback
+        print(f"🔴 BACKEND: Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error creating discarded conversation: {str(e)}")
 
 
 def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conversations: list, transcript: str) -> Dict[str, Any]:
