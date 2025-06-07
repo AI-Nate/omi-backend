@@ -11,6 +11,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:omi/backend/auth.dart';
 import 'package:omi/backend/preferences.dart';
+import 'package:omi/backend/http/api/users.dart' as users_api;
 import 'package:omi/env/dev_env.dart';
 import 'package:omi/env/env.dart';
 import 'package:omi/env/prod_env.dart';
@@ -83,7 +84,21 @@ Future<bool> _init() async {
   await ServiceManager.instance().start();
 
   bool isAuth = (await getIdToken()) != null;
-  if (isAuth) MixpanelManager().identify();
+  if (isAuth) {
+    MixpanelManager().identify();
+
+    // 🤖 DEV MODE: Sync current dev mode state with backend on app startup
+    // This ensures backend always knows the current dev mode status
+    try {
+      final devModeEnabled = SharedPreferencesUtil().devModeEnabled;
+      debugPrint(
+          '📡 MAIN: Syncing dev mode state on app startup: $devModeEnabled');
+      await users_api.syncDevModeWithBackend(devModeEnabled);
+      debugPrint('📡 MAIN: Successfully synced dev mode on startup');
+    } catch (e) {
+      debugPrint('❌ MAIN: Failed to sync dev mode on startup: $e');
+    }
+  }
   initOpus(await opus_flutter.load());
 
   await GrowthbookUtil.init();

@@ -251,10 +251,18 @@ def create_conversation_with_agent(
                 for event in structured_data["events"]
             ]
         
+        # Mark conversation as completed to prevent duplicate auto-processing
+        conversation.status = ConversationStatus.completed
+        
         # Save the conversation to database (skip memory/trend extraction to avoid additional LLM calls)
         print(f"🟦 BACKEND: Saving conversation to database...")
         import database.conversations as conversations_db
         conversations_db.upsert_conversation(uid, conversation.dict())
+        
+        # Clear in-progress conversation from Redis to prevent auto-processing
+        import database.redis as redis_db
+        redis_db.remove_in_progress_conversation_id(uid)
+        print(f"🟦 BACKEND: Cleared in-progress conversation from Redis to prevent duplicate processing")
         
         # Save structured vector for search
         from utils.conversations.process_conversation import save_structured_vector

@@ -533,7 +533,11 @@ class CaptureProvider extends ChangeNotifier
   void onConnected() {
     _transcriptServiceReady = true;
 
-    // Dev mode state sync is now handled via HTTP API when settings change
+    // 🤖 DEV MODE: Sync dev mode state with backend when WebSocket connects
+    // This ensures backend knows current dev mode status for auto-processing decisions
+    debugPrint(
+        '📡 CAPTURE_PROVIDER: WebSocket connected, syncing dev mode state with backend');
+    syncDevModeWithBackend();
 
     notifyListeners();
   }

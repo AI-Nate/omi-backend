@@ -148,6 +148,10 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         # Save to database
         conversations_db.upsert_conversation(uid, conversation.dict())
         
+        # Clear in-progress conversation from Redis to prevent auto-processing
+        redis_db.remove_in_progress_conversation_id(uid)
+        print(f"🟢 TRANSCRIBE: Cleared in-progress conversation from Redis to prevent duplicate processing")
+        
         # Save structured vector for search
         from utils.conversations.process_conversation import save_structured_vector
         save_structured_vector(uid, conversation)
@@ -303,6 +307,14 @@ async def _listen(
             if not conversation or conversation['finished_at'] > finished_at:
                 print("_trigger_create_conversation_with_delay not conversation or not last session", uid)
                 return
+            
+            # 🤖 DEV MODE: Check if conversation was already processed manually
+            # This prevents duplicate processing when user manually stops recording in dev mode
+            conversation_obj = Conversation(**conversation)
+            if conversation_obj.status == ConversationStatus.completed:
+                print(f"🤖 TRANSCRIBE: Conversation {conversation_obj.id} already completed, skipping auto-processing", uid)
+                return
+            
             await _create_current_conversation()
         except asyncio.CancelledError:
             pass
