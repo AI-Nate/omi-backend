@@ -108,12 +108,12 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         else:
             print(f"🔍 TRANSCRIBE: Falling back to agent extracted title: '{structured_data.get('title', 'None')}')")
         
-        # Update conversation with agent-generated structured data
+        # Update conversation with agent-generated structured data (now includes content-based emoji!)
         conversation.structured = Structured(
             title=structured_data["title"],
             overview=agent_analysis,  # Use agent analysis directly since no title is included
             category=structured_data["category"],
-            emoji=structured_data.get("emoji", "🧠")
+            emoji=structured_data.get("emoji", "🧠")  # Now uses content-based emoji from enhanced function!
         )
         
         # Store the full agent analysis

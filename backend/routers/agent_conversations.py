@@ -503,12 +503,89 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Error creating discarded conversation: {str(e)}")
 
 
+def _generate_emoji_and_category_from_transcript(transcript: str) -> tuple[str, str]:
+    """
+    Generate emoji and category based on transcript content using LLM analysis.
+    
+    Args:
+        transcript: The conversation transcript to analyze
+        
+    Returns:
+        Tuple of (emoji, category)
+    """
+    try:
+        from utils.llm import llm_mini
+        from models.conversation import CategoryEnum
+        from pydantic import BaseModel, Field
+        
+        # Define a simple output model for emoji and category generation
+        class EmojiCategoryOutput(BaseModel):
+            emoji: str = Field(description="A single emoji that best represents the conversation content", default="🧠")
+            category: CategoryEnum = Field(description="The category that best fits this conversation", default=CategoryEnum.other)
+        
+        # Get valid categories for the prompt
+        valid_categories = [cat.value for cat in CategoryEnum]
+        valid_categories_str = ", ".join([f"'{cat}'" for cat in valid_categories])
+        
+        # Create a focused prompt for emoji and category generation
+        prompt = f"""
+        Analyze the following conversation transcript and determine the most appropriate emoji and category.
+
+        **For the emoji:**
+        - Choose a single emoji that best represents the main topic or mood of the conversation
+        - Examples: 🍕 for food/cooking, 💼 for work/business, 💪 for fitness/health, ❤️ for relationships, 🎓 for education, 🏠 for home/family, 💰 for finance, 🚗 for travel, 🎮 for gaming, 📱 for technology
+        - Avoid generic emojis like 🧠 unless the conversation is specifically about psychology/mind
+
+        **For the category:**
+        You MUST choose one of these exact values: {valid_categories_str}
+
+        **Conversation transcript:**
+        {transcript[:2000]}  # Limit to first 2000 chars for efficiency
+
+        Choose the emoji and category that best represent the main theme and content of this conversation.
+        """
+        
+        # Use the mini LLM for quick emoji/category generation
+        with_parser = llm_mini.with_structured_output(EmojiCategoryOutput)
+        response = with_parser.invoke(prompt)
+        
+        return response.emoji, response.category.value
+        
+    except Exception as e:
+        print(f"🔴 Error generating emoji and category: {e}")
+        # Fallback to simple content-based heuristics
+        transcript_lower = transcript.lower()
+        
+        # Simple keyword-based emoji selection
+        if any(word in transcript_lower for word in ['food', 'cook', 'recipe', 'restaurant', 'eat', 'meal', 'dinner', 'lunch']):
+            return "🍕", "personal"
+        elif any(word in transcript_lower for word in ['work', 'job', 'project', 'meeting', 'business', 'office', 'team']):
+            return "💼", "work" 
+        elif any(word in transcript_lower for word in ['exercise', 'workout', 'gym', 'fitness', 'health', 'doctor', 'medicine']):
+            return "💪", "health"
+        elif any(word in transcript_lower for word in ['money', 'finance', 'budget', 'investment', 'bank', 'cost', 'price']):
+            return "💰", "financial"
+        elif any(word in transcript_lower for word in ['learn', 'study', 'school', 'education', 'course', 'book', 'teach']):
+            return "🎓", "educational"
+        elif any(word in transcript_lower for word in ['travel', 'trip', 'vacation', 'flight', 'hotel', 'visit']):
+            return "✈️", "travel"
+        elif any(word in transcript_lower for word in ['family', 'kids', 'children', 'parent', 'home', 'house']):
+            return "🏠", "parenting"
+        elif any(word in transcript_lower for word in ['love', 'relationship', 'partner', 'date', 'wedding', 'romantic']):
+            return "❤️", "romantic"
+        elif any(word in transcript_lower for word in ['tech', 'computer', 'software', 'app', 'coding', 'programming']):
+            return "💻", "technological"
+        else:
+            return "🧠", "other"  # Fallback
+
+
 def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conversations: list, transcript: str) -> Dict[str, Any]:
     """
     Extract structured conversation data from agent analysis.
     
     This function parses the agent's analysis and converts it into the
     structured format expected by the conversation creation system.
+    Now includes content-based emoji and category generation!
     """
     import re
     
@@ -603,6 +680,11 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
         takeaways = [item.strip() for item in re.split(r'[-•*\n]', takeaway_text) if item.strip()]
         key_takeaways = takeaways[:5]  # Limit to 5 takeaways
     
+    # 🚀 ENHANCED: Generate content-based emoji and category from transcript
+    print(f"🎨 AGENT: Generating content-based emoji and category from transcript...")
+    emoji, category = _generate_emoji_and_category_from_transcript(transcript)
+    print(f"🎨 AGENT: Generated emoji: '{emoji}' and category: '{category}'")
+    
     # Create events if retrieved conversations were used
     events = []
     if retrieved_conversations:
@@ -616,7 +698,8 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
     return {
         "title": title,
         "overview": overview,
-        "category": "other",  # Use valid category from CategoryEnum
+        "category": category,  # 🚀 IMPROVED: Now uses content-based category instead of hardcoded "other"
+        "emoji": emoji,  # 🚀 NEW: Content-based emoji generation
         "action_items": [{"content": item} for item in action_items[:10]],  # Limit to 10 items
         "key_takeaways": key_takeaways,
         "events": events,
@@ -624,7 +707,8 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
         "metadata": {
             "processed_by": "ai-agent",
             "retrieved_conversations_count": len(retrieved_conversations),
-            "analysis_length": len(analysis)
+            "analysis_length": len(analysis),
+            "emoji_generation": "content-based"  # Track that we're using content-based emoji
         }
     }
 
