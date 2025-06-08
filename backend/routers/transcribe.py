@@ -52,6 +52,21 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         # Get transcript text
         transcript = conversation.get_transcript(False)
         
+        # STEP 1: Check if conversation should be discarded (following manual agent processing pattern)
+        print(f"🔍 TRANSCRIBE: Checking if transcript should be discarded...")
+        from utils.llm import should_discard_conversation
+        should_discard = should_discard_conversation(transcript)
+        print(f"🔍 TRANSCRIBE: Discard decision: {should_discard}")
+        
+        if should_discard:
+            print(f"🗑️ TRANSCRIBE: Transcript should be discarded for conversation {conversation.id}")
+            conversation.discarded = True
+            conversation.status = ConversationStatus.completed
+            conversations_db.upsert_conversation(uid, conversation.dict())
+            # Clear in-progress conversation from Redis
+            redis_db.remove_in_progress_conversation_id(uid)
+            return conversation
+        
         # Analyze with agent
         result = agent.analyze_conversation(
             transcript=transcript,
@@ -146,15 +161,57 @@ async def _process_conversation_with_agent(conversation: Conversation, uid: str)
         conversation.discarded = False
         
         # Save to database
+        print(f"🟦 TRANSCRIBE: Saving conversation to database...")
         conversations_db.upsert_conversation(uid, conversation.dict())
         
         # Clear in-progress conversation from Redis to prevent auto-processing
         redis_db.remove_in_progress_conversation_id(uid)
         print(f"🟢 TRANSCRIBE: Cleared in-progress conversation from Redis to prevent duplicate processing")
         
-        # Save structured vector for search
+        # STEP 2: Trigger apps (following manual agent processing pattern)
+        print(f"🔧 TRANSCRIBE: Triggering apps for agent-processed conversation...")
+        if not conversation.discarded:
+            from utils.conversations.process_conversation import _trigger_apps
+            _trigger_apps(uid, conversation, is_reprocess=False, app_id=None)
+            print(f"✅ TRANSCRIBE: Apps triggered successfully - {len(conversation.apps_results)} app results")
+        else:
+            print(f"⏭️ TRANSCRIBE: Skipping app triggering for discarded conversation")
+        
+        # STEP 3: Extract memories (following manual agent processing pattern)
+        print(f"🧠 TRANSCRIBE: Extracting memories for agent-processed conversation...")
+        if not conversation.discarded:
+            import threading
+            from utils.conversations.process_conversation import _extract_memories
+            threading.Thread(target=_extract_memories, args=(uid, conversation)).start()
+            print(f"✅ TRANSCRIBE: Memory extraction started in background thread")
+        else:
+            print(f"⏭️ TRANSCRIBE: Skipping memory extraction for discarded conversation")
+        
+        # STEP 4: Save structured vector for search (following manual agent processing pattern)
         from utils.conversations.process_conversation import save_structured_vector
-        save_structured_vector(uid, conversation)
+        threading.Thread(target=save_structured_vector, args=(uid, conversation)).start()
+        print(f"✅ TRANSCRIBE: Vector embedding started in background thread")
+        
+        # STEP 5: Trigger external integrations (following manual agent processing pattern)  
+        print(f"🔗 TRANSCRIBE: Triggering external integrations for agent-processed conversation...")
+        from utils.app_integrations import trigger_external_integrations
+        messages = trigger_external_integrations(uid, conversation)
+        print(f"✅ TRANSCRIBE: External integrations triggered - {len(messages)} messages generated")
+        
+        # STEP 6: Update personas (following manual agent processing pattern)
+        print(f"👤 TRANSCRIBE: Updating personas for agent-processed conversation...")
+        if not conversation.discarded:
+            from utils.apps import update_personas_async
+            threading.Thread(target=update_personas_async, args=(uid,)).start()
+            print(f"✅ TRANSCRIBE: Persona updates started in background thread")
+        else:
+            print(f"⏭️ TRANSCRIBE: Skipping persona updates for discarded conversation")
+        
+        # STEP 7: Trigger conversation created webhook (following manual agent processing pattern)
+        print(f"🪝 TRANSCRIBE: Triggering conversation created webhook...")
+        from utils.webhooks import conversation_created_webhook
+        threading.Thread(target=conversation_created_webhook, args=(uid, conversation)).start()  
+        print(f"✅ TRANSCRIBE: Conversation created webhook started in background thread")
         
         print(f"🟢 TRANSCRIBE: Agent processing completed for conversation {conversation.id}")
         return conversation
