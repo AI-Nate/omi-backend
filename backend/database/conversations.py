@@ -40,8 +40,6 @@ def get_conversation(uid, conversation_id):
 def get_conversations(uid: str, limit: int = 100, offset: int = 0, include_discarded: bool = False,
                       statuses: List[str] = [], start_date: Optional[datetime] = None,
                       end_date: Optional[datetime] = None, categories: Optional[List[str]] = None):
-    print(f"🔍 GET_CONVERSATIONS: Called for user {uid} with limit={limit}, offset={offset}, include_discarded={include_discarded}, statuses={statuses}")
-    
     conversations_ref = (
         db.collection('users').document(uid).collection(conversations_collection)
         .where(filter=FieldFilter('deleted', '==', False))
@@ -66,19 +64,7 @@ def get_conversations(uid: str, limit: int = 100, offset: int = 0, include_disca
     # Limits
     conversations_ref = conversations_ref.limit(limit).offset(offset)
     
-    conversations = [doc.to_dict() for doc in conversations_ref.stream()]
-    print(f"🔍 GET_CONVERSATIONS: Found {len(conversations)} conversations for user {uid}")
-    
-    # Debug log each conversation's basic info
-    for conv in conversations:
-        structured = conv.get('structured', {})
-        title = structured.get('title', 'No title')
-        summary = structured.get('summary', 'No summary')
-        status = conv.get('status', 'unknown')
-        created_at = conv.get('created_at')
-        print(f"  🔍 CONV: ID={conv.get('id', 'unknown')[:8]}..., status={status}, title='{title[:50]}...', has_summary={bool(summary and summary != 'No summary')}, created_at={created_at}")
-    
-    return conversations
+    return [doc.to_dict() for doc in conversations_ref.stream()]
 
 
 def update_conversation(uid: str, conversation_id: str, memory_data: dict):
