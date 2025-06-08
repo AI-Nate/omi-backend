@@ -36,8 +36,10 @@ extension StringExtensions on String {
     // Remove bullet points (- or *)
     text = text.replaceAll(RegExp(r'^[\s]*[-*]\s+', multiLine: true), '');
 
-    // Remove numbered lists (1. 2. etc.)
+    // Remove numbered lists (1. 2. etc.) and $1, $2 formats from agent responses
     text = text.replaceAll(RegExp(r'^[\s]*\d+\.\s+', multiLine: true), '');
+    text =
+        text.replaceAll(RegExp(r'^[\s]*\$\d+[\.\:\s]+', multiLine: true), '');
 
     // Remove blockquotes (>)
     text = text.replaceAll(RegExp(r'^>\s+', multiLine: true), '');

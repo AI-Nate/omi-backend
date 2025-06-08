@@ -148,26 +148,59 @@ class ConversationProvider extends ChangeNotifier
   }
 
   void clearAllProcessingConversations() {
-    debugPrint('🧹 PROVIDER: Clearing all processing conversations');
+    debugPrint('🧹 PROVIDER: Starting clearAllProcessingConversations');
+    debugPrint(
+        '🧹 PROVIDER: Before clear - processingConversations: ${processingConversations.length}');
+    for (var conv in processingConversations) {
+      debugPrint('  📝 Processing ID: ${conv.id}, Status: ${conv.status}');
+    }
+
     processingConversations.clear();
+    debugPrint('🧹 PROVIDER: Cleared processingConversations list');
 
     // Also remove any processing conversations from main conversations list
+    var removedFromMain = conversations
+        .where((c) => c.status == ConversationStatus.processing)
+        .toList();
+    debugPrint(
+        '🧹 PROVIDER: Found ${removedFromMain.length} processing conversations in main list');
+    for (var conv in removedFromMain) {
+      debugPrint(
+          '  📝 Removing from main - ID: ${conv.id}, Status: ${conv.status}');
+    }
     conversations.removeWhere((c) => c.status == ConversationStatus.processing);
 
     // Remove from grouped conversations as well
+    var totalRemovedFromGroups = 0;
     for (final date in groupedConversations.keys.toList()) {
+      var removedFromGroup = groupedConversations[date]
+              ?.where((c) => c.status == ConversationStatus.processing)
+              .toList() ??
+          [];
+      totalRemovedFromGroups += removedFromGroup.length;
+      for (var conv in removedFromGroup) {
+        debugPrint(
+            '  📝 Removing from group $date - ID: ${conv.id}, Status: ${conv.status}');
+      }
+
       groupedConversations[date]
           ?.removeWhere((c) => c.status == ConversationStatus.processing);
       // Remove empty date groups
       if (groupedConversations[date]?.isEmpty ?? false) {
+        debugPrint('🧹 PROVIDER: Removing empty date group: $date');
         groupedConversations.remove(date);
       }
     }
+    debugPrint(
+        '🧹 PROVIDER: Removed $totalRemovedFromGroups processing conversations from grouped conversations');
 
     // Clear cache to force fresh data
     SharedPreferencesUtil().cachedConversations = conversations;
+    debugPrint(
+        '🧹 PROVIDER: Updated cache with ${conversations.length} conversations');
 
-    debugPrint('🧹 PROVIDER: All processing conversations cleared');
+    debugPrint(
+        '🧹 PROVIDER: All processing conversations cleared - processingConversations: ${processingConversations.length}');
     notifyListeners();
   }
 
@@ -217,30 +250,47 @@ class ConversationProvider extends ChangeNotifier
   }
 
   Future fetchConversations() async {
+    debugPrint('🔍 PROVIDER: Starting fetchConversations()');
     previousQuery = "";
     currentSearchPage = 0;
     totalSearchPages = 0;
     searchedConversations = [];
 
     conversations = await getConversationsFromServer();
+    debugPrint(
+        '🔍 PROVIDER: Got ${conversations.length} total conversations from server');
 
     processingConversations = conversations
         .where((m) => m.status == ConversationStatus.processing)
         .toList();
+    debugPrint(
+        '🔍 PROVIDER: Found ${processingConversations.length} processing conversations:');
+    for (var conv in processingConversations) {
+      debugPrint(
+          '  📝 Processing ID: ${conv.id}, Created: ${conv.createdAt}, Status: ${conv.status}');
+    }
 
     conversations = conversations
         .where((m) => m.status == ConversationStatus.completed)
         .toList();
+    debugPrint(
+        '🔍 PROVIDER: After filtering, ${conversations.length} completed conversations');
+
     if (conversations.isEmpty) {
       conversations = SharedPreferencesUtil().cachedConversations;
+      debugPrint(
+          '🔍 PROVIDER: Using cached conversations: ${conversations.length}');
     } else {
       SharedPreferencesUtil().cachedConversations = conversations;
+      debugPrint(
+          '🔍 PROVIDER: Updated cache with ${conversations.length} conversations');
     }
     if (searchedConversations.isEmpty) {
       searchedConversations = conversations;
     }
     _groupConversationsByDateWithoutNotify();
 
+    debugPrint('🔍 PROVIDER: fetchConversations() completed');
     notifyListeners();
   }
 

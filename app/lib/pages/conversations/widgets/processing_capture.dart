@@ -321,13 +321,27 @@ getPhoneMicRecordingButton(
 Widget getProcessingConversationsWidget(
     List<ServerConversation> conversations) {
   // FIXME, this has to be a single one always, and also a conversation obj
+  debugPrint(
+      '🔍 PROCESSING_WIDGET: getProcessingConversationsWidget called with ${conversations.length} conversations');
+  for (var conv in conversations) {
+    debugPrint(
+        '  📝 Processing Widget - ID: ${conv.id}, Status: ${conv.status}, Created: ${conv.createdAt}');
+  }
+
   if (conversations.isEmpty) {
+    debugPrint(
+        '🔍 PROCESSING_WIDGET: No processing conversations, returning empty widget');
     return const SliverToBoxAdapter(child: SizedBox.shrink());
   }
+
+  debugPrint(
+      '🔍 PROCESSING_WIDGET: Rendering ${conversations.length} processing conversation widgets');
   return SliverList(
     delegate: SliverChildBuilderDelegate(
       (context, index) {
         var pm = conversations[index];
+        debugPrint(
+            '🔍 PROCESSING_WIDGET: Rendering index $index - ID: ${pm.id}');
         return Padding(
           padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
           child: ProcessingConversationWidget(conversation: pm),
@@ -357,6 +371,8 @@ class _ProcessingConversationWidgetState
     extends State<ProcessingConversationWidget> {
   @override
   Widget build(BuildContext context) {
+    debugPrint(
+        '🔍 PROCESSING_CONVERSATION_WIDGET: Building for ID: ${widget.conversation.id}, Status: ${widget.conversation.status}');
     return Consumer3<CaptureProvider, DeviceProvider, ConnectivityProvider>(
         builder:
             (context, provider, deviceProvider, connectivityProvider, child) {

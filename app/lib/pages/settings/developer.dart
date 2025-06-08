@@ -463,6 +463,58 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                   ),
                   const SizedBox(height: 36),
                   const Text(
+                    'User Interface Settings',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Restore confirmation dialogs that were previously disabled.',
+                    style: TextStyle(color: Colors.grey.shade200, fontSize: 14),
+                  ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    contentPadding: const EdgeInsets.all(0),
+                    title: const Text(
+                      'Conversation Delete Confirmation',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    subtitle: const Text(
+                      'Show confirmation dialog when deleting conversations',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    value: SharedPreferencesUtil()
+                        .showConversationDeleteConfirmation,
+                    onChanged: (value) {
+                      setState(() {
+                        SharedPreferencesUtil()
+                            .showConversationDeleteConfirmation = value ?? true;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    contentPadding: const EdgeInsets.all(0),
+                    title: const Text(
+                      'Conversation Summary Confirmation',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    subtitle: const Text(
+                      'Show confirmation dialog when stopping recordings for summary',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    value: SharedPreferencesUtil().showSummarizeConfirmation,
+                    onChanged: (value) {
+                      setState(() {
+                        SharedPreferencesUtil().showSummarizeConfirmation =
+                            value ?? true;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 36),
+                  const Text(
                     'Pilot Features',
                     style: TextStyle(
                         color: Colors.white,

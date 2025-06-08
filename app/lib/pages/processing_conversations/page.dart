@@ -43,12 +43,16 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
   }
 
   void _deleteProcessingConversation() async {
+    debugPrint(
+        '🗑️ PROCESSING_DELETE: Starting delete for conversation ID: ${widget.conversation.id}');
     setState(() {
       _isDeleting = true;
     });
 
     try {
       // Clear the in-progress conversation from the backend
+      debugPrint(
+          '🗑️ PROCESSING_DELETE: Calling clearInProgressConversation API...');
       bool success = await clearInProgressConversation();
 
       if (success) {
@@ -142,6 +146,17 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
   @override
   Widget build(BuildContext context) {
     return Consumer<ConversationProvider>(builder: (context, provider, child) {
+      debugPrint(
+          '🔍 PROCESSING_PAGE: Building with conversation ID: ${widget.conversation.id}');
+      debugPrint(
+          '🔍 PROCESSING_PAGE: Conversation status: ${widget.conversation.status}');
+      debugPrint(
+          '🔍 PROCESSING_PAGE: Provider has ${provider.processingConversations.length} processing conversations');
+      for (var conv in provider.processingConversations) {
+        debugPrint(
+            '  📝 Provider processing ID: ${conv.id}, Status: ${conv.status}');
+      }
+
       // Track memory // FIXME
       // if (widget.memory.status == ServerProcessingMemoryStatus.done &&
       //     provider.memories.firstWhereOrNull((e) => e.id == widget.memory.memoryId) != null) {

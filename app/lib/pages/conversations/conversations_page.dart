@@ -18,7 +18,8 @@ class ConversationsPage extends StatefulWidget {
   State<ConversationsPage> createState() => _ConversationsPageState();
 }
 
-class _ConversationsPageState extends State<ConversationsPage> with AutomaticKeepAliveClientMixin {
+class _ConversationsPageState extends State<ConversationsPage>
+    with AutomaticKeepAliveClientMixin {
   TextEditingController textController = TextEditingController();
 
   @override
@@ -27,8 +28,11 @@ class _ConversationsPageState extends State<ConversationsPage> with AutomaticKee
   @override
   void initState() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (Provider.of<ConversationProvider>(context, listen: false).conversations.isEmpty) {
-        await Provider.of<ConversationProvider>(context, listen: false).getInitialConversations();
+      if (Provider.of<ConversationProvider>(context, listen: false)
+          .conversations
+          .isEmpty) {
+        await Provider.of<ConversationProvider>(context, listen: false)
+            .getInitialConversations();
       }
     });
     super.initState();
@@ -38,7 +42,14 @@ class _ConversationsPageState extends State<ConversationsPage> with AutomaticKee
   Widget build(BuildContext context) {
     debugPrint('building conversations page');
     super.build(context);
-    return Consumer<ConversationProvider>(builder: (context, convoProvider, child) {
+    return Consumer<ConversationProvider>(
+        builder: (context, convoProvider, child) {
+      debugPrint(
+          '🔍 CONVERSATIONS_PAGE: Building with ${convoProvider.processingConversations.length} processing conversations');
+      for (var conv in convoProvider.processingConversations) {
+        debugPrint(
+            '  📝 ConversationsPage - ID: ${conv.id}, Status: ${conv.status}');
+      }
       return RefreshIndicator(
         backgroundColor: Colors.black,
         color: Colors.white,
@@ -55,8 +66,10 @@ class _ConversationsPageState extends State<ConversationsPage> with AutomaticKee
             const SliverToBoxAdapter(child: SearchWidget()),
             const SliverToBoxAdapter(child: SizedBox(height: 16)),
             const SliverToBoxAdapter(child: SearchResultHeaderWidget()),
-            getProcessingConversationsWidget(convoProvider.processingConversations),
-            if (convoProvider.groupedConversations.isEmpty && !convoProvider.isLoadingConversations)
+            getProcessingConversationsWidget(
+                convoProvider.processingConversations),
+            if (convoProvider.groupedConversations.isEmpty &&
+                !convoProvider.isLoadingConversations)
               const SliverToBoxAdapter(
                 child: Center(
                   child: Padding(
@@ -65,7 +78,8 @@ class _ConversationsPageState extends State<ConversationsPage> with AutomaticKee
                   ),
                 ),
               )
-            else if (convoProvider.groupedConversations.isEmpty && convoProvider.isLoadingConversations)
+            else if (convoProvider.groupedConversations.isEmpty &&
+                convoProvider.isLoadingConversations)
               const SliverToBoxAdapter(
                 child: Center(
                   child: Padding(
@@ -88,7 +102,8 @@ class _ConversationsPageState extends State<ConversationsPage> with AutomaticKee
                           child: Padding(
                             padding: EdgeInsets.only(top: 32.0),
                             child: CircularProgressIndicator(
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           ),
                         );
@@ -97,24 +112,31 @@ class _ConversationsPageState extends State<ConversationsPage> with AutomaticKee
                       return VisibilityDetector(
                         key: const Key('conversations-key'),
                         onVisibilityChanged: (visibilityInfo) {
-                          var provider = Provider.of<ConversationProvider>(context, listen: false);
+                          var provider = Provider.of<ConversationProvider>(
+                              context,
+                              listen: false);
                           if (provider.previousQuery.isNotEmpty) {
                             if (visibilityInfo.visibleFraction > 0 &&
                                 !provider.isLoadingConversations &&
-                                (provider.totalSearchPages > provider.currentSearchPage)) {
+                                (provider.totalSearchPages >
+                                    provider.currentSearchPage)) {
                               provider.searchMoreConversations();
                             }
                           } else {
-                            if (visibilityInfo.visibleFraction > 0 && !convoProvider.isLoadingConversations) {
+                            if (visibilityInfo.visibleFraction > 0 &&
+                                !convoProvider.isLoadingConversations) {
                               convoProvider.getMoreConversationsFromServer();
                             }
                           }
                         },
-                        child: const SizedBox(height: 20, width: double.maxFinite),
+                        child:
+                            const SizedBox(height: 20, width: double.maxFinite),
                       );
                     } else {
-                      var date = convoProvider.groupedConversations.keys.elementAt(index);
-                      List<ServerConversation> memoriesForDate = convoProvider.groupedConversations[date]!;
+                      var date = convoProvider.groupedConversations.keys
+                          .elementAt(index);
+                      List<ServerConversation> memoriesForDate =
+                          convoProvider.groupedConversations[date]!;
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
