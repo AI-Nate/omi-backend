@@ -492,8 +492,10 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
     title_patterns = [
         r'^#\s*(.+)$',  # Markdown H1 header
         r'^##\s*(.+)$',  # Markdown H2 header  
-        r'^Title:\s*(.+)$',  # Explicit "Title:" prefix
+        r'^Title:\s*(.+)$',  # Explicit "Title:" prefix (title case)
+        r'^TITLE:\s*(.+)$',  # Explicit "TITLE:" prefix (uppercase)
         r'^\*\*Title:\*\*\s*(.+)$',  # Bold "Title:" prefix
+        r'^\*\*TITLE:\*\*\s*(.+)$',  # Bold "TITLE:" prefix
         r'^\*\*(.+)\*\*$',  # Bold text on its own line
     ]
     

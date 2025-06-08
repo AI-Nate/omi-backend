@@ -228,7 +228,23 @@ REQUIRED TOOL USAGE:
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-IMPORTANT: You MUST use the available tools (conversation_retrieval, web_search, and azure_agent) to gather comprehensive information before providing your analysis. Format any web search results and expert analysis nicely with bullet points, links, and relevant details."""
+IMPORTANT: You MUST use the available tools (conversation_retrieval, web_search, and azure_agent) to gather comprehensive information before providing your analysis.
+
+RESPONSE FORMAT REQUIREMENT:
+You MUST format your response exactly as follows:
+
+TITLE: [Generate a concise, descriptive title based on the main topic/theme of the conversation - max 60 characters]
+
+ANALYSIS:
+[Your comprehensive analysis here, including all tool results, expert insights, and recommendations. Format with bullet points, links, and relevant details.]
+
+The TITLE should capture the essence of what the conversation is about, not just be generic. Examples:
+- "Restaurant Recommendations in San Francisco"
+- "Project Planning and Timeline Discussion" 
+- "Health Insurance Options and Coverage"
+- "Weekend Travel Plans to Portland"
+
+Do NOT use generic titles like "Conversation" or "Discussion"."""
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
