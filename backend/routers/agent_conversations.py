@@ -137,9 +137,9 @@ def create_conversation_with_agent(
             redis_db.set_user_auto_processing_cancelled(uid, True)
             print(f"🛑 BACKEND: Set auto-processing cancellation flag for user {uid}")
             
-            # CRITICAL FIX: Update the database conversation status to 'completed' first
-            conversations_db.update_conversation_status(uid, conversation_id, ConversationStatus.completed)
-            print(f"✅ BACKEND: Updated in-progress conversation {conversation_id} status to 'completed' in database")
+            # CRITICAL FIX: Delete the database conversation entirely since it's empty and will be replaced
+            conversations_db.delete_conversation(uid, conversation_id)
+            print(f"✅ BACKEND: Deleted empty in-progress conversation {conversation_id} from database (will be replaced by agent conversation)")
             
             # Then clear from Redis
             redis_db.remove_in_progress_conversation_id(uid)
