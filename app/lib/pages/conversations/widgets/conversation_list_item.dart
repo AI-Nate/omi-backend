@@ -197,7 +197,7 @@ class _ConversationListItemState extends State<ConversationListItem> {
                       widget.conversation.discarded
                           ? const SizedBox.shrink()
                           : Text(
-                              structured.overview.decodeString,
+                              structured.overview.decodeString.stripMarkdown,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium!
