@@ -122,13 +122,21 @@ def create_conversation_with_agent(
     # 🧹 EARLY CLEAR: Clear in-progress conversation immediately to prevent race conditions
     try:
         import database.redis_db as redis_db
+        import database.conversations as conversations_db
         from utils.conversations.process_conversation import retrieve_in_progress_conversation
+        from models.conversation import ConversationStatus
         
         # Check if there's an in-progress conversation before clearing
         in_progress_conversation = retrieve_in_progress_conversation(uid)
         if in_progress_conversation:
             conversation_id = in_progress_conversation['id']
             print(f"🧹 BACKEND: Found in-progress conversation {conversation_id}, clearing immediately to prevent duplication")
+            
+            # CRITICAL FIX: Update the database conversation status to 'completed' first
+            conversations_db.update_conversation_status(uid, conversation_id, ConversationStatus.completed)
+            print(f"✅ BACKEND: Updated in-progress conversation {conversation_id} status to 'completed' in database")
+            
+            # Then clear from Redis
             redis_db.remove_in_progress_conversation_id(uid)
             print(f"✅ BACKEND: Cleared in-progress conversation {conversation_id} from Redis")
         else:
@@ -385,13 +393,21 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
         
         # 🧹 EARLY CLEAR: Clear in-progress conversation immediately to prevent auto-processing
         try:
+            import database.conversations as conversations_db
             from utils.conversations.process_conversation import retrieve_in_progress_conversation
+            from models.conversation import ConversationStatus
             
             # Check if there's an in-progress conversation before clearing
             in_progress_conversation = retrieve_in_progress_conversation(uid)
             if in_progress_conversation:
                 conversation_id = in_progress_conversation['id']
                 print(f"🧹 BACKEND: Found in-progress conversation {conversation_id}, clearing for discard")
+                
+                # CRITICAL FIX: Update the database conversation status to 'completed' first
+                conversations_db.update_conversation_status(uid, conversation_id, ConversationStatus.completed)
+                print(f"✅ BACKEND: Updated in-progress conversation {conversation_id} status to 'completed' in database for discard")
+                
+                # Then clear from Redis
                 redis_db.remove_in_progress_conversation_id(uid)
                 print(f"✅ BACKEND: Cleared in-progress conversation {conversation_id} from Redis for discard")
             else:
