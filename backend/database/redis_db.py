@@ -602,3 +602,34 @@ def remove_user_dev_mode(uid: str):
     print(f"🔄 DEV_MODE: Removing dev mode setting for user {uid}")
     r.delete(f'users:{uid}:dev_mode')
     print(f"🔄 DEV_MODE: Successfully removed dev mode setting for user {uid}")
+
+
+# ******************************************************
+# **************** AUTO-PROCESSING *********************
+# ******************************************************
+
+@try_catch_decorator
+def set_user_auto_processing_cancelled(uid: str, cancelled: bool, ttl: int = 300):
+    """Set the user's auto-processing cancellation flag with TTL (5 minutes default)"""
+    print(f"🛑 AUTO_CANCEL: Setting auto-processing cancellation for user {uid} to {cancelled} with TTL {ttl}s")
+    r.set(f'users:{uid}:auto_processing_cancelled', str(cancelled).lower(), ex=ttl)
+    print(f"🛑 AUTO_CANCEL: Successfully set auto-processing cancellation in Redis for user {uid}")
+
+
+@try_catch_decorator 
+def get_user_auto_processing_cancelled(uid: str) -> bool:
+    """Get the user's auto-processing cancellation state, defaults to False if not set"""
+    cancelled = r.get(f'users:{uid}:auto_processing_cancelled')
+    if cancelled is None:
+        return False
+    result = cancelled.decode().lower() == 'true'
+    print(f"🛑 AUTO_CANCEL: Retrieved auto-processing cancellation state for user {uid}: {result}")
+    return result
+
+
+@try_catch_decorator
+def remove_user_auto_processing_cancelled(uid: str):
+    """Remove the user's auto-processing cancellation flag"""
+    print(f"🛑 AUTO_CANCEL: Removing auto-processing cancellation flag for user {uid}")
+    r.delete(f'users:{uid}:auto_processing_cancelled')
+    print(f"🛑 AUTO_CANCEL: Successfully removed auto-processing cancellation flag for user {uid}")

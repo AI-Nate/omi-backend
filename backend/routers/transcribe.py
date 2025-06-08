@@ -302,6 +302,12 @@ async def _listen(
         try:
             await asyncio.sleep(delay_seconds)
 
+            # 🛑 NEW: Check if auto-processing was cancelled by manual processing
+            if redis_db.get_user_auto_processing_cancelled(uid):
+                print(f"🛑 AUTO_PROCESSING: Auto-processing cancelled by manual processing for user {uid}")
+                redis_db.remove_user_auto_processing_cancelled(uid)  # Clean up the flag
+                return
+
             # recheck session
             conversation = retrieve_in_progress_conversation(uid)
             if not conversation:

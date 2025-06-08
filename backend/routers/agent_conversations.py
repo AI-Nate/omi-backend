@@ -119,10 +119,11 @@ def create_conversation_with_agent(
     print(f"🟦 BACKEND: Request - conversation_id: {request.conversation_id}")
     print(f"🟦 BACKEND: Request - session_id: {request.session_id}")
     
-    # 🧹 EARLY CLEAR: Clear in-progress conversation immediately to prevent race conditions
+    # CRITICAL FIX: Early clearing of in-progress conversation to prevent duplicate processing
+    # This must happen BEFORE any processing starts to prevent race conditions
     try:
-        import database.redis_db as redis_db
         import database.conversations as conversations_db
+        import database.redis_db as redis_db
         from utils.conversations.process_conversation import retrieve_in_progress_conversation
         from models.conversation import ConversationStatus
         
@@ -131,6 +132,10 @@ def create_conversation_with_agent(
         if in_progress_conversation:
             conversation_id = in_progress_conversation['id']
             print(f"🧹 BACKEND: Found in-progress conversation {conversation_id}, clearing immediately to prevent duplication")
+            
+            # 🚨 NEW: Signal auto-processing to cancel by setting a cancellation flag
+            redis_db.set_user_auto_processing_cancelled(uid, True)
+            print(f"🛑 BACKEND: Set auto-processing cancellation flag for user {uid}")
             
             # CRITICAL FIX: Update the database conversation status to 'completed' first
             conversations_db.update_conversation_status(uid, conversation_id, ConversationStatus.completed)
@@ -319,9 +324,12 @@ def create_conversation_with_agent(
         print(f"✅ BACKEND: Vector embedding started in background thread")
         
         # Clear in-progress conversation from Redis to prevent auto-processing
-        import database.redis_db as redis_db
         redis_db.remove_in_progress_conversation_id(uid)
         print(f"🟦 BACKEND: Cleared in-progress conversation from Redis to prevent duplicate processing")
+        
+        # Clear the auto-processing cancellation flag since agent processing is complete
+        redis_db.remove_user_auto_processing_cancelled(uid)
+        print(f"🟦 BACKEND: Cleared auto-processing cancellation flag for user {uid}")
         
         # 🚀 STEP 4: Trigger external integrations (following POST /v1/conversations pattern)
         print(f"🔗 BACKEND: Triggering external integrations for agent-created conversation...")
