@@ -300,7 +300,10 @@ async def _listen(
     # Stream transcript
     async def _trigger_create_conversation_with_delay(delay_seconds: int, finished_at: datetime):
         try:
+            print(f"🔄 AUTO_PROCESSING: Timer started for user {uid}, will wake up in {delay_seconds} seconds")
             await asyncio.sleep(delay_seconds)
+
+            print(f"🔄 AUTO_PROCESSING: Timer woke up for user {uid} after {delay_seconds} seconds")
 
             # 🛑 NEW: Check if auto-processing was cancelled by manual processing
             if redis_db.get_user_auto_processing_cancelled(uid):
@@ -327,17 +330,26 @@ async def _listen(
                 return
             
             print(f"▶️ AUTO_PROCESSING: Proceeding with auto-processing of conversation {conversation_obj.id} for user {uid}")
+            print(f"🔍 AUTO_PROCESSING: Conversation transcript length: {len(conversation_obj.get_transcript(False))}")
+            print(f"🔍 AUTO_PROCESSING: Conversation segments count: {len(conversation_obj.transcript_segments)}")
             
             await _create_current_conversation()
         except asyncio.CancelledError:
+            print(f"🔄 AUTO_PROCESSING: Timer task was cancelled for user {uid}")
             pass
 
     async def _create_conversation(conversation: dict):
         conversation = Conversation(**conversation)
+        print(f"🔄 PROCESSING: Starting to process conversation {conversation.id} for user {uid}")
+        print(f"🔍 PROCESSING: Conversation status: {conversation.status}")
+        print(f"🔍 PROCESSING: Conversation transcript length: {len(conversation.get_transcript(False))}")
+        print(f"🔍 PROCESSING: Conversation segments count: {len(conversation.transcript_segments)}")
+        
         if conversation.status != ConversationStatus.processing:
             _send_message_event(ConversationEvent(event_type="memory_processing_started", memory=conversation))
             conversations_db.update_conversation_status(uid, conversation.id, ConversationStatus.processing)
             conversation.status = ConversationStatus.processing
+            print(f"🔄 PROCESSING: Updated conversation {conversation.id} status to processing")
 
         try:
             # Geolocation
@@ -348,24 +360,27 @@ async def _listen(
 
             # Check if user has dev mode enabled for agent processing
             use_agent_processing = redis_db.get_user_dev_mode(uid)
-            print(f"🤖 TRANSCRIBE: User {uid} dev mode enabled: {use_agent_processing}")
+            print(f"🤖 PROCESSING: User {uid} dev mode enabled: {use_agent_processing}")
             
             if use_agent_processing:
                 # Use agent processing for dev mode
-                print(f"🤖 TRANSCRIBE: Processing conversation {conversation.id} with agent")
+                print(f"🤖 PROCESSING: Processing conversation {conversation.id} with agent")
                 conversation = await _process_conversation_with_agent(conversation, uid)
                 messages = trigger_external_integrations(uid, conversation)
+                print(f"✅ PROCESSING: Agent processing completed for conversation {conversation.id}")
             else:
                 # Use standard processing
-                print(f"📝 TRANSCRIBE: Processing conversation {conversation.id} with standard pipeline")
+                print(f"📝 PROCESSING: Processing conversation {conversation.id} with standard pipeline")
                 conversation = process_conversation(uid, language, conversation)
                 messages = trigger_external_integrations(uid, conversation)
+                print(f"✅ PROCESSING: Standard processing completed for conversation {conversation.id}")
         except Exception as e:
-            print(f"Error processing conversation: {e}", uid)
+            print(f"🔴 PROCESSING: Error processing conversation {conversation.id}: {e}", uid)
             conversations_db.set_conversation_as_discarded(uid, conversation.id)
             conversation.discarded = True
             messages = []
 
+        print(f"📡 PROCESSING: Sending conversation created event for {conversation.id}")
         _send_message_event(ConversationEvent(event_type="memory_created", memory=conversation, messages=messages))
 
     async def finalize_processing_conversations():
@@ -416,7 +431,7 @@ async def _listen(
     asyncio.create_task(send_last_conversation())
 
     async def _create_current_conversation():
-        print("_create_current_conversation", uid)
+        print(f"🔄 CREATE_CURRENT: _create_current_conversation called for user {uid}")
 
         # Reset state variables
         nonlocal seconds_to_trim
@@ -425,8 +440,17 @@ async def _listen(
         seconds_to_add = None
 
         conversation = retrieve_in_progress_conversation(uid)
-        if not conversation or not conversation['transcript_segments']:
+        if not conversation:
+            print(f"🔄 CREATE_CURRENT: No in-progress conversation found for user {uid}")
             return
+        if not conversation['transcript_segments']:
+            print(f"🔄 CREATE_CURRENT: In-progress conversation {conversation['id']} has no transcript segments for user {uid}")
+            return
+            
+        print(f"🔄 CREATE_CURRENT: Found in-progress conversation {conversation['id']} for user {uid}")
+        print(f"🔍 CREATE_CURRENT: Conversation status: {conversation.get('status', 'unknown')}")
+        print(f"🔍 CREATE_CURRENT: Conversation segments count: {len(conversation['transcript_segments'])}")
+        
         await _create_conversation(conversation)
 
     conversation_creation_task_lock = asyncio.Lock()
