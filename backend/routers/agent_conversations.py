@@ -3,7 +3,7 @@ Agent-based conversation analysis API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 import json
 import asyncio
@@ -190,13 +190,18 @@ def create_conversation_with_agent(
         agent_title = result.get('title', '')
         print(f"🔍 AGENT_CREATE: Agent generated title: '{agent_title}'")
         
-        # Extract structured data from agent analysis
+        # Extract structured data from agent analysis (for title, category, emoji)
         print(f"🟦 BACKEND: Extracting structured data from agent analysis...")
         structured_data = _extract_structured_data_from_agent_analysis(
             agent_analysis, 
             retrieved_conversations,
             request.transcript
         )
+        
+        # Generate dedicated action items using the same high-quality approach as standard API
+        print(f"🎯 BACKEND: Generating dedicated action items for action items view...")
+        dedicated_action_items = _generate_action_items_from_transcript(request.transcript, uid)
+        print(f"🎯 BACKEND: Generated {len(dedicated_action_items)} dedicated action items")
         
         # Use the agent generated title if available, otherwise use extracted title
         if agent_title and agent_title.strip():
@@ -254,12 +259,15 @@ def create_conversation_with_agent(
         # Store the full agent analysis
         conversation.structured.agent_analysis = agent_analysis
         
-        # Update action items
-        if structured_data.get("action_items"):
+        # Update action items using dedicated high-quality action items (not from agent analysis regex)
+        if dedicated_action_items:
             conversation.structured.action_items = [
-                ActionItem(description=item["content"]) 
-                for item in structured_data["action_items"]
+                ActionItem(description=item) 
+                for item in dedicated_action_items
             ]
+            print(f"🎯 BACKEND: Added {len(dedicated_action_items)} high-quality action items to conversation")
+        else:
+            print(f"🎯 BACKEND: No action items generated from transcript")
         
         # Update key takeaways
         if structured_data.get("key_takeaways"):
@@ -437,6 +445,11 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
                 )
             ]
         
+        # Even for discarded conversations, try to extract action items if they exist
+        print(f"🎯 BACKEND: Checking for action items in discarded conversation...")
+        dedicated_action_items = _generate_action_items_from_transcript(transcript, uid)
+        print(f"🎯 BACKEND: Found {len(dedicated_action_items)} action items in discarded conversation")
+        
         # Create discarded conversation
         conversation = Conversation(
             id=str(uuid.uuid4()),
@@ -456,6 +469,14 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
             discarded=True,  # Mark as discarded
             deleted=False
         )
+        
+        # Add action items even to discarded conversations if they exist
+        if dedicated_action_items:
+            conversation.structured.action_items = [
+                ActionItem(description=item) 
+                for item in dedicated_action_items
+            ]
+            print(f"🎯 BACKEND: Added {len(dedicated_action_items)} action items to discarded conversation")
         
         # Mark conversation as completed
         conversation.status = ConversationStatus.completed
@@ -864,4 +885,77 @@ def clear_agent_session(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error clearing session: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error clearing session: {str(e)}")
+
+
+def _generate_action_items_from_transcript(transcript: str, uid: str = None) -> List[str]:
+    """
+    Generate action items specifically for the action items view using the same 
+    high-quality LLM approach as the standard conversation API.
+    
+    This is separate from agent analysis to ensure we get structured, actionable items
+    regardless of the agent's free-form analysis style.
+    """
+    try:
+        from utils.llm import llm_medium
+        from pydantic import BaseModel, Field
+        from typing import List
+        
+        print(f"🎯 AGENT: Generating dedicated action items from transcript for action items view")
+        
+        # Define a focused model just for action items
+        class ActionItemsOutput(BaseModel):
+            action_items: List[str] = Field(
+                description="A list of clear, actionable items that the user should complete based on this conversation. "
+                           "Each item should start with an action verb and be specific and measurable.",
+                default=[]
+            )
+        
+        # Get user context for personalization if uid is available
+        user_context = ""
+        if uid:
+            try:
+                from utils.llms.memory import get_prompt_memories
+                user_name, memories_str = get_prompt_memories(uid)
+                user_context = f"User name: {user_name}\n{memories_str}\n\n"
+            except Exception as e:
+                print(f"Could not get user memories for action items: {e}")
+                user_context = ""
+        
+        # Create a focused prompt for action items only
+        prompt = f"""
+        Extract clear, actionable items from the following conversation transcript.
+        
+        {user_context}
+        
+        **Instructions for Action Items:**
+        - Focus on commitments, tasks, or next steps mentioned in the conversation
+        - Each item should start with a clear action verb (e.g., "Schedule...", "Send...", "Review...", "Call...")
+        - Make items specific and measurable when possible
+        - Only include items that are actually actionable by the user
+        - Ignore casual mentions or hypothetical discussions
+        - Limit to the most important 5-7 action items
+        - If no clear action items exist, return an empty list
+        
+        **Examples of good action items:**
+        - "Schedule follow-up meeting with John for next Tuesday"
+        - "Send the project proposal to the client by Friday"
+        - "Review the budget spreadsheet and provide feedback"
+        - "Call the dentist to book annual checkup"
+        
+        **Conversation transcript:**
+        {transcript}
+        """
+        
+        # Use the medium LLM for action item extraction
+        with_parser = llm_medium.with_structured_output(ActionItemsOutput)
+        response = with_parser.invoke(prompt)
+        
+        action_items = response.action_items or []
+        print(f"🎯 AGENT: Generated {len(action_items)} action items for action items view")
+        
+        return action_items
+        
+    except Exception as e:
+        print(f"🔴 AGENT: Error generating action items: {e}")
+        return []  # Return empty list if generation fails 
