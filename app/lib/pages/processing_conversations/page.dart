@@ -3,6 +3,7 @@ import 'package:omi/backend/schema/conversation.dart';
 import 'package:omi/pages/capture/widgets/widgets.dart';
 import 'package:omi/pages/conversation_detail/page.dart';
 import 'package:omi/providers/conversation_provider.dart';
+import 'package:omi/backend/http/api/conversations.dart';
 import 'package:provider/provider.dart';
 
 class ProcessingConversationPage extends StatefulWidget {
@@ -14,12 +15,15 @@ class ProcessingConversationPage extends StatefulWidget {
   });
 
   @override
-  State<ProcessingConversationPage> createState() => _ProcessingConversationPageState();
+  State<ProcessingConversationPage> createState() =>
+      _ProcessingConversationPageState();
 }
 
-class _ProcessingConversationPageState extends State<ProcessingConversationPage> with TickerProviderStateMixin {
+class _ProcessingConversationPageState extends State<ProcessingConversationPage>
+    with TickerProviderStateMixin {
   final scaffoldKey = GlobalKey<ScaffoldState>();
   TabController? _controller;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -36,6 +40,115 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
         ),
       ));
     });
+  }
+
+  void _deleteProcessingConversation() async {
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      // Clear the in-progress conversation from the backend
+      bool success = await clearInProgressConversation();
+
+      if (success) {
+        // Remove the processing conversation from the provider
+        if (mounted) {
+          final provider =
+              Provider.of<ConversationProvider>(context, listen: false);
+
+          // Remove the specific processing conversation from the provider
+          provider.removeProcessingConversation(widget.conversation.id);
+
+          // Also remove the generic '0' processing conversation if it exists
+          provider.removeProcessingConversation('0');
+
+          // Clear ALL processing conversations to handle any edge cases
+          debugPrint(
+              '🔄 PROCESSING_DELETE: Clearing all processing conversations from provider');
+          final allProcessingIds =
+              provider.processingConversations.map((c) => c.id).toList();
+          for (final id in allProcessingIds) {
+            provider.removeProcessingConversation(id);
+            debugPrint(
+                '🗑️ PROCESSING_DELETE: Removed processing conversation: $id');
+          }
+
+          // Refresh conversations from server to ensure backend and frontend are in sync
+          debugPrint(
+              '🔄 PROCESSING_DELETE: Refreshing conversations after clearing processing conversation');
+          await provider.fetchConversations();
+
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Processing conversation cleared successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            // Navigate back to home
+            Navigator.of(context).pop();
+          }
+        }
+      } else {
+        // Show error message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to clear processing conversation'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
+      }
+    }
+  }
+
+  void _showDeleteDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Processing Conversation'),
+          content: const Text(
+              'This conversation seems stuck in processing. Do you want to clear it and reset?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteProcessingConversation();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -73,6 +186,17 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
                 const Text("🎙️"),
                 const SizedBox(width: 4),
                 const Expanded(child: Text("In progress")),
+                _isDeleting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        onPressed: _showDeleteDialog,
+                        icon: const Icon(Icons.delete_outline, size: 24.0),
+                        tooltip: 'Clear stuck processing conversation',
+                      ),
               ],
             ),
           ),
@@ -84,7 +208,10 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
                 padding: EdgeInsets.zero,
                 indicatorPadding: EdgeInsets.zero,
                 controller: _controller,
-                labelStyle: Theme.of(context).textTheme.titleLarge!.copyWith(fontSize: 18),
+                labelStyle: Theme.of(context)
+                    .textTheme
+                    .titleLarge!
+                    .copyWith(fontSize: 18),
                 tabs: [
                   Tab(
                     text: convoSource == ConversationSource.openglass
@@ -95,7 +222,9 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
                   ),
                   const Tab(text: 'Summary')
                 ],
-                indicator: BoxDecoration(color: Colors.transparent, borderRadius: BorderRadius.circular(16)),
+                indicator: BoxDecoration(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(16)),
               ),
               Expanded(
                 child: Padding(
@@ -114,7 +243,11 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
                                     Center(child: Text("No Transcript")),
                                   ],
                                 )
-                              : getTranscriptWidget(false, widget.conversation.transcriptSegments, [], null)
+                              : getTranscriptWidget(
+                                  false,
+                                  widget.conversation.transcriptSegments,
+                                  [],
+                                  null)
                         ],
                       ),
                       ListView(
@@ -123,11 +256,50 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
                           const SizedBox(height: 80),
                           Center(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                              child: Text(
-                                widget.conversation.transcriptSegments.isEmpty ? "No summary" : "Processing",
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 16),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    widget.conversation.transcriptSegments
+                                            .isEmpty
+                                        ? "No summary"
+                                        : "Processing",
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                  if (widget.conversation.transcriptSegments
+                                      .isNotEmpty) ...[
+                                    const SizedBox(height: 24),
+                                    Text(
+                                      "Taking longer than expected?",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _isDeleting
+                                        ? const CircularProgressIndicator()
+                                        : ElevatedButton.icon(
+                                            onPressed: _showDeleteDialog,
+                                            icon: const Icon(Icons.refresh,
+                                                size: 20),
+                                            label: const Text("Clear & Reset"),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  Colors.orange[100],
+                                              foregroundColor:
+                                                  Colors.orange[800],
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 20,
+                                                vertical: 12,
+                                              ),
+                                            ),
+                                          ),
+                                  ],
+                                ],
                               ),
                             ),
                           ),
