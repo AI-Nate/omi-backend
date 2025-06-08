@@ -57,22 +57,10 @@ class _ProcessingConversationPageState extends State<ProcessingConversationPage>
           final provider =
               Provider.of<ConversationProvider>(context, listen: false);
 
-          // Remove the specific processing conversation from the provider
-          provider.removeProcessingConversation(widget.conversation.id);
-
-          // Also remove the generic '0' processing conversation if it exists
-          provider.removeProcessingConversation('0');
-
-          // Clear ALL processing conversations to handle any edge cases
+          // Use the comprehensive cleanup method that handles all edge cases
           debugPrint(
-              '🔄 PROCESSING_DELETE: Clearing all processing conversations from provider');
-          final allProcessingIds =
-              provider.processingConversations.map((c) => c.id).toList();
-          for (final id in allProcessingIds) {
-            provider.removeProcessingConversation(id);
-            debugPrint(
-                '🗑️ PROCESSING_DELETE: Removed processing conversation: $id');
-          }
+              '🧹 PROCESSING_DELETE: Using comprehensive cleanup method');
+          provider.clearAllProcessingConversations();
 
           // Refresh conversations from server to ensure backend and frontend are in sync
           debugPrint(

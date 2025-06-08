@@ -147,6 +147,30 @@ class ConversationProvider extends ChangeNotifier
     notifyListeners();
   }
 
+  void clearAllProcessingConversations() {
+    debugPrint('🧹 PROVIDER: Clearing all processing conversations');
+    processingConversations.clear();
+
+    // Also remove any processing conversations from main conversations list
+    conversations.removeWhere((c) => c.status == ConversationStatus.processing);
+
+    // Remove from grouped conversations as well
+    for (final date in groupedConversations.keys.toList()) {
+      groupedConversations[date]
+          ?.removeWhere((c) => c.status == ConversationStatus.processing);
+      // Remove empty date groups
+      if (groupedConversations[date]?.isEmpty ?? false) {
+        groupedConversations.remove(date);
+      }
+    }
+
+    // Clear cache to force fresh data
+    SharedPreferencesUtil().cachedConversations = conversations;
+
+    debugPrint('🧹 PROVIDER: All processing conversations cleared');
+    notifyListeners();
+  }
+
   void onConversationTap(int idx) {
     if (idx < 0 || idx > conversations.length - 1) {
       return;
