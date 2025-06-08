@@ -531,20 +531,53 @@ def clear_in_progress_conversation(uid: str = Depends(auth.get_current_user_uid)
     """
     Clear the current in-progress conversation to prevent duplicate auto-processing.
     This is useful when manual processing has already been triggered.
+    Also handles stuck processing conversations that failed to complete.
     """
     print(f'🧹 CONVERSATIONS: Clearing in-progress conversation for user {uid}')
     
     # Remove from Redis
     redis_db.remove_in_progress_conversation_id(uid)
     
-    # Also update any in-progress conversations in the database to completed status
+    # First, try to find actual in-progress conversations
     in_progress_conversation = retrieve_in_progress_conversation(uid)
     if in_progress_conversation:
         conversation_id = in_progress_conversation['id']
         conversations_db.update_conversation_status(uid, conversation_id, ConversationStatus.completed)
         print(f'✅ CONVERSATIONS: Cleared in-progress conversation {conversation_id} for user {uid}')
+        return {"status": "Ok"}
+    
+    # If no in-progress conversation found, look for stuck processing conversations
+    # Get all processing conversations for this user
+    processing_conversations = conversations_db.get_processing_conversations(uid)
+    
+    if processing_conversations:
+        print(f'🔧 CONVERSATIONS: Found {len(processing_conversations)} stuck processing conversations for user {uid}')
+        for conversation in processing_conversations:
+            conversation_id = conversation['id']
+            created_at = conversation.get('created_at')
+            
+            # Only update conversations that are older than 10 minutes (stuck)
+            if created_at:
+                from datetime import datetime, timezone, timedelta
+                now = datetime.now(timezone.utc)
+                # Handle both string and datetime objects
+                if isinstance(created_at, str):
+                    # Parse ISO format datetime string
+                    from dateutil import parser
+                    created_at = parser.parse(created_at)
+                elif hasattr(created_at, 'timestamp'):  # Firestore timestamp
+                    created_at = created_at.replace(tzinfo=timezone.utc)
+                
+                age_minutes = (now - created_at).total_seconds() / 60
+                print(f'🕐 CONVERSATIONS: Processing conversation {conversation_id} age: {age_minutes:.1f} minutes')
+                
+                if age_minutes > 10:  # Stuck for more than 10 minutes
+                    conversations_db.update_conversation_status(uid, conversation_id, ConversationStatus.completed)
+                    print(f'✅ CONVERSATIONS: Cleared stuck processing conversation {conversation_id} (age: {age_minutes:.1f} minutes)')
+                else:
+                    print(f'⏳ CONVERSATIONS: Processing conversation {conversation_id} is recent, leaving it to complete')
     else:
-        print(f'ℹ️ CONVERSATIONS: No in-progress conversation found for user {uid}')
+        print(f'ℹ️ CONVERSATIONS: No in-progress or processing conversations found for user {uid}')
     
     return {"status": "Ok"}
 
