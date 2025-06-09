@@ -5,6 +5,7 @@ import 'package:omi/backend/preferences.dart';
 import 'package:omi/backend/schema/conversation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:omi/services/tts_service.dart';
 
 class EnhancedSummarySection extends StatelessWidget {
   final ServerConversation conversation;
@@ -25,49 +26,60 @@ class EnhancedSummarySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Title with optional image enhanced indicator
+        // Title with optional image enhanced indicator and TTS button
         Row(
           children: [
-            Text(
-              'Enhanced Summary',
-              style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+            Expanded(
+              child: Row(
+                children: [
+                  Text(
+                    'Enhanced Summary',
+                    style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-            ),
-            if (enhancedByImage &&
-                conversation.structured.imageUrls.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.purple.withOpacity(0.5)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.image,
-                      size: 14,
-                      color: Colors.purple,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      conversation.structured.imageUrls.length > 1
-                          ? '${conversation.structured.imageUrls.length} Images'
-                          : 'Image Enhanced',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.purple,
-                        fontWeight: FontWeight.w500,
+                  if (enhancedByImage &&
+                      conversation.structured.imageUrls.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: Colors.purple.withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.image,
+                            size: 14,
+                            color: Colors.purple,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            conversation.structured.imageUrls.length > 1
+                                ? '${conversation.structured.imageUrls.length} Images'
+                                : 'Image Enhanced',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.purple,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
-            ],
+            ),
+            // TTS Button
+            if (conversation.structured.overview.isNotEmpty)
+              _buildTTSButton(context),
           ],
         ),
         const SizedBox(height: 16),
@@ -567,5 +579,159 @@ class EnhancedSummarySection extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildTTSButton(BuildContext context) {
+    return ValueListenableBuilder<TTSState>(
+      valueListenable: TTSService().stateNotifier,
+      builder: (context, ttsState, child) {
+        return Container(
+          margin: const EdgeInsets.only(left: 8),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: ttsState == TTSState.loading
+                  ? null
+                  : () => _handleTTSAction(context, ttsState),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _getTTSButtonColor(ttsState).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _getTTSButtonColor(ttsState).withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (ttsState == TTSState.loading)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+                        ),
+                      )
+                    else
+                      Icon(
+                        ttsState.icon,
+                        size: 16,
+                        color: _getTTSButtonColor(ttsState),
+                      ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _getTTSButtonText(ttsState),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _getTTSButtonColor(ttsState),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Color _getTTSButtonColor(TTSState state) {
+    switch (state) {
+      case TTSState.idle:
+        return Colors.deepPurple;
+      case TTSState.loading:
+        return Colors.deepPurple;
+      case TTSState.playing:
+        return Colors.red;
+      case TTSState.paused:
+        return Colors.orange;
+      case TTSState.error:
+        return Colors.red;
+    }
+  }
+
+  String _getTTSButtonText(TTSState state) {
+    switch (state) {
+      case TTSState.idle:
+        return 'Listen';
+      case TTSState.loading:
+        return 'Loading...';
+      case TTSState.playing:
+        return 'Stop';
+      case TTSState.paused:
+        return 'Resume';
+      case TTSState.error:
+        return 'Error';
+    }
+  }
+
+  void _handleTTSAction(BuildContext context, TTSState currentState) async {
+    final ttsService = TTSService();
+
+    switch (currentState) {
+      case TTSState.idle:
+      case TTSState.error:
+        // Start TTS
+        final success = await ttsService.speakConversationSummary(
+          conversation,
+          onStart: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('🔊 Starting to read conversation summary...'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+          onComplete: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Finished reading conversation summary'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+          onError: (error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ Error: $error'),
+                duration: const Duration(seconds: 3),
+                backgroundColor: Colors.red,
+              ),
+            );
+          },
+        );
+
+        if (!success) {
+          print('🔴 TTS: Failed to start conversation speech');
+        }
+        break;
+
+      case TTSState.playing:
+        // Stop TTS
+        await ttsService.stop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⏹️ Stopped reading conversation summary'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        break;
+
+      case TTSState.paused:
+        // Resume TTS
+        await ttsService.resume();
+        break;
+
+      case TTSState.loading:
+        // Do nothing, already loading
+        break;
+    }
   }
 }

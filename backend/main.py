@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from modal import Image, App, asgi_app, Secret
 from routers import workflow, chat, firmware, plugins, transcribe, notifications, \
     speech_profile, agents, users, processing_conversations, trends, sync, apps, custom_auth, \
-    payment, integration, conversations, memories, mcp, agent_conversations
+    payment, integration, conversations, memories, mcp, agent_conversations, tts
 
 from utils.other.timeout import TimeoutMiddleware
 
@@ -47,6 +47,7 @@ app.include_router(custom_auth.router)
 
 app.include_router(payment.router)
 app.include_router(mcp.router)
+app.include_router(tts.router)
 
 
 methods_timeout = {
