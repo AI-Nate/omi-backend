@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:omi/backend/http/api/tts.dart';
@@ -12,6 +13,7 @@ class TTSService {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   bool _isLoading = false;
+  StreamSubscription<PlayerState>? _playerStateSubscription;
 
   bool get isPlaying => _isPlaying;
   bool get isLoading => _isLoading;
@@ -33,6 +35,7 @@ class TTSService {
         await stop();
       }
 
+      print('🔊 TTS_SERVICE: Setting state to loading...');
       _isLoading = true;
       _stateNotifier.value = TTSState.loading;
       onStart?.call();
@@ -55,17 +58,33 @@ class TTSService {
       }
 
       print('🔊 TTS: Received audio data: ${audioData.length} bytes');
+      print('🔊 TTS_SERVICE: About to play audio from bytes...');
 
       // Play the audio
-      await _playAudioFromBytes(audioData);
+      try {
+        await _playAudioFromBytes(audioData);
+        print('🔊 TTS_SERVICE: Audio playback started successfully');
+      } catch (e) {
+        print('🔴 TTS_SERVICE: Error in _playAudioFromBytes: $e');
+        _isLoading = false;
+        _stateNotifier.value = TTSState.error;
+        onError?.call('Error playing audio: $e');
+        return false;
+      }
 
+      print('🔊 TTS_SERVICE: Setting state to playing...');
       _isLoading = false;
       _isPlaying = true;
       _stateNotifier.value = TTSState.playing;
+      print(
+          '🔊 TTS_SERVICE: State updated to playing: ${_stateNotifier.value}');
 
       // Set up completion callback
-      _audioPlayer.playerStateStream.listen((PlayerState state) {
+      _playerStateSubscription =
+          _audioPlayer.playerStateStream.listen((PlayerState state) {
+        print('🔊 TTS_SERVICE: Player state changed: ${state.processingState}');
         if (state.processingState == ProcessingState.completed) {
+          print('🔊 TTS_SERVICE: Audio completed, setting state to idle');
           _isPlaying = false;
           _stateNotifier.value = TTSState.idle;
           onComplete?.call();
@@ -75,6 +94,7 @@ class TTSService {
       return true;
     } catch (e) {
       print('🔴 TTS: Error speaking conversation summary: $e');
+      print('🔴 TTS_SERVICE: Stack trace: ${StackTrace.current}');
       _isLoading = false;
       _isPlaying = false;
       _stateNotifier.value = TTSState.error;
@@ -127,7 +147,8 @@ class TTSService {
       _stateNotifier.value = TTSState.playing;
 
       // Set up completion callback
-      _audioPlayer.playerStateStream.listen((PlayerState state) {
+      _playerStateSubscription =
+          _audioPlayer.playerStateStream.listen((PlayerState state) {
         if (state.processingState == ProcessingState.completed) {
           _isPlaying = false;
           _stateNotifier.value = TTSState.idle;
@@ -148,28 +169,45 @@ class TTSService {
 
   Future<void> _playAudioFromBytes(Uint8List audioData) async {
     try {
+      print(
+          '🔊 TTS_SERVICE: _playAudioFromBytes called with ${audioData.length} bytes');
+
       // Stop any existing playback
+      print('🔊 TTS_SERVICE: Stopping existing playback...');
       await _audioPlayer.stop();
 
       // Create an audio source from bytes and play
+      print('🔊 TTS_SERVICE: Creating BytesAudioSource...');
       final audioSource = BytesAudioSource(audioData);
+
+      print('🔊 TTS_SERVICE: Setting audio source...');
       await _audioPlayer.setAudioSource(audioSource);
+
+      print('🔊 TTS_SERVICE: Starting playback...');
       await _audioPlayer.play();
 
       print('🔊 TTS: Audio playback started');
     } catch (e) {
       print('🔴 TTS: Error playing audio: $e');
+      print(
+          '🔴 TTS_SERVICE: _playAudioFromBytes stack trace: ${StackTrace.current}');
       rethrow;
     }
   }
 
   Future<void> stop() async {
     try {
+      print('🔊 TTS_SERVICE: Stop called, cancelling subscription...');
+      await _playerStateSubscription?.cancel();
+      _playerStateSubscription = null;
+
+      print('🔊 TTS_SERVICE: Stopping audio player...');
       await _audioPlayer.stop();
+
       _isPlaying = false;
       _isLoading = false;
       _stateNotifier.value = TTSState.idle;
-      print('🔊 TTS: Audio playback stopped');
+      print('🔊 TTS: Audio playback stopped, state set to idle');
     } catch (e) {
       print('🔴 TTS: Error stopping audio: $e');
     }
@@ -200,6 +238,7 @@ class TTSService {
   void dispose() {
     _audioPlayer.dispose();
     _stateNotifier.dispose();
+    _playerStateSubscription?.cancel();
   }
 }
 
