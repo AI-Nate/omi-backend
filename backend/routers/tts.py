@@ -167,8 +167,8 @@ async def convert_text_to_speech(
 @router.post("/v1/tts/conversation/{conversation_id}", tags=['tts'])
 async def convert_conversation_summary_to_speech(
     conversation_id: str,
-    voice: str = "alloy",
-    speed: float = 1.0,
+    voice: str = "nova",
+    speed: float = 1.2,
     uid: str = Depends(auth.get_current_user_uid)
 ):
     """
