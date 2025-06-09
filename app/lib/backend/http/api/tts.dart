@@ -37,6 +37,7 @@ Future<Uint8List?> convertTextToSpeech(
 }
 
 /// Convert conversation summary to speech using Azure TTS service
+/// This function handles caching - if audio is cached, it will download from Firebase Storage
 Future<Uint8List?> convertConversationToSpeech(
   String conversationId, {
   String voice = 'alloy',
@@ -55,11 +56,44 @@ Future<Uint8List?> convertConversationToSpeech(
       method: 'POST',
     );
 
-    if (response != null && response.statusCode == 200) {
-      return response.bodyBytes;
+    if (response != null) {
+      if (response.statusCode == 200) {
+        // Direct audio response from TTS generation
+        return response.bodyBytes;
+      } else if (response.statusCode == 302) {
+        // Redirect to cached audio file
+        final redirectUrl = response.headers['location'];
+        if (redirectUrl != null) {
+          print('🔊 TTS API: Redirected to cached audio: $redirectUrl');
+
+          // Download the cached audio file
+          final cachedResponse = await makeApiCall(
+            url: redirectUrl,
+            headers: {},
+            method: 'GET',
+            body: '',
+          );
+
+          if (cachedResponse != null && cachedResponse.statusCode == 200) {
+            print(
+                '🔊 TTS API: Successfully downloaded cached audio: ${cachedResponse.bodyBytes.length} bytes');
+            return cachedResponse.bodyBytes;
+          } else {
+            print(
+                '🔴 TTS API: Failed to download cached audio: ${cachedResponse?.statusCode}');
+            return null;
+          }
+        } else {
+          print('🔴 TTS API: Redirect response missing location header');
+          return null;
+        }
+      } else {
+        print(
+            '🔴 TTS API: Error ${response.statusCode}: ${response.reasonPhrase}');
+        return null;
+      }
     } else {
-      print(
-          '🔴 TTS API: Error ${response?.statusCode}: ${response?.reasonPhrase}');
+      print('🔴 TTS API: No response received');
       return null;
     }
   } catch (e) {

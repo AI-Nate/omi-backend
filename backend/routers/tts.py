@@ -174,12 +174,27 @@ async def convert_conversation_summary_to_speech(
     """
     Convert a specific conversation's agent analysis to speech.
     
-    This endpoint retrieves a conversation's agent analysis text
-    and converts it to audio using Azure TTS service.
+    This endpoint first checks if a cached audio file exists in Firebase Storage.
+    If found, it returns a redirect to the cached file URL.
+    If not found, it generates new audio using Azure TTS and caches it.
     """
     print(f"🔊 TTS_CONVERSATION: Starting convert_conversation_summary_to_speech for conversation {conversation_id}, user {uid}")
     
     try:
+        # First, check if cached audio exists in Firebase Storage
+        from utils.other.storage import get_conversation_audio_url, upload_conversation_audio
+        
+        print(f"🔊 TTS_CONVERSATION: Checking for cached audio (voice: {voice}, speed: {speed})")
+        cached_audio_url = get_conversation_audio_url(uid, conversation_id, voice, speed)
+        
+        if cached_audio_url:
+            print(f"🔊 TTS_CONVERSATION: Found cached audio, redirecting to: {cached_audio_url}")
+            # Return redirect to cached audio file
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url=cached_audio_url, status_code=302)
+        
+        print(f"🔊 TTS_CONVERSATION: No cached audio found, generating new audio")
+        
         # Get conversation data
         import database.conversations as conversations_db
         conversation_data = conversations_db.get_conversation(uid, conversation_id)
@@ -208,9 +223,74 @@ async def convert_conversation_summary_to_speech(
         print(f"🔊 TTS_CONVERSATION: Converting conversation {conversation_id} summary to speech")
         print(f"🔊 TTS_CONVERSATION: Content length: {len(agent_analysis)} characters")
         
-        # Convert to speech using the main TTS function
-        tts_request = TTSRequest(text=agent_analysis, voice=voice, speed=speed)
-        return await convert_text_to_speech(tts_request, uid)
+        # Generate audio using Azure TTS
+        text_to_convert = agent_analysis
+        
+        # Get Azure TTS configuration
+        azure_tts_api_key = os.getenv("AZURE_TTS_API_KEY")
+        azure_tts_endpoint = os.getenv("AZURE_TTS_ENDPOINT")
+        azure_tts_api_version = os.getenv("AZURE_TTS_API_VERSION", "2025-03-01-preview")
+        
+        if not azure_tts_api_key or not azure_tts_endpoint:
+            print(f"🔴 TTS_CONVERSATION: Azure TTS service not properly configured")
+            raise HTTPException(
+                status_code=500, 
+                detail="Azure TTS service not properly configured"
+            )
+        
+        # Prepare Azure TTS request
+        azure_url = f"{azure_tts_endpoint}?api-version={azure_tts_api_version}"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {azure_tts_api_key}"
+        }
+        
+        payload = {
+            "model": "gpt-4o-mini-tts",
+            "input": text_to_convert,
+            "voice": voice,
+            "speed": speed
+        }
+        
+        print(f"🔊 TTS_CONVERSATION: Making request to Azure TTS...")
+        
+        # Call Azure TTS service
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                azure_url,
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code != 200:
+                print(f"🔴 TTS_CONVERSATION: Azure TTS API error: {response.status_code} - {response.text}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Azure TTS service error: {response.status_code} - {response.text}"
+                )
+            
+            # Get audio content
+            audio_content = response.content
+            print(f"🔊 TTS_CONVERSATION: Generated audio - {len(audio_content)} bytes")
+            
+            # Cache the audio in Firebase Storage
+            try:
+                print(f"🔊 TTS_CONVERSATION: Uploading audio to Firebase Storage...")
+                cached_url = upload_conversation_audio(audio_content, uid, conversation_id, voice, speed)
+                print(f"🔊 TTS_CONVERSATION: Audio cached successfully at: {cached_url}")
+            except Exception as cache_error:
+                print(f"🔴 TTS_CONVERSATION: Failed to cache audio: {cache_error}")
+                # Continue with direct audio response even if caching fails
+            
+            # Return the audio as streaming response
+            return StreamingResponse(
+                io.BytesIO(audio_content),
+                media_type="audio/mpeg",
+                headers={
+                    "Content-Disposition": "inline; filename=speech.mp3",
+                    "Cache-Control": "public, max-age=3600"  # Cache for 1 hour
+                }
+            )
         
     except HTTPException:
         print(f"🔴 TTS_CONVERSATION: HTTPException raised, re-raising")
@@ -221,6 +301,41 @@ async def convert_conversation_summary_to_speech(
         raise HTTPException(
             status_code=500,
             detail=f"Error converting conversation summary: {str(e)}"
+        )
+
+
+@router.delete("/v1/tts/conversation/{conversation_id}/cache", tags=['tts'])
+async def clear_conversation_audio_cache(
+    conversation_id: str,
+    voice: Optional[str] = None,
+    speed: Optional[float] = None,
+    uid: str = Depends(auth.get_current_user_uid)
+):
+    """
+    Clear cached audio files for a conversation.
+    
+    If voice and speed are provided, clears specific cached file.
+    Otherwise, clears all cached audio files for the conversation.
+    """
+    print(f"🔊 TTS_CACHE_CLEAR: Clearing audio cache for conversation {conversation_id}, user {uid}")
+    
+    try:
+        from utils.other.storage import delete_conversation_audio
+        
+        delete_conversation_audio(uid, conversation_id, voice, speed)
+        
+        if voice and speed:
+            print(f"🔊 TTS_CACHE_CLEAR: Cleared specific cache for voice={voice}, speed={speed}")
+            return {"message": f"Cleared cached audio for voice={voice}, speed={speed}"}
+        else:
+            print(f"🔊 TTS_CACHE_CLEAR: Cleared all audio cache for conversation")
+            return {"message": "Cleared all cached audio for conversation"}
+            
+    except Exception as e:
+        print(f"🔴 TTS_CACHE_CLEAR: Error clearing audio cache: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error clearing audio cache: {str(e)}"
         )
 
 

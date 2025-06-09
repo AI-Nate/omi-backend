@@ -420,3 +420,114 @@ def delete_conversation_images(uid: str, conversation_id: str):
             print(f"Deleted conversation image: {blob.name}")
         except Exception as e:
             print(f"Failed to delete conversation image {blob.name}: {e}")
+
+
+# **********************************
+# ******* CONVERSATION AUDIO *******
+# **********************************
+def upload_conversation_audio(audio_data: bytes, uid: str, conversation_id: str, voice: str = "alloy", speed: float = 1.0) -> str:
+    """
+    Upload an audio file for a conversation TTS to Firebase Storage.
+    
+    Args:
+        audio_data: Raw audio data as bytes
+        uid: User ID
+        conversation_id: ID of the conversation
+        voice: TTS voice used
+        speed: TTS speed used
+    
+    Returns:
+        str: Signed URL of the uploaded audio file
+    """
+    import tempfile
+    import os
+    
+    # Create filename with voice and speed parameters to ensure uniqueness
+    filename = f"{conversation_id}_{voice}_{speed}.mp3"
+    
+    # Create temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
+        temp_file.write(audio_data)
+        temp_file_path = temp_file.name
+    
+    try:
+        # Upload to Firebase Storage
+        bucket = storage_client.bucket(chat_files_bucket)  # Reusing chat files bucket
+        path = f'{uid}/conversation_audio/{filename}'
+        blob = bucket.blob(path)
+        blob.cache_control = 'public, max-age=86400'  # Cache for 24 hours
+        blob.content_type = 'audio/mpeg'
+        blob.upload_from_filename(temp_file_path)
+        
+        # Return signed URL
+        return _get_signed_url(blob, 60 * 24)  # 24 hours expiry
+        
+    finally:
+        # Clean up temporary file
+        if os.path.exists(temp_file_path):
+            os.unlink(temp_file_path)
+
+
+def get_conversation_audio_url(uid: str, conversation_id: str, voice: str = "alloy", speed: float = 1.0) -> str:
+    """
+    Get signed URL for existing conversation audio file.
+    
+    Args:
+        uid: User ID
+        conversation_id: ID of the conversation
+        voice: TTS voice used
+        speed: TTS speed used
+    
+    Returns:
+        str: Signed URL if file exists, None otherwise
+    """
+    bucket = storage_client.bucket(chat_files_bucket)
+    filename = f"{conversation_id}_{voice}_{speed}.mp3"
+    path = f'{uid}/conversation_audio/{filename}'
+    blob = bucket.blob(path)
+    
+    try:
+        # Check if the blob exists
+        if blob.exists():
+            return _get_signed_url(blob, 60 * 24)  # 24 hours expiry
+        else:
+            return None
+    except Exception as e:
+        print(f"Error checking conversation audio existence: {e}")
+        return None
+
+
+def delete_conversation_audio(uid: str, conversation_id: str, voice: str = None, speed: float = None):
+    """
+    Delete audio files associated with a conversation.
+    If voice and speed are provided, delete specific file. Otherwise, delete all audio files for the conversation.
+    
+    Args:
+        uid: User ID
+        conversation_id: ID of the conversation
+        voice: Specific voice to delete (optional)
+        speed: Specific speed to delete (optional)
+    """
+    bucket = storage_client.bucket(chat_files_bucket)
+    
+    if voice is not None and speed is not None:
+        # Delete specific audio file
+        filename = f"{conversation_id}_{voice}_{speed}.mp3"
+        path = f'{uid}/conversation_audio/{filename}'
+        blob = bucket.blob(path)
+        try:
+            blob.delete()
+            print(f"Deleted conversation audio: {blob.name}")
+        except Exception as e:
+            print(f"Failed to delete conversation audio {blob.name}: {e}")
+    else:
+        # Delete all audio files for this conversation
+        prefix = f'{uid}/conversation_audio/{conversation_id}_'
+        blobs = bucket.list_blobs(prefix=prefix)
+        
+        for blob in blobs:
+            try:
+                blob.delete()
+                print(f"Deleted conversation audio: {blob.name}")
+            except Exception as e:
+                print(f"Failed to delete conversation audio {blob.name}: {e}")

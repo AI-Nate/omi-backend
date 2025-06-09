@@ -15,6 +15,18 @@ service firebase.storage {
                        request.auth.token.admin == true);
     }
     
+    // Allow authenticated users to read conversation audio files
+    match /{userId}/conversation_audio/{allPaths=**} {
+      // Allow read access to authenticated users for their own audio files
+      // or to any authenticated user (since conversation audio can be shared)
+      allow read: if request.auth != null;
+      
+      // Only allow writes from service accounts or the audio file owner
+      allow write: if request.auth != null && 
+                      (request.auth.uid == userId || 
+                       request.auth.token.admin == true);
+    }
+    
     // Allow authenticated users to read other user profile/shared content
     match /{userId}/shared/{allPaths=**} {
       allow read: if request.auth != null;
