@@ -60,6 +60,20 @@ class TTSService {
       print('🔊 TTS: Received audio data: ${audioData.length} bytes');
       print('🔊 TTS_SERVICE: About to play audio from bytes...');
 
+      // Set up completion callback BEFORE starting playback
+      await _playerStateSubscription?.cancel();
+      _playerStateSubscription =
+          _audioPlayer.playerStateStream.listen((PlayerState state) {
+        print(
+            '🔊 TTS_SERVICE: Player state changed: ${state.processingState}, playing: ${state.playing}');
+        if (state.processingState == ProcessingState.completed) {
+          print('🔊 TTS_SERVICE: Audio completed, setting state to idle');
+          _isPlaying = false;
+          _stateNotifier.value = TTSState.idle;
+          onComplete?.call();
+        }
+      });
+
       // Play the audio
       try {
         await _playAudioFromBytes(audioData);
@@ -78,18 +92,6 @@ class TTSService {
       _stateNotifier.value = TTSState.playing;
       print(
           '🔊 TTS_SERVICE: State updated to playing: ${_stateNotifier.value}');
-
-      // Set up completion callback
-      _playerStateSubscription =
-          _audioPlayer.playerStateStream.listen((PlayerState state) {
-        print('🔊 TTS_SERVICE: Player state changed: ${state.processingState}');
-        if (state.processingState == ProcessingState.completed) {
-          print('🔊 TTS_SERVICE: Audio completed, setting state to idle');
-          _isPlaying = false;
-          _stateNotifier.value = TTSState.idle;
-          onComplete?.call();
-        }
-      });
 
       return true;
     } catch (e) {
@@ -139,22 +141,26 @@ class TTSService {
 
       print('🔊 TTS: Received audio data: ${audioData.length} bytes');
 
+      // Set up completion callback BEFORE starting playback
+      await _playerStateSubscription?.cancel();
+      _playerStateSubscription =
+          _audioPlayer.playerStateStream.listen((PlayerState state) {
+        print(
+            '🔊 TTS_SERVICE: Player state changed: ${state.processingState}, playing: ${state.playing}');
+        if (state.processingState == ProcessingState.completed) {
+          print('🔊 TTS_SERVICE: Audio completed, setting state to idle');
+          _isPlaying = false;
+          _stateNotifier.value = TTSState.idle;
+          onComplete?.call();
+        }
+      });
+
       // Play the audio
       await _playAudioFromBytes(audioData);
 
       _isLoading = false;
       _isPlaying = true;
       _stateNotifier.value = TTSState.playing;
-
-      // Set up completion callback
-      _playerStateSubscription =
-          _audioPlayer.playerStateStream.listen((PlayerState state) {
-        if (state.processingState == ProcessingState.completed) {
-          _isPlaying = false;
-          _stateNotifier.value = TTSState.idle;
-          onComplete?.call();
-        }
-      });
 
       return true;
     } catch (e) {
@@ -183,10 +189,11 @@ class TTSService {
       print('🔊 TTS_SERVICE: Setting audio source...');
       await _audioPlayer.setAudioSource(audioSource);
 
-      print('🔊 TTS_SERVICE: Starting playback...');
-      await _audioPlayer.play();
+      print('🔊 TTS_SERVICE: Starting playback (non-blocking)...');
+      // Don't await play() - it can hang. Start playback and return immediately.
+      _audioPlayer.play();
 
-      print('🔊 TTS: Audio playback started');
+      print('🔊 TTS: Audio playback initiated');
     } catch (e) {
       print('🔴 TTS: Error playing audio: $e');
       print(
