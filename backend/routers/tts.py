@@ -84,21 +84,22 @@ async def convert_text_to_speech(
         azure_tts_api_version = os.getenv("AZURE_TTS_API_VERSION", "2025-03-01-preview")
         
         print(f"🔊 TTS_SPEAK: Azure config - endpoint: {azure_tts_endpoint}, version: {azure_tts_api_version}")
+        print(f"🔊 TTS_SPEAK: Azure API key present: {bool(azure_tts_api_key)}")
         
         if not azure_tts_api_key or not azure_tts_endpoint:
             print(f"🔴 TTS_SPEAK: Azure TTS service not properly configured")
+            print(f"🔴 TTS_SPEAK: API Key present: {bool(azure_tts_api_key)}")
+            print(f"🔴 TTS_SPEAK: Endpoint: {repr(azure_tts_endpoint)}")
             raise HTTPException(
                 status_code=500, 
                 detail="Azure TTS service not properly configured"
             )
         
-        # Truncate text if it's too long for Azure TTS
-        original_length = len(request.text)
-        truncated_text = truncate_text_for_tts(request.text)
+        # Skip truncation for testing - use original text
+        text_to_convert = request.text
         
         print(f"🔊 TTS_SPEAK: Converting text to speech for user {uid}")
-        print(f"🔊 TTS_SPEAK: Original text length: {original_length} characters")
-        print(f"🔊 TTS_SPEAK: Truncated text length: {len(truncated_text)} characters")
+        print(f"🔊 TTS_SPEAK: Text length: {len(text_to_convert)} characters")
         print(f"🔊 TTS_SPEAK: Voice: {request.voice}, Speed: {request.speed}")
         
         # Prepare Azure TTS request
@@ -110,7 +111,7 @@ async def convert_text_to_speech(
         
         payload = {
             "model": "gpt-4o-mini-tts",
-            "input": truncated_text,
+            "input": text_to_convert,
             "voice": request.voice,
             "speed": request.speed
         }
