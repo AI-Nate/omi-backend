@@ -112,6 +112,12 @@ class UrgencyHapticService {
         return false;
       }
 
+      // Verify haptic services are available
+      if (!await _areHapticServicesAvailable(connection)) {
+        print('❌ HAPTIC: Haptic services not available on connected device');
+        return false;
+      }
+
       // Map urgency levels to omi device haptic levels
       int hapticLevel;
       switch (level) {
@@ -234,15 +240,22 @@ class UrgencyHapticService {
           '🔍 HAPTIC: Current connection: ${connection != null ? 'EXISTS' : 'NULL'}');
       if (connection != null) {
         print('🔍 HAPTIC: Connection state: ${connection.connectionState}');
+        print(
+            '🔍 HAPTIC: Bluetooth connected: ${await connection.isConnected()}');
+        print('🔍 HAPTIC: Can ping: ${await connection.ping()}');
       }
 
       // Test connection with retry logic
       connection = await _establishDeviceConnection(deviceId, deviceService);
       print(
           '🔍 HAPTIC: Connection after retry: ${connection != null ? 'ESTABLISHED' : 'FAILED'}');
+
       if (connection != null) {
         print(
             '🔍 HAPTIC: Final connection state: ${connection.connectionState}');
+        print('🔍 HAPTIC: Testing haptic services...');
+        bool servicesAvailable = await _areHapticServicesAvailable(connection);
+        print('🔍 HAPTIC: Haptic services available: $servicesAvailable');
       }
     } catch (e) {
       print('❌ HAPTIC: Error testing device connection: $e');
@@ -304,8 +317,7 @@ class UrgencyHapticService {
     // Step 1: Try normal connection
     DeviceConnection? connection =
         await deviceService.ensureConnection(deviceId);
-    if (connection != null &&
-        connection.connectionState == DeviceConnectionState.connected) {
+    if (await _isConnectionValid(connection)) {
       print('🟢 HAPTIC: Device already connected');
       return connection;
     }
@@ -314,8 +326,7 @@ class UrgencyHapticService {
     print(
         '🔄 HAPTIC: Initial connection failed, attempting forced reconnection...');
     connection = await deviceService.ensureConnection(deviceId, force: true);
-    if (connection != null &&
-        connection.connectionState == DeviceConnectionState.connected) {
+    if (await _isConnectionValid(connection)) {
       print('🟢 HAPTIC: Device reconnected successfully');
       return connection;
     }
@@ -331,8 +342,7 @@ class UrgencyHapticService {
 
       // Try connection after discovery
       connection = await deviceService.ensureConnection(deviceId, force: true);
-      if (connection != null &&
-          connection.connectionState == DeviceConnectionState.connected) {
+      if (await _isConnectionValid(connection)) {
         print('🟢 HAPTIC: Device connected after discovery');
         return connection;
       }
@@ -343,5 +353,61 @@ class UrgencyHapticService {
     // Step 4: Final failure
     print('❌ HAPTIC: All connection attempts failed');
     return null;
+  }
+
+  /// Validate if connection is truly connected and usable
+  static Future<bool> _isConnectionValid(DeviceConnection? connection) async {
+    if (connection == null) {
+      print('🔍 HAPTIC: Connection is null');
+      return false;
+    }
+
+    // Check connection state
+    if (connection.connectionState != DeviceConnectionState.connected) {
+      print(
+          '🔍 HAPTIC: Connection state is not connected: ${connection.connectionState}');
+      return false;
+    }
+
+    // Check if Bluetooth device is actually connected
+    bool isConnected = await connection.isConnected();
+    if (!isConnected) {
+      print('🔍 HAPTIC: Bluetooth device is not connected');
+      return false;
+    }
+
+    // Test if we can ping the device
+    bool canPing = await connection.ping();
+    if (!canPing) {
+      print('🔍 HAPTIC: Cannot ping device');
+      return false;
+    }
+
+    print('🟢 HAPTIC: Connection is valid and responsive');
+    return true;
+  }
+
+  /// Check if haptic services are available on the device
+  static Future<bool> _areHapticServicesAvailable(
+      DeviceConnection connection) async {
+    try {
+      // For OMI devices, we can test if performPlayToSpeakerHaptic works
+      // by calling it with level 0 (should be safe/no-op)
+      print('🔍 HAPTIC: Testing service availability...');
+
+      // Try a test haptic command (level 0 should be safe)
+      bool result = await connection.performPlayToSpeakerHaptic(0);
+
+      if (result) {
+        print('🟢 HAPTIC: Haptic services are available');
+        return true;
+      } else {
+        print('⚠️ HAPTIC: Haptic service test failed');
+        return false;
+      }
+    } catch (e) {
+      print('❌ HAPTIC: Error testing haptic services: $e');
+      return false;
+    }
   }
 }
