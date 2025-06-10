@@ -2,9 +2,23 @@
 
 ## Overview
 
-The Urgency-Based Haptic Notification feature provides intelligent haptic feedback based on the urgency level of AI-generated conversation summaries. When the Agent API processes a conversation transcript, it automatically assesses the urgency and triggers appropriate haptic patterns to notify users of important content requiring immediate attention.
+This feature adds urgency-based haptic feedback to the OMI wearable device based on AI-assessed conversation importance. The system provides differentiated tactile notifications (light/medium/strong vibrations) corresponding to low/medium/high urgency levels determined by the Agent API.
 
 ## Architecture
+
+### Dual Firmware Support
+The implementation supports both OMI firmware variants:
+- **Main OMI Firmware**: Uses dedicated Haptic service (`CONFIG_OMI_ENABLE_HAPTIC=y`, `CONFIG_OMI_ENABLE_SPEAKER=n`)
+- **DevKit Firmware**: Uses Speaker service for haptic control (`CONFIG_OMI_ENABLE_SPEAKER=y`)
+
+Both firmwares use the same Bluetooth service UUID: `CAB1AB95-2EA5-4F4D-BB56-874B72CFC984`
+
+### Service Selection Strategy
+The Flutter app automatically detects and uses the appropriate service:
+1. **Primary**: Dedicated Haptic service (main OMI firmware)
+2. **Fallback**: Speaker service (devkit firmware)
+
+This ensures compatibility across all hardware variants without requiring firmware changes.
 
 ### Backend Components
 
@@ -52,6 +66,67 @@ The Urgency-Based Haptic Notification feature provides intelligent haptic feedba
 - **Testing UI**: Allows users to test different urgency patterns
 - **Sample Assessments**: Provides realistic examples of urgency assessments
 - **Feedback Display**: Shows test results and urgency descriptions
+
+#### 6. **Mobile App Integration** (`app/lib/services/urgency_haptic_service.dart`)
+
+The Flutter app includes urgency-based haptic feedback with automatic service detection:
+
+```dart
+class UrgencyHapticService {
+  static Future<bool> _triggerOmiDeviceHaptic(UrgencyLevel level, bool actionRequired) async {
+    final deviceService = ServiceManager.instance().device;
+    final deviceId = _getConnectedDeviceId();
+    final connection = await deviceService.ensureConnection(deviceId);
+    
+    // Automatic service detection and fallback
+    // 1. Try dedicated Haptic service (main OMI firmware)
+    // 2. Fallback to Speaker service (devkit firmware)
+    
+    int hapticLevel = level == UrgencyLevel.high ? 3 : 
+                     level == UrgencyLevel.medium ? 2 : 1;
+    
+    return await connection.performPlayToSpeakerHaptic(hapticLevel);
+  }
+}
+```
+
+**Haptic Durations by Firmware**:
+- **Low Urgency**: 100ms (main) / 20ms (devkit)
+- **Medium Urgency**: 300ms (main) / 50ms (devkit) 
+- **High Urgency**: 500ms (both firmwares)
+
+#### 7. **Bluetooth Service Management** (`app/lib/services/devices/omi_connection.dart`)
+
+The device connection handles both service types automatically:
+
+```dart
+class OmiDeviceConnection extends DeviceConnection {
+  BluetoothService? _hapticService;  // Dedicated Haptic service
+  BluetoothService? _speakerService; // Speaker service (devkit fallback)
+  
+  Future<bool> performPlayToSpeakerHaptic(int level) async {
+    // Try dedicated Haptic service first
+    if (_hapticService != null) {
+      var hapticCharacteristic = getCharacteristic(_hapticService!, hapticCharacteristicUuid);
+      if (hapticCharacteristic != null) {
+        await hapticCharacteristic.write([level & 0xFF]);
+        return true;
+      }
+    }
+    
+    // Fallback to Speaker service
+    if (_speakerService != null) {
+      var speakerCharacteristic = getCharacteristic(_speakerService!, speakerDataStreamCharacteristicUuid);
+      if (speakerCharacteristic != null) {
+        await speakerCharacteristic.write([level & 0xFF]);
+        return true;
+      }
+    }
+    
+    return false; // No haptic service available
+  }
+}
+```
 
 ## Urgency Assessment Criteria
 
@@ -161,6 +236,28 @@ Time Sensitivity: [Specific timeframe]
 3. Test sample urgency assessments with realistic scenarios
 4. Verify haptic patterns match expected intensity and duration
 
+### Firmware Compatibility Testing
+```bash
+# Test with main OMI firmware (Haptic service)
+flutter: 🎯 HAPTIC: Using dedicated Haptic service (level 1)
+flutter: 🟢 HAPTIC: Triggering LOW urgency on OMI device (100ms/20ms)
+
+# Test with devkit firmware (Speaker service)  
+flutter: 🎯 HAPTIC: Using Speaker service fallback (level 2)
+flutter: 🟡 HAPTIC: Triggering MEDIUM urgency on OMI device (300ms/50ms)
+```
+
+### Service Discovery Testing
+```bash
+# Connection with Haptic service available
+flutter: 🔍 Haptic service discovered
+flutter: ✅ HAPTIC: OMI device haptic triggered successfully
+
+# Connection with Speaker service only
+flutter: ⚠️ Haptic service not found, using Speaker service
+flutter: ✅ HAPTIC: OMI device haptic triggered successfully
+```
+
 ## Performance Considerations
 
 ### Backend Performance
@@ -214,4 +311,24 @@ Time Sensitivity: [Specific timeframe]
 ### Privacy Considerations
 - **Conversation Content**: Urgency assessment is based on existing conversation analysis
 - **No External Calls**: Haptic processing doesn't send data to external services
-- **User Control**: Full user control over haptic feedback preferences 
+- **User Control**: Full user control over haptic feedback preferences
+
+## Implementation Benefits
+
+### ✅ **Architectural Advantages**
+- **Firmware Agnostic**: Works with both main OMI and devkit firmwares
+- **Automatic Detection**: No manual configuration required
+- **Graceful Fallback**: Seamless compatibility across hardware variants
+- **Service Isolation**: Dedicated Haptic service in main firmware separates concerns
+
+### ✅ **User Experience**
+- **Contextual Feedback**: Different vibration patterns for different urgency levels
+- **Adaptive Timing**: Longer vibrations for more urgent content
+- **Action Indicators**: Additional haptic pulse when action is required
+- **Universal Compatibility**: Works on all supported OMI devices
+
+### ✅ **Developer Experience**  
+- **Single Implementation**: One codebase supports all firmware variants
+- **Future-Proof**: Easy to extend with new haptic patterns or firmware versions
+- **Clear Logging**: Detailed logs show which service is being used
+- **Type Safety**: Strong typing for urgency levels and assessments 

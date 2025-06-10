@@ -42,13 +42,23 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Test different haptic patterns based on conversation urgency levels.',
+              'Test different haptic patterns based on conversation urgency levels.\nSupports both OMI Haptic service and Speaker service fallback.',
               style: TextStyle(color: Colors.grey, fontSize: 16),
             ),
             const SizedBox(height: 32),
 
             // Urgency Level Tests
             _buildUrgencyTestSection(),
+
+            const SizedBox(height: 32),
+
+            // Advanced Testing Section
+            _buildAdvancedTestSection(),
+
+            const SizedBox(height: 32),
+
+            // Device Status Section
+            _buildDeviceStatusSection(),
 
             const SizedBox(height: 32),
 
@@ -107,7 +117,7 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
         // Low Urgency Test
         _buildTestButton(
           title: '🟢 Low Urgency',
-          description: 'Single light haptic pulse',
+          description: 'Light haptic: 100ms (main) / 20ms (devkit)',
           onPressed: () => _testUrgencyLevel(UrgencyLevel.low),
           color: Colors.green,
         ),
@@ -117,7 +127,7 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
         // Medium Urgency Test
         _buildTestButton(
           title: '🟡 Medium Urgency',
-          description: 'Double medium haptic pulse',
+          description: 'Medium haptic: 300ms (main) / 50ms (devkit)',
           onPressed: () => _testUrgencyLevel(UrgencyLevel.medium),
           color: Colors.orange,
         ),
@@ -127,11 +137,124 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
         // High Urgency Test
         _buildTestButton(
           title: '🔴 High Urgency',
-          description: 'Double heavy haptic pulse',
+          description: 'Strong haptic: 500ms (both firmwares)',
           onPressed: () => _testUrgencyLevel(UrgencyLevel.high),
           color: Colors.red,
         ),
       ],
+    );
+  }
+
+  Widget _buildAdvancedTestSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Advanced Pattern Testing',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Test patterns with "Action Required" flag (triggers additional pulse)',
+          style: TextStyle(color: Colors.grey, fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+
+        // Low Urgency with Action Required
+        _buildTestButton(
+          title: '🟢 Low + Action Required',
+          description: 'Light haptic with extra pulse for attention',
+          onPressed: () => _testUrgencyLevelWithAction(UrgencyLevel.low),
+          color: Colors.green.shade300,
+        ),
+
+        const SizedBox(height: 12),
+
+        // Medium Urgency with Action Required
+        _buildTestButton(
+          title: '🟡 Medium + Action Required',
+          description: 'Medium haptic with extra pulse for attention',
+          onPressed: () => _testUrgencyLevelWithAction(UrgencyLevel.medium),
+          color: Colors.orange.shade300,
+        ),
+
+        const SizedBox(height: 12),
+
+        // High Urgency with Action Required
+        _buildTestButton(
+          title: '🔴 High + Action Required',
+          description: 'Strong haptic with extra pulse for attention',
+          onPressed: () => _testUrgencyLevelWithAction(UrgencyLevel.high),
+          color: Colors.red.shade300,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeviceStatusSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade800,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade600),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Device Connection Status',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '• Main OMI Firmware: Uses dedicated Haptic service',
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '• DevKit Firmware: Uses Speaker service for haptic',
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '• Both services use UUID: CAB1AB95-2EA5-4F4D-BB56-874B72CFC984',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'The app will automatically use the available service with fallback to phone haptic.',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -339,6 +462,20 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
     } catch (e) {
       setState(() {
         _lastTestResult = 'Error testing "$title" assessment: $e';
+      });
+    }
+  }
+
+  Future<void> _testUrgencyLevelWithAction(UrgencyLevel level) async {
+    try {
+      await UrgencyHapticService.testHapticPatternWithAction(level);
+      setState(() {
+        _lastTestResult =
+            'Tested ${level.name.toUpperCase()} urgency pattern WITH action required successfully';
+      });
+    } catch (e) {
+      setState(() {
+        _lastTestResult = 'Error testing ${level.name} pattern with action: $e';
       });
     }
   }

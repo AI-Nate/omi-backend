@@ -21,6 +21,7 @@ class OmiDeviceConnection extends DeviceConnection {
   BluetoothService? _accelService;
   BluetoothService? _buttonService;
   BluetoothService? _speakerService;
+  BluetoothService? _hapticService;
 
   OmiDeviceConnection(super.device, super.bleDevice);
 
@@ -62,6 +63,12 @@ class OmiDeviceConnection extends DeviceConnection {
     _buttonService = await getService(buttonServiceUuid);
     if (_buttonService == null) {
       logServiceNotFoundError('Button', deviceId);
+    }
+
+    // Try to get dedicated Haptic service (main OMI firmware)
+    _hapticService = await getService(hapticServiceUuid);
+    if (_hapticService == null) {
+      logServiceNotFoundError('Haptic', deviceId);
     }
   }
 
@@ -421,25 +428,36 @@ class OmiDeviceConnection extends DeviceConnection {
   }
 
   // level
-  //   1 - play 20ms
-  //   2 - play 50ms
-  //   3 - play 500ms
+  //   1 - play 100ms (main OMI firmware) / 20ms (devkit firmware)
+  //   2 - play 300ms (main OMI firmware) / 50ms (devkit firmware)
+  //   3 - play 500ms (both firmwares)
   @override
   Future<bool> performPlayToSpeakerHaptic(int level) async {
-    if (_speakerService == null) {
-      logServiceNotFoundError('Speaker Write', deviceId);
-      return false;
+    // Try dedicated Haptic service first (main OMI firmware)
+    if (_hapticService != null) {
+      var hapticCharacteristic =
+          getCharacteristic(_hapticService!, hapticCharacteristicUuid);
+      if (hapticCharacteristic != null) {
+        debugPrint('🎯 HAPTIC: Using dedicated Haptic service (level $level)');
+        await hapticCharacteristic.write([level & 0xFF]);
+        return true;
+      }
     }
 
-    var speakerDataStreamCharacteristic = getCharacteristic(
-        _speakerService!, speakerDataStreamCharacteristicUuid);
-    if (speakerDataStreamCharacteristic == null) {
-      logCharacteristicNotFoundError('Speaker data stream', deviceId);
-      return false;
+    // Fallback to Speaker service (devkit firmware)
+    if (_speakerService != null) {
+      var speakerDataStreamCharacteristic = getCharacteristic(
+          _speakerService!, speakerDataStreamCharacteristicUuid);
+      if (speakerDataStreamCharacteristic != null) {
+        debugPrint('🎯 HAPTIC: Using Speaker service fallback (level $level)');
+        await speakerDataStreamCharacteristic.write([level & 0xFF]);
+        return true;
+      }
     }
-    debugPrint('About to play to speaker haptic');
-    await speakerDataStreamCharacteristic.write([level & 0xFF]);
-    return true;
+
+    // No haptic service available
+    logServiceNotFoundError('Haptic/Speaker', deviceId);
+    return false;
   }
 
   @override

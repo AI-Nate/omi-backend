@@ -1,7 +1,6 @@
 import 'package:flutter/services.dart';
 import '../backend/schema/structured.dart';
 import '../services/services.dart';
-import '../providers/device_provider.dart';
 import '../backend/preferences.dart';
 
 enum UrgencyLevel {
@@ -117,13 +116,14 @@ class UrgencyHapticService {
           print('🔴 HAPTIC: Triggering HIGH urgency on OMI device (500ms)');
           break;
         case UrgencyLevel.medium:
-          hapticLevel = 2; // 50ms - medium haptic
-          print('🟡 HAPTIC: Triggering MEDIUM urgency on OMI device (50ms)');
+          hapticLevel = 2; // 300ms (main) / 50ms (devkit) - medium haptic
+          print(
+              '🟡 HAPTIC: Triggering MEDIUM urgency on OMI device (300ms/50ms)');
           break;
         case UrgencyLevel.low:
         default:
-          hapticLevel = 1; // 20ms - light haptic
-          print('🟢 HAPTIC: Triggering LOW urgency on OMI device (20ms)');
+          hapticLevel = 1; // 100ms (main) / 20ms (devkit) - light haptic
+          print('🟢 HAPTIC: Triggering LOW urgency on OMI device (100ms/20ms)');
           break;
       }
 
