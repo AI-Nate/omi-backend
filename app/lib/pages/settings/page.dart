@@ -7,6 +7,7 @@ import 'package:omi/pages/settings/about.dart';
 import 'package:omi/pages/settings/developer.dart';
 import 'package:omi/pages/settings/profile.dart';
 import 'package:omi/pages/settings/widgets.dart';
+import 'package:omi/pages/settings/urgency_haptic_test_page.dart';
 import 'package:omi/utils/other/temp.dart';
 import 'package:omi/widgets/dialog.dart';
 import 'package:intercom_flutter/intercom_flutter.dart';
@@ -91,6 +92,14 @@ class _SettingsPageState extends State<SettingsPage> {
             setState(() {});
           },
           icon: const Icon(Icons.code, color: Colors.white, size: 22),
+        ),
+        const SizedBox(height: 12),
+
+        // Haptic Test
+        getItemAddOn2(
+          'Test Haptic Patterns',
+          () => routeToPage(context, const UrgencyHapticTestPage()),
+          icon: const Icon(Icons.vibration, color: Colors.white, size: 22),
         ),
         const SizedBox(height: 12),
 
