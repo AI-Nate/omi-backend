@@ -676,30 +676,58 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
     if overview_match:
         overview = overview_match.group(1).strip()
     
-    # Extract action items
+    # Extract action items with enhanced patterns
     action_items = []
-    action_patterns = [
-        r'(?:Action Items?|Next Steps?|To[- ]?Do|Follow[- ]?up):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)',
-        r'^\s*[-•*]\s*(.+)$',  # Bullet points
-        r'^\s*\d+\.\s*(.+)$'   # Numbered lists
-    ]
     
-    for pattern in action_patterns:
-        matches = re.finditer(pattern, analysis, re.MULTILINE | re.IGNORECASE | re.DOTALL)
-        for match in matches:
-            text = match.group(1).strip()
-            if len(text) > 10:  # Only meaningful action items
-                # Split multi-line action items
-                items = [item.strip() for item in text.split('\n') if item.strip()]
-                action_items.extend(items[:5])  # Limit to 5 items
+    # Try to find "Action Items:" section first (new format)
+    action_section_match = re.search(r'Action Items?:\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
+    if action_section_match:
+        action_text = action_section_match.group(1).strip()
+        # Extract bullet points from the action items section
+        bullet_items = re.findall(r'^\s*[-•*]\s*(.+)$', action_text, re.MULTILINE)
+        for item in bullet_items:
+            cleaned_item = item.strip()
+            if len(cleaned_item) > 10:  # Only meaningful action items
+                action_items.append(cleaned_item)
     
-    # Extract key takeaways
+    # Fallback to general patterns if no "Action Items:" section found
+    if not action_items:
+        action_patterns = [
+            r'(?:Next Steps?|To[- ]?Do|Follow[- ]?up):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)',
+            r'^\s*[-•*]\s*(.+)$',  # Bullet points anywhere
+            r'^\s*\d+\.\s*(.+)$'   # Numbered lists
+        ]
+        
+        for pattern in action_patterns:
+            matches = re.finditer(pattern, analysis, re.MULTILINE | re.IGNORECASE | re.DOTALL)
+            for match in matches:
+                text = match.group(1).strip()
+                if len(text) > 10:  # Only meaningful action items
+                    # Split multi-line action items
+                    items = [item.strip() for item in text.split('\n') if item.strip()]
+                    action_items.extend(items[:5])  # Limit to 5 items
+    
+    # Extract key takeaways with enhanced patterns
     key_takeaways = []
-    takeaway_match = re.search(r'(?:Key Takeaways?|Insights?|Main Points?):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
-    if takeaway_match:
-        takeaway_text = takeaway_match.group(1).strip()
-        takeaways = [item.strip() for item in re.split(r'[-•*\n]', takeaway_text) if item.strip()]
-        key_takeaways = takeaways[:5]  # Limit to 5 takeaways
+    
+    # Try to find "Key Takeaways:" section first (new format)
+    takeaway_section_match = re.search(r'Key Takeaways?:\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
+    if takeaway_section_match:
+        takeaway_text = takeaway_section_match.group(1).strip()
+        # Extract bullet points from the key takeaways section
+        bullet_takeaways = re.findall(r'^\s*[-•*]\s*(.+)$', takeaway_text, re.MULTILINE)
+        for item in bullet_takeaways:
+            cleaned_item = item.strip()
+            if len(cleaned_item) > 5:  # Only meaningful takeaways
+                key_takeaways.append(cleaned_item)
+    
+    # Fallback to general patterns if no "Key Takeaways:" section found
+    if not key_takeaways:
+        takeaway_match = re.search(r'(?:Insights?|Main Points?):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
+        if takeaway_match:
+            takeaway_text = takeaway_match.group(1).strip()
+            takeaways = [item.strip() for item in re.split(r'[-•*\n]', takeaway_text) if item.strip()]
+            key_takeaways = [t for t in takeaways if len(t) > 5][:5]  # Limit to 5 takeaways
     
     # 🚀 ENHANCED: Generate content-based emoji and category from transcript
     print(f"🎨 AGENT: Generating content-based emoji and category from transcript...")

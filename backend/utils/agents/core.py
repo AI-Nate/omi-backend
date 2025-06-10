@@ -279,7 +279,18 @@ You MUST format your response exactly as follows:
 TITLE: [Generate a concise, descriptive title based on the main topic/theme of the conversation - max 60 characters]
 
 ANALYSIS:
-[Your comprehensive analysis here, including all tool results, expert insights, and recommendations. Format with bullet points, links, and relevant details.]
+[Your comprehensive analysis including expert insights, web search results, and recommendations]
+
+Key Takeaways:
+- [3-5 key insights or important points from your analysis]
+- [Focus on the most valuable insights from expert consultation]
+- [Include patterns, discoveries, or important realizations]
+
+Action Items:
+- [Specific, actionable steps the user should take]
+- [Start each with an action verb like "Schedule", "Research", "Contact"]
+- [Make items concrete and measurable when possible]
+- [Include both immediate next steps and longer-term actions]
 
 The TITLE should capture the essence of what the conversation is about, not just be generic. Examples:
 - "Restaurant Recommendations in San Francisco"
@@ -287,7 +298,10 @@ The TITLE should capture the essence of what the conversation is about, not just
 - "Health Insurance Options and Coverage"
 - "Weekend Travel Plans to Portland"
 
-Do NOT use generic titles like "Conversation" or "Discussion"."""
+Do NOT use generic titles like "Conversation" or "Discussion".
+
+IMPORTANT: Always include both "Key Takeaways:" and "Action Items:" sections even if some lists are empty. The parsing system expects these exact section headers.
+"""
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
