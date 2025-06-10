@@ -259,6 +259,14 @@ def create_conversation_with_agent(
         # Store the full agent analysis
         conversation.structured.agent_analysis = agent_analysis
         
+        # Extract and store urgency assessment from agent result
+        urgency_assessment = result.get('urgency_assessment')
+        if urgency_assessment:
+            conversation.structured.urgency_assessment = urgency_assessment
+            print(f"🔔 BACKEND: Added urgency assessment - Level: {urgency_assessment.get('level')}, Action Required: {urgency_assessment.get('action_required')}")
+        else:
+            print(f"⚠️ BACKEND: No urgency assessment available from agent")
+        
         # Update action items using dedicated high-quality action items (not from agent analysis regex)
         if dedicated_action_items:
             conversation.structured.action_items = [

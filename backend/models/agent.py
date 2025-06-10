@@ -59,6 +59,9 @@ class AgentAnalysisResponse(BaseModel):
     retrieved_conversations: Optional[List[RetrievedConversation]] = Field(
         None, description="Conversations retrieved during analysis"
     )
+    urgency_assessment: Optional[Dict[str, Any]] = Field(
+        None, description="Urgency assessment for the conversation including level, reasoning, action_required, and time_sensitivity"
+    )
     
     class Config:
         schema_extra = {
@@ -67,6 +70,12 @@ class AgentAnalysisResponse(BaseModel):
                 "session_id": "user_session_1",
                 "timestamp": "2024-01-15T10:30:00Z",
                 "status": "success",
+                "urgency_assessment": {
+                    "level": "medium",
+                    "reasoning": "Important project planning but no immediate deadlines",
+                    "action_required": False,
+                    "time_sensitivity": "within 1 week"
+                },
                 "retrieved_conversations": [
                     {
                         "id": "conv_456",

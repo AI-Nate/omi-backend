@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -144,6 +144,10 @@ class Structured(BaseModel):
     )
     agent_analysis: Optional[str] = Field(
         description="Full agent analysis text with detailed insights and recommendations",
+        default=None,
+    )
+    urgency_assessment: Optional[Dict[str, Any]] = Field(
+        description="Urgency assessment from agent analysis including level, reasoning, action_required, and time_sensitivity",
         default=None,
     )
 

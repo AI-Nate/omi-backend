@@ -292,6 +292,23 @@ Action Items:
 - [Make items concrete and measurable when possible]
 - [Include both immediate next steps and longer-term actions]
 
+URGENCY ASSESSMENT:
+Level: [high/medium/low]
+Reasoning: [Brief explanation for the urgency level in 1-2 sentences, max 150 characters]
+Action Required: [yes/no - whether immediate action is needed]
+Time Sensitivity: [Specific timeframe like "within 2 hours", "within 1 week", "no rush"]
+
+**URGENCY CRITERIA:**
+- HIGH: Requires immediate action (within hours), contains urgent deadlines, emergencies, critical decisions, or time-sensitive opportunities that could be missed
+- MEDIUM: Important but not urgent (within days), contains significant information requiring action soon, important decisions, or opportunities with flexible timing
+- LOW: Informational, routine discussions, general conversations without time-sensitive elements, or casual planning
+
+**Assessment Guidelines:**
+- Consider deadlines, time constraints, consequence severity, decision urgency, scheduling conflicts, and problem criticality
+- Be conservative with HIGH urgency - only use for truly urgent situations requiring immediate attention
+- Focus on what the USER needs to do, not general conversation importance
+- Look for explicit time references, deadlines, or urgency indicators in the conversation
+
 The TITLE should capture the essence of what the conversation is about, not just be generic. Examples:
 - "Restaurant Recommendations in San Francisco"
 - "Project Planning and Timeline Discussion" 
@@ -300,7 +317,7 @@ The TITLE should capture the essence of what the conversation is about, not just
 
 Do NOT use generic titles like "Conversation" or "Discussion".
 
-IMPORTANT: Always include both "Key Takeaways:" and "Action Items:" sections even if some lists are empty. The parsing system expects these exact section headers.
+IMPORTANT: Always include "Key Takeaways:", "Action Items:", and "URGENCY ASSESSMENT:" sections even if some lists are empty. The parsing system expects these exact section headers.
 """
 
             # Configure the agent with conversation config
@@ -326,6 +343,7 @@ IMPORTANT: Always include both "Key Takeaways:" and "Action Items:" sections eve
             # Parse title and analysis from the response
             title = "Conversation"  # Default fallback
             analysis = final_message  # Default to full response
+            urgency_assessment = None  # Default to no urgency assessment
             
             import re
             
@@ -347,26 +365,73 @@ IMPORTANT: Always include both "Key Takeaways:" and "Action Items:" sections eve
                 print(f"🔍 AGENT: Extracted title from response: '{title}'")
             
             # Extract analysis part (everything after "ANALYSIS:")
-            analysis_match = re.search(r'ANALYSIS:\s*(.+)', final_message, re.DOTALL | re.IGNORECASE)
+            analysis_match = re.search(r'ANALYSIS:\s*(.+?)(?=URGENCY ASSESSMENT:|$)', final_message, re.DOTALL | re.IGNORECASE)
             if analysis_match:
                 analysis = analysis_match.group(1).strip()
                 print(f"🔍 AGENT: Extracted analysis (length: {len(analysis)})")
             else:
                 # If no ANALYSIS: marker found, use everything after TITLE:
                 if title_match:
-                    analysis = final_message[title_match.end():].strip()
-                    # Remove any remaining "ANALYSIS:" markers
-                    analysis = re.sub(r'^\s*ANALYSIS:\s*', '', analysis, flags=re.IGNORECASE)
+                    analysis_text = final_message[title_match.end():].strip()
+                    # Remove any remaining "ANALYSIS:" markers and stop at urgency assessment
+                    analysis_text = re.sub(r'^\s*ANALYSIS:\s*', '', analysis_text, flags=re.IGNORECASE)
+                    # Extract everything before URGENCY ASSESSMENT if it exists
+                    urgency_split = re.split(r'URGENCY ASSESSMENT:', analysis_text, flags=re.IGNORECASE)
+                    analysis = urgency_split[0].strip()
                 print(f"🔍 AGENT: Using fallback analysis extraction (length: {len(analysis)})")
             
+            # Extract urgency assessment
+            urgency_match = re.search(
+                r'URGENCY ASSESSMENT:\s*\n?'
+                r'Level:\s*([^\n]+)\s*\n?'
+                r'Reasoning:\s*([^\n]+)\s*\n?'
+                r'Action Required:\s*([^\n]+)\s*\n?'
+                r'Time Sensitivity:\s*([^\n]+)',
+                final_message, re.IGNORECASE | re.DOTALL
+            )
+            
+            if urgency_match:
+                try:
+                    level = urgency_match.group(1).strip().lower()
+                    reasoning = urgency_match.group(2).strip()
+                    action_required_str = urgency_match.group(3).strip().lower()
+                    time_sensitivity = urgency_match.group(4).strip()
+                    
+                    # Validate and clean up the values
+                    if level not in ['high', 'medium', 'low']:
+                        level = 'low'  # Default to low if invalid
+                    
+                    action_required = action_required_str in ['yes', 'true', '1']
+                    
+                    urgency_assessment = {
+                        "level": level,
+                        "reasoning": reasoning[:150],  # Limit reasoning length
+                        "action_required": action_required,
+                        "time_sensitivity": time_sensitivity
+                    }
+                    
+                    print(f"🔔 AGENT: Extracted urgency assessment - Level: {level}, Action Required: {action_required}")
+                    
+                except Exception as e:
+                    print(f"⚠️ AGENT: Error parsing urgency assessment: {e}")
+                    urgency_assessment = None
+            else:
+                print(f"⚠️ AGENT: No urgency assessment found in response")
+            
             # Parse and structure the response
-            return {
+            response_data = {
                 "title": title,
                 "analysis": analysis,
                 "session_id": session_id,
                 "timestamp": datetime.now().isoformat(),
                 "status": "success"
             }
+            
+            # Add urgency assessment if available
+            if urgency_assessment:
+                response_data["urgency_assessment"] = urgency_assessment
+            
+            return response_data
             
         except Exception as e:
             return {

@@ -26,6 +26,7 @@ import 'package:omi/services/sockets/transcription_connection.dart';
 import 'package:omi/services/wals.dart';
 import 'package:omi/utils/analytics/mixpanel.dart';
 import 'package:omi/utils/enums.dart';
+import 'package:omi/services/urgency_haptic_service.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
@@ -898,6 +899,19 @@ class CaptureProvider extends ChangeNotifier
         conversationProvider?.upsertConversation(response.conversation!);
         MixpanelManager().conversationCreated(response.conversation!);
 
+        // 🔔 HAPTIC: Trigger urgency-based haptic feedback for background processing
+        try {
+          if (response.conversation!.structured.urgencyAssessment != null) {
+            debugPrint(
+                '🔔 CAPTURE_PROVIDER: Triggering background haptic feedback for urgency assessment');
+            await UrgencyHapticService.triggerHapticForConversation(
+                response.conversation!.structured);
+          }
+        } catch (e) {
+          debugPrint(
+              '🔔 CAPTURE_PROVIDER: Error triggering background haptic feedback: $e');
+        }
+
         // Check if the conversation is discarded and handle appropriately
         if (response.conversation!.discarded) {
           debugPrint(
@@ -1033,6 +1047,27 @@ class CaptureProvider extends ChangeNotifier
     if (conversation == null) return;
     conversationProvider?.upsertConversation(conversation);
     MixpanelManager().conversationCreated(conversation);
+
+    // 🔔 HAPTIC: Trigger urgency-based haptic feedback
+    try {
+      if (conversation.structured.urgencyAssessment != null) {
+        debugPrint(
+            '🔔 CAPTURE_PROVIDER: Triggering haptic feedback for urgency assessment');
+        await UrgencyHapticService.triggerHapticForConversation(
+            conversation.structured);
+
+        // Show urgency description for debugging
+        final urgencyDescription = UrgencyHapticService.getUrgencyDescription(
+            conversation.structured.urgencyAssessment);
+        debugPrint(
+            '🔔 CAPTURE_PROVIDER: Urgency details - $urgencyDescription');
+      } else {
+        debugPrint(
+            '🔔 CAPTURE_PROVIDER: No urgency assessment available for haptic feedback');
+      }
+    } catch (e) {
+      debugPrint('🔔 CAPTURE_PROVIDER: Error triggering haptic feedback: $e');
+    }
 
     // Reset the recording state so UI is ready for next recording
     await _resetStateVariables();

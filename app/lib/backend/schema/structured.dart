@@ -24,6 +24,9 @@ class Structured {
   // Full agent analysis text with detailed insights
   String? agentAnalysis;
 
+  // Urgency assessment from agent analysis
+  Map<String, dynamic>? urgencyAssessment;
+
   Structured(this.title, this.overview,
       {this.id = 0,
       this.emoji = '',
@@ -121,6 +124,13 @@ class Structured {
           json['agentAnalysis'] ?? json['agent_analysis'];
     }
 
+    // Parse urgency assessment
+    if (json['urgencyAssessment'] != null ||
+        json['urgency_assessment'] != null) {
+      structured.urgencyAssessment =
+          json['urgencyAssessment'] ?? json['urgency_assessment'];
+    }
+
     return structured;
   }
 
@@ -182,6 +192,7 @@ class Structured {
       'events': events.map((event) => event.toJson()).toList(),
       'imageUrls': imageUrls,
       'agentAnalysis': agentAnalysis,
+      'urgencyAssessment': urgencyAssessment,
     };
   }
 }
