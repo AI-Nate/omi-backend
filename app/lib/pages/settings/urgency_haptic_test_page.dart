@@ -27,7 +27,7 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,6 +94,9 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
                 ),
               ),
             ],
+
+            // Add some bottom padding to ensure scrolling past last element
+            const SizedBox(height: 32),
           ],
         ),
       ),
