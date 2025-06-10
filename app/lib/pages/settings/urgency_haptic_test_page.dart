@@ -253,6 +253,38 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
               ],
             ),
           ),
+
+          const SizedBox(height: 16),
+
+          // Connection test button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _testDeviceConnection,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade700,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.all(16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.bluetooth_searching, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Test Device Connection',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -476,6 +508,20 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
     } catch (e) {
       setState(() {
         _lastTestResult = 'Error testing ${level.name} pattern with action: $e';
+      });
+    }
+  }
+
+  Future<void> _testDeviceConnection() async {
+    try {
+      await UrgencyHapticService.testDeviceConnection();
+      setState(() {
+        _lastTestResult =
+            'Device connection test completed - check console logs for details';
+      });
+    } catch (e) {
+      setState(() {
+        _lastTestResult = 'Error testing device connection: $e';
       });
     }
   }

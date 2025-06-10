@@ -1,6 +1,8 @@
 import 'package:flutter/services.dart';
 import '../backend/schema/structured.dart';
 import '../services/services.dart';
+import '../services/devices.dart';
+import '../services/devices/device_connection.dart';
 import '../backend/preferences.dart';
 
 enum UrgencyLevel {
@@ -101,10 +103,12 @@ class UrgencyHapticService {
         return false;
       }
 
-      // Get device connection
-      final connection = await deviceService.ensureConnection(deviceId);
+      // Get device connection with comprehensive retry logic
+      DeviceConnection? connection =
+          await _establishDeviceConnection(deviceId, deviceService);
+
       if (connection == null) {
-        print('🔍 HAPTIC: Could not establish connection to omi device');
+        print('❌ HAPTIC: Failed to establish device connection');
         return false;
       }
 
@@ -210,6 +214,41 @@ class UrgencyHapticService {
     await _executeHapticPattern(level, true);
   }
 
+  /// Test device connection status (for debugging)
+  static Future<void> testDeviceConnection() async {
+    try {
+      final deviceService = ServiceManager.instance().device;
+      final deviceId = _getConnectedDeviceId();
+
+      print('🔍 HAPTIC: Testing device connection...');
+      print('🔍 HAPTIC: Device ID: $deviceId');
+
+      if (deviceId.isEmpty) {
+        print('❌ HAPTIC: No device ID found in SharedPreferences');
+        return;
+      }
+
+      // Test current connection
+      var connection = await deviceService.ensureConnection(deviceId);
+      print(
+          '🔍 HAPTIC: Current connection: ${connection != null ? 'EXISTS' : 'NULL'}');
+      if (connection != null) {
+        print('🔍 HAPTIC: Connection state: ${connection.connectionState}');
+      }
+
+      // Test connection with retry logic
+      connection = await _establishDeviceConnection(deviceId, deviceService);
+      print(
+          '🔍 HAPTIC: Connection after retry: ${connection != null ? 'ESTABLISHED' : 'FAILED'}');
+      if (connection != null) {
+        print(
+            '🔍 HAPTIC: Final connection state: ${connection.connectionState}');
+      }
+    } catch (e) {
+      print('❌ HAPTIC: Error testing device connection: $e');
+    }
+  }
+
   /// Check if urgency requires immediate attention
   static bool requiresImmediateAttention(
       Map<String, dynamic>? urgencyAssessment) {
@@ -257,5 +296,52 @@ class UrgencyHapticService {
     }
 
     return description;
+  }
+
+  /// Establish device connection with comprehensive retry logic
+  static Future<DeviceConnection?> _establishDeviceConnection(
+      String deviceId, deviceService) async {
+    // Step 1: Try normal connection
+    DeviceConnection? connection =
+        await deviceService.ensureConnection(deviceId);
+    if (connection != null &&
+        connection.connectionState == DeviceConnectionState.connected) {
+      print('🟢 HAPTIC: Device already connected');
+      return connection;
+    }
+
+    // Step 2: Try forced reconnection
+    print(
+        '🔄 HAPTIC: Initial connection failed, attempting forced reconnection...');
+    connection = await deviceService.ensureConnection(deviceId, force: true);
+    if (connection != null &&
+        connection.connectionState == DeviceConnectionState.connected) {
+      print('🟢 HAPTIC: Device reconnected successfully');
+      return connection;
+    }
+
+    // Step 3: Try device discovery and connection
+    print(
+        '🔍 HAPTIC: Forced reconnection failed, attempting device discovery...');
+    try {
+      await deviceService.discover(desirableDeviceId: deviceId, timeout: 5);
+
+      // Wait a bit for discovery to complete
+      await Future.delayed(Duration(milliseconds: 1000));
+
+      // Try connection after discovery
+      connection = await deviceService.ensureConnection(deviceId, force: true);
+      if (connection != null &&
+          connection.connectionState == DeviceConnectionState.connected) {
+        print('🟢 HAPTIC: Device connected after discovery');
+        return connection;
+      }
+    } catch (e) {
+      print('❌ HAPTIC: Device discovery failed: $e');
+    }
+
+    // Step 4: Final failure
+    print('❌ HAPTIC: All connection attempts failed');
+    return null;
   }
 }
