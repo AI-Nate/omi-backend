@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/urgency_haptic_service.dart';
+import '../../backend/preferences.dart';
 
 class UrgencyHapticTestPage extends StatefulWidget {
   const UrgencyHapticTestPage({Key? key}) : super(key: key);
@@ -42,8 +43,51 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Test different haptic patterns based on conversation urgency levels.\nSupports both OMI Haptic service and Speaker service fallback.',
+              'Test different haptic patterns based on conversation urgency levels.\nSupports OMI Haptic service, Speaker service, and audio feedback fallbacks.',
               style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: SharedPreferencesUtil().hapticFeedbackEnabled
+                    ? Colors.green.withOpacity(0.1)
+                    : Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: SharedPreferencesUtil().hapticFeedbackEnabled
+                      ? Colors.green.withOpacity(0.3)
+                      : Colors.orange.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    SharedPreferencesUtil().hapticFeedbackEnabled
+                        ? Icons.check_circle_outline
+                        : Icons.warning_outlined,
+                    color: SharedPreferencesUtil().hapticFeedbackEnabled
+                        ? Colors.green
+                        : Colors.orange,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      SharedPreferencesUtil().hapticFeedbackEnabled
+                          ? 'Haptic feedback is enabled. Tests will trigger actual haptic feedback.'
+                          : 'Haptic feedback is disabled in Developer Settings. Tests will run but no haptic feedback will occur.',
+                      style: TextStyle(
+                        color: SharedPreferencesUtil().hapticFeedbackEnabled
+                            ? Colors.green
+                            : Colors.orange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 32),
 
@@ -224,12 +268,22 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
           ),
           const SizedBox(height: 4),
           const Text(
-            '• DevKit Firmware: Uses Speaker service for haptic',
+            '• DevKit Firmware 2.0.10+: Uses Speaker service for haptic',
             style: TextStyle(color: Colors.grey, fontSize: 14),
           ),
           const SizedBox(height: 4),
           const Text(
-            '• Both services use UUID: CAB1AB95-2EA5-4F4D-BB56-874B72CFC984',
+            '• DevKit Firmware 2.0.1: Uses audio feedback via available services',
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '• Enhanced retry logic handles Bluetooth timing issues',
+            style: TextStyle(color: Colors.green, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '• Haptic/Speaker services use UUID: CAB1AB95-2EA5-4F4D-BB56-874B72CFC984',
             style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
           const SizedBox(height: 12),
@@ -246,7 +300,7 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'The app will automatically use the available service with fallback to phone haptic.',
+                    'Smart fallback system: Haptic Service → Speaker Service → Audio Feedback → Phone Haptic. Includes retry logic with progressive delays to handle Bluetooth timing issues.',
                     style: TextStyle(
                       color: Colors.blue,
                       fontSize: 12,
@@ -473,14 +527,16 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
 
   Future<void> _testUrgencyLevel(UrgencyLevel level) async {
     try {
+      print('🧪 TEST: Starting ${level.name.toUpperCase()} urgency test...');
       await UrgencyHapticService.testHapticPattern(level);
       setState(() {
         _lastTestResult =
-            'Tested ${level.name.toUpperCase()} urgency pattern successfully';
+            '✅ Tested ${level.name.toUpperCase()} urgency pattern successfully\n'
+            'Check console logs for detailed service detection and fallback information.';
       });
     } catch (e) {
       setState(() {
-        _lastTestResult = 'Error testing ${level.name} pattern: $e';
+        _lastTestResult = '❌ Error testing ${level.name} pattern: $e';
       });
     }
   }
@@ -503,28 +559,37 @@ class _UrgencyHapticTestPageState extends State<UrgencyHapticTestPage> {
 
   Future<void> _testUrgencyLevelWithAction(UrgencyLevel level) async {
     try {
+      print(
+          '🧪 TEST: Starting ${level.name.toUpperCase()} urgency test WITH action required...');
       await UrgencyHapticService.testHapticPatternWithAction(level);
       setState(() {
         _lastTestResult =
-            'Tested ${level.name.toUpperCase()} urgency pattern WITH action required successfully';
+            '✅ Tested ${level.name.toUpperCase()} urgency pattern WITH action required successfully\n'
+            'This should trigger additional haptic pulses. Check console logs for service details.';
       });
     } catch (e) {
       setState(() {
-        _lastTestResult = 'Error testing ${level.name} pattern with action: $e';
+        _lastTestResult =
+            '❌ Error testing ${level.name} pattern with action: $e';
       });
     }
   }
 
   Future<void> _testDeviceConnection() async {
     try {
+      print('🧪 TEST: Starting comprehensive device connection test...');
       await UrgencyHapticService.testDeviceConnection();
       setState(() {
-        _lastTestResult =
-            'Device connection test completed - check console logs for details';
+        _lastTestResult = '🔍 Device connection test completed\n'
+            '• Check console logs for:\n'
+            '  - Firmware version detection\n'
+            '  - Available services discovery\n'
+            '  - Service compatibility status\n'
+            '  - Connection state details';
       });
     } catch (e) {
       setState(() {
-        _lastTestResult = 'Error testing device connection: $e';
+        _lastTestResult = '❌ Error testing device connection: $e';
       });
     }
   }

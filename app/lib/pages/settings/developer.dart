@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'widgets/appbar_with_banner.dart';
 import 'widgets/toggle_section_widget.dart';
+import 'urgency_haptic_test_page.dart';
 
 class DeveloperSettingsPage extends StatefulWidget {
   const DeveloperSettingsPage({super.key});
@@ -461,6 +462,20 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                     value: provider.localSyncEnabled,
                     onChanged: provider.onLocalSyncEnabledChanged,
                   ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    contentPadding: const EdgeInsets.all(0),
+                    title: const Text(
+                      'Real-time Translation',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    subtitle: const Text(
+                      'Enable automatic translation of non-primary language conversations (affects Google Cloud billing)',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    value: provider.translationEnabled,
+                    onChanged: provider.onTranslationEnabledChanged,
+                  ),
                   const SizedBox(height: 36),
                   const Text(
                     'User Interface Settings',
@@ -536,6 +551,50 @@ class _DeveloperSettingsPageState extends State<DeveloperSettingsPage> {
                     value: provider.followUpQuestionEnabled,
                     onChanged: provider.onFollowUpQuestionChanged,
                   ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    contentPadding: const EdgeInsets.all(0),
+                    title: const Text(
+                      'Haptic Feedback',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    subtitle: const Text(
+                      'Enable urgency-based haptic feedback for conversations',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    value: provider.hapticFeedbackEnabled,
+                    onChanged: provider.onHapticFeedbackChanged,
+                  ),
+                  if (provider.hapticFeedbackEnabled) ...[
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 16.0),
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const UrgencyHapticTestPage(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.vibration,
+                            color: Colors.deepPurple, size: 16),
+                        label: const Text(
+                          'Test Haptic Patterns',
+                          style: TextStyle(
+                            color: Colors.deepPurple,
+                            fontSize: 14,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

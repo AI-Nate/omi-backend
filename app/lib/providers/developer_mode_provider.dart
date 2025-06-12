@@ -31,6 +31,8 @@ class DeveloperModeProvider extends BaseProvider {
   bool followUpQuestionEnabled = false;
   bool transcriptionDiagnosticEnabled = false;
   bool devModeEnabled = false;
+  bool hapticFeedbackEnabled = true;
+  bool translationEnabled = true;
 
   void onConversationEventsToggled(bool value) {
     conversationEventsToggled = value;
@@ -72,6 +74,11 @@ class DeveloperModeProvider extends BaseProvider {
     notifyListeners();
   }
 
+  void onTranslationEnabledChanged(var value) {
+    translationEnabled = value;
+    notifyListeners();
+  }
+
   Future getWebhooksStatus() async {
     var res = await webhooksStatus();
     if (res == null) {
@@ -108,6 +115,8 @@ class DeveloperModeProvider extends BaseProvider {
     transcriptionDiagnosticEnabled =
         SharedPreferencesUtil().transcriptionDiagnosticEnabled;
     devModeEnabled = SharedPreferencesUtil().devModeEnabled;
+    hapticFeedbackEnabled = SharedPreferencesUtil().hapticFeedbackEnabled;
+    translationEnabled = SharedPreferencesUtil().translationEnabled;
     conversationEventsToggled =
         SharedPreferencesUtil().conversationEventsToggled;
     transcriptsToggled = SharedPreferencesUtil().transcriptsToggled;
@@ -140,6 +149,16 @@ class DeveloperModeProvider extends BaseProvider {
       getUserWebhookUrl(type: 'day_summary').then((url) {
         webhookDaySummary.text = url;
         SharedPreferencesUtil().webhookDaySummary = url;
+      }),
+      // Fetch translation preference from server
+      getUserTranslationPreference().then((serverEnabled) {
+        if (serverEnabled != null) {
+          translationEnabled = serverEnabled;
+          SharedPreferencesUtil().translationEnabled = serverEnabled;
+        }
+      }).catchError((e) {
+        debugPrint('Error fetching translation preference: $e');
+        // Keep local preference if server fails
       }),
     ]);
     // getUserWebhookUrl(type: 'audio_bytes_websocket').then((url) => webhookWsAudioBytes.text = url);
@@ -216,6 +235,17 @@ class DeveloperModeProvider extends BaseProvider {
     prefs.devModeJoanFollowUpEnabled = followUpQuestionEnabled;
     prefs.transcriptionDiagnosticEnabled = transcriptionDiagnosticEnabled;
     prefs.devModeEnabled = devModeEnabled;
+    prefs.hapticFeedbackEnabled = hapticFeedbackEnabled;
+    prefs.translationEnabled = translationEnabled;
+
+    // Save translation preference to server
+    try {
+      await setUserTranslationPreference(translationEnabled);
+      debugPrint('Translation preference saved to server: $translationEnabled');
+    } catch (e) {
+      debugPrint('Error saving translation preference to server: $e');
+      AppSnackbar.showSnackbarError('Failed to save translation preference');
+    }
 
     // Sync dev mode with backend if it changed
     if (wasDevModeChanged) {
@@ -255,6 +285,11 @@ class DeveloperModeProvider extends BaseProvider {
 
   void onDevModeChanged(var value) {
     devModeEnabled = value;
+    notifyListeners();
+  }
+
+  void onHapticFeedbackChanged(var value) {
+    hapticFeedbackEnabled = value;
     notifyListeners();
   }
 }

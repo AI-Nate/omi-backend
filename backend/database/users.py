@@ -245,3 +245,35 @@ def set_user_name(uid: str, name: str) -> None:
     """
     user_ref = db.collection('users').document(uid)
     user_ref.set({'name': name}, merge=True)
+
+
+def get_user_translation_preference(uid: str) -> bool:
+    """
+    Get the user's translation feature preference.
+    
+    Args:
+        uid: User ID
+        
+    Returns:
+        True if translation is enabled (default), False if disabled
+    """
+    user_ref = db.collection('users').document(uid)
+    user_doc = user_ref.get()
+    
+    if user_doc.exists:
+        user_data = user_doc.to_dict()
+        return user_data.get('translation_enabled', True)  # Default to True
+    
+    return True  # Default to True if user doesn't exist
+
+
+def set_user_translation_preference(uid: str, enabled: bool) -> None:
+    """
+    Set the user's translation feature preference.
+    
+    Args:
+        uid: User ID
+        enabled: True to enable translation, False to disable
+    """
+    user_ref = db.collection('users').document(uid)
+    user_ref.set({'translation_enabled': enabled}, merge=True)

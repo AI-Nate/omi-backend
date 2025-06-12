@@ -33,42 +33,82 @@ class OmiDeviceConnection extends DeviceConnection {
           onConnectionStateChanged}) async {
     await super.connect(onConnectionStateChanged: onConnectionStateChanged);
 
+    // Debug: List all discovered services
+    print('🔍 DEBUG: === DISCOVERED SERVICES ===');
+    try {
+      var services = await bleDevice.discoverServices();
+      print('🔍 DEBUG: Found ${services.length} total services:');
+      for (var service in services) {
+        var uuid = service.uuid.str128.toLowerCase();
+        print('🔍 DEBUG: Service UUID: $uuid');
+        print(
+            '🔍 DEBUG: Service characteristics: ${service.characteristics.length}');
+      }
+    } catch (e) {
+      print('❌ DEBUG: Error listing services: $e');
+    }
+    print('🔍 DEBUG: === END SERVICES LIST ===');
+
     // Services
+    print('🔍 DEBUG: Looking for omiServiceUuid: $omiServiceUuid');
     _omiService = await getService(omiServiceUuid);
     if (_omiService == null) {
       logServiceNotFoundError('Omi', deviceId);
       throw DeviceConnectionException("Omi ble service is not found");
+    } else {
+      print('🟢 DEBUG: Found Omi service');
     }
 
+    print('🔍 DEBUG: Looking for batteryServiceUuid: $batteryServiceUuid');
     _batteryService = await getService(batteryServiceUuid);
     if (_batteryService == null) {
       logServiceNotFoundError('Battery', deviceId);
+    } else {
+      print('🟢 DEBUG: Found Battery service');
     }
 
+    print(
+        '🔍 DEBUG: Looking for storageDataStreamServiceUuid: $storageDataStreamServiceUuid');
     _storageService = await getService(storageDataStreamServiceUuid);
     if (_storageService == null) {
       logServiceNotFoundError('Storage', deviceId);
+    } else {
+      print('🟢 DEBUG: Found Storage service');
     }
 
+    print(
+        '🔍 DEBUG: Looking for speakerDataStreamServiceUuid: $speakerDataStreamServiceUuid');
     _speakerService = await getService(speakerDataStreamServiceUuid);
     if (_speakerService == null) {
       logServiceNotFoundError('Speaker', deviceId);
+    } else {
+      print('🟢 DEBUG: Found Speaker service');
     }
 
+    print(
+        '🔍 DEBUG: Looking for accelDataStreamServiceUuid: $accelDataStreamServiceUuid');
     _accelService = await getService(accelDataStreamServiceUuid);
     if (_accelService == null) {
       logServiceNotFoundError('Accelerometer', deviceId);
+    } else {
+      print('🟢 DEBUG: Found Accelerometer service');
     }
 
+    print('🔍 DEBUG: Looking for buttonServiceUuid: $buttonServiceUuid');
     _buttonService = await getService(buttonServiceUuid);
     if (_buttonService == null) {
       logServiceNotFoundError('Button', deviceId);
+    } else {
+      print('🟢 DEBUG: Found Button service');
     }
 
     // Try to get dedicated Haptic service (main OMI firmware)
+    print('🔍 DEBUG: Looking for hapticServiceUuid: $hapticServiceUuid');
     _hapticService = await getService(hapticServiceUuid);
     if (_hapticService == null) {
       logServiceNotFoundError('Haptic', deviceId);
+    } else {
+      print('🟢 DEBUG: Found Haptic service');
     }
   }
 

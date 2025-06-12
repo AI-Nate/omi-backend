@@ -17,6 +17,11 @@ from utils.other import endpoints as auth
 from utils.other.storage import delete_all_conversation_recordings, get_user_person_speech_samples, \
     delete_user_person_speech_samples
 from utils.webhooks import webhook_first_time_setup
+import database.users as users_db
+from database.users import get_user_speech_profile, delete_user_speech_profile, get_user_name, set_user_name, \
+    get_user_store_recording_permission, set_user_store_recording_permission, \
+    get_user_language_preference, set_user_language_preference, \
+    get_user_translation_preference, set_user_translation_preference
 
 router = APIRouter()
 
@@ -243,13 +248,55 @@ def get_user_language(uid: str = Depends(auth.get_current_user_uid)):
 
 
 @router.patch('/v1/users/language', tags=['v1'])
-def set_user_language(data: dict, uid: str = Depends(auth.get_current_user_uid)):
-    """Set the user's preferred language (e.g., 'en', 'vi', etc.)."""
-    language = data.get('language')
-    if not language:
-        raise HTTPException(status_code=400, detail="Language is required")
-    set_user_language_preference(uid, language)
-    return {'status': 'ok'}
+def set_user_language(
+        data: dict,
+        uid: str = Depends(auth.get_current_user_uid)
+):
+    """Set the user's preferred language."""
+    try:
+        language = data.get('language', '')
+        if not language:
+            raise HTTPException(status_code=400, detail="Language cannot be empty")
+        
+        set_user_language_preference(uid, language)
+        return {"status": "ok", "message": f"Language set to {language}"}
+    except Exception as e:
+        print(f"Error setting user language: {e}")
+        raise HTTPException(status_code=500, detail="Failed to set language preference")
+
+
+@router.get('/v1/users/translation', tags=['v1'])
+def get_user_translation_setting(uid: str = Depends(auth.get_current_user_uid)):
+    """Get the user's translation feature preference."""
+    try:
+        enabled = get_user_translation_preference(uid)
+        return {"translation_enabled": enabled}
+    except Exception as e:
+        print(f"Error getting user translation preference: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get translation preference")
+
+
+@router.patch('/v1/users/translation', tags=['v1'])
+def set_user_translation_setting(
+        data: dict,
+        uid: str = Depends(auth.get_current_user_uid)
+):
+    """Set the user's translation feature preference."""
+    try:
+        enabled = data.get('translation_enabled')
+        if enabled is None:
+            raise HTTPException(status_code=400, detail="translation_enabled field is required")
+        
+        if not isinstance(enabled, bool):
+            raise HTTPException(status_code=400, detail="translation_enabled must be a boolean")
+        
+        set_user_translation_preference(uid, enabled)
+        return {"status": "ok", "message": f"Translation {'enabled' if enabled else 'disabled'}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error setting user translation preference: {e}")
+        raise HTTPException(status_code=500, detail="Failed to set translation preference")
 
 
 @router.put('/v1/users/preferences/app', tags=['v1'])

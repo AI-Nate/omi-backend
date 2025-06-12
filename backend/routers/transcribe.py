@@ -16,6 +16,7 @@ import database.conversations as conversations_db
 import database.users as user_db
 from database import redis_db
 from database.redis_db import get_cached_user_geolocation
+from database.users import get_user_translation_preference
 from models.conversation import Conversation, TranscriptSegment, ConversationStatus, Structured, Geolocation
 from models.message_event import ConversationEvent, MessageEvent, MessageServiceStatusEvent, LastConversationEvent, TranslationEvent
 from models.transcript_segment import Translation
@@ -809,6 +810,15 @@ async def _listen(
     current_conversation_id = None
     translation_enabled = including_combined_segments and stt_language == 'multi'
     language_cache = TranscriptSegmentLanguageCache()
+
+    # Check user's translation preference from database
+    try:
+        user_translation_enabled = get_user_translation_preference(uid)
+        translation_enabled = translation_enabled and user_translation_enabled
+        print(f"Translation enabled for user {uid}: {translation_enabled} (feature: {including_combined_segments and stt_language == 'multi'}, user_pref: {user_translation_enabled})")
+    except Exception as e:
+        print(f"Error getting user translation preference for {uid}: {e}")
+        # Fallback to default behavior if error occurs
 
     async def translate(segments: List[TranscriptSegment], conversation_id: str):
         try:

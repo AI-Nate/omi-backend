@@ -122,11 +122,16 @@ class SharedPreferencesUtil {
   bool get devModeJoanFollowUpEnabled =>
       getBool('devModeJoanFollowUpEnabled') ?? false;
 
+  // Translation feature toggle (synced with server)
   set transcriptionDiagnosticEnabled(bool value) =>
       saveBool('transcriptionDiagnosticEnabled', value);
 
   bool get transcriptionDiagnosticEnabled =>
       getBool('transcriptionDiagnosticEnabled') ?? false;
+
+  set translationEnabled(bool value) => saveBool('translationEnabled', value);
+
+  bool get translationEnabled => getBool('translationEnabled') ?? true;
 
   set conversationEventsToggled(bool value) =>
       saveBool('conversationEventsToggled', value);
@@ -201,6 +206,11 @@ class SharedPreferencesUtil {
   bool get devModeEnabled => getBool('devModeEnabled') ?? false;
 
   set devModeEnabled(bool value) => saveBool('devModeEnabled', value);
+
+  bool get hapticFeedbackEnabled => getBool('hapticFeedbackEnabled') ?? true;
+
+  set hapticFeedbackEnabled(bool value) =>
+      saveBool('hapticFeedbackEnabled', value);
 
   bool get permissionStoreRecordingsEnabled =>
       getBool('permissionStoreRecordingsEnabled') ?? false;

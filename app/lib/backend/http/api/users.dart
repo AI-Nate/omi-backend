@@ -356,6 +356,38 @@ Future<bool> setUserPrimaryLanguage(String languageCode) async {
   return response.statusCode == 200;
 }
 
+// User translation preference API calls
+Future<bool?> getUserTranslationPreference() async {
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/users/translation',
+    headers: {},
+    method: 'GET',
+    body: '',
+  );
+  if (response == null) return null;
+  debugPrint('getUserTranslationPreference response: ${response.body}');
+
+  try {
+    var jsonResponse = jsonDecode(response.body);
+    return jsonResponse['translation_enabled'] as bool?;
+  } catch (e) {
+    debugPrint('Error parsing getUserTranslationPreference response: $e');
+    return null;
+  }
+}
+
+Future<bool> setUserTranslationPreference(bool enabled) async {
+  var response = await makeApiCall(
+    url: '${Env.apiBaseUrl}v1/users/translation',
+    headers: {},
+    method: 'PATCH',
+    body: jsonEncode({'translation_enabled': enabled}),
+  );
+  if (response == null) return false;
+  debugPrint('setUserTranslationPreference response: ${response.body}');
+  return response.statusCode == 200;
+}
+
 Future<bool> setPreferredSummarizationAppServer(String appId) async {
   var response = await makeApiCall(
     url: '${Env.apiBaseUrl}v1/users/preferences/app?app_id=$appId',
