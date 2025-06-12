@@ -13,7 +13,7 @@ from langchain.schema import (
 )
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings, AzureChatOpenAI
 from pydantic import BaseModel, Field, ValidationError
 import pytz
 
@@ -29,14 +29,77 @@ from utils.prompts import extract_memories_prompt, extract_learnings_prompt, ext
 from utils.llms.memory import get_prompt_memories
 from utils.langsmith_wrapper import trace_langchain_llm, trace_function
 
-# Initialize LLM models
-llm_mini = trace_langchain_llm(ChatOpenAI(model='gpt-4o-mini'))
-llm_mini_stream = trace_langchain_llm(ChatOpenAI(model='gpt-4o-mini', streaming=True))
-llm_large = trace_langchain_llm(ChatOpenAI(model='o1-preview'))
-llm_large_stream = trace_langchain_llm(ChatOpenAI(model='o1-preview', streaming=True, temperature=1))
-llm_medium = trace_langchain_llm(ChatOpenAI(model='gpt-4o'))
-llm_medium_experiment = trace_langchain_llm(ChatOpenAI(model='gpt-4.1'))
-llm_medium_stream = trace_langchain_llm(ChatOpenAI(model='gpt-4o', streaming=True))
+# Initialize LLM models - CONVERTED TO AZURE OPENAI FOR COST SAVINGS
+from langchain_openai import AzureChatOpenAI
+
+# Azure OpenAI models using gpt-4.1 deployment for cost savings
+llm_mini = trace_langchain_llm(AzureChatOpenAI(
+    deployment_name="gpt-4.1",  # Using gpt-4.1 deployment for cost savings
+    model_name="gpt-4.1",
+    temperature=0.1,
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+))
+
+llm_mini_stream = trace_langchain_llm(AzureChatOpenAI(
+    deployment_name="gpt-4.1",  # Using gpt-4.1 deployment for cost savings
+    model_name="gpt-4.1", 
+    temperature=0.1,
+    streaming=True,
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+))
+
+llm_large = trace_langchain_llm(AzureChatOpenAI(
+    deployment_name="gpt-4.1",  # Using gpt-4.1 deployment for cost savings (replacing o1-preview)
+    model_name="gpt-4.1",
+    temperature=0.1,
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+))
+
+llm_large_stream = trace_langchain_llm(AzureChatOpenAI(
+    deployment_name="gpt-4.1",  # Using gpt-4.1 deployment for cost savings (replacing o1-preview)
+    model_name="gpt-4.1",
+    temperature=0.1,
+    streaming=True,
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+))
+
+llm_medium = trace_langchain_llm(AzureChatOpenAI(
+    deployment_name="gpt-4.1",  # Using gpt-4.1 deployment for cost savings
+    model_name="gpt-4.1",
+    temperature=0.1,
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+))
+
+llm_medium_experiment = trace_langchain_llm(AzureChatOpenAI(
+    deployment_name="gpt-4.1",  # Already using gpt-4.1 deployment
+    model_name="gpt-4.1",
+    temperature=0.1,
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+))
+
+llm_medium_stream = trace_langchain_llm(AzureChatOpenAI(
+    deployment_name="gpt-4.1",  # Using gpt-4.1 deployment for cost savings
+    model_name="gpt-4.1",
+    temperature=0.1,
+    streaming=True,
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+))
+
+# Keep persona LLMs unchanged (using OpenRouter for variety)
 llm_persona_mini_stream = trace_langchain_llm(ChatOpenAI(
     temperature=0.8,
     model="google/gemini-flash-1.5-8b",
@@ -53,8 +116,17 @@ llm_persona_medium_stream = trace_langchain_llm(ChatOpenAI(
     default_headers={"X-Title": "Omi Chat"},
     streaming=True,
 ))
-# Using text-embedding-3-small with 1024 dimensions to match the Pinecone index
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small", dimensions=1024)
+
+# Using Azure OpenAI text-embedding-3-small with 1024 dimensions to match the Pinecone index for cost savings
+from langchain_openai import AzureOpenAIEmbeddings
+embeddings = AzureOpenAIEmbeddings(
+    model="text-embedding-3-small",
+    dimensions=1024,
+    azure_deployment="text-embedding-3-small",  # Your Azure deployment name for embeddings
+    api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY")
+)
 parser = PydanticOutputParser(pydantic_object=Structured)
 
 encoding = tiktoken.encoding_for_model('gpt-4')
@@ -89,8 +161,15 @@ def analyze_image_content(image_data: bytes, user_prompt: Optional[str] = None) 
         # Encode image to base64
         base64_image = base64.b64encode(image_data).decode('utf-8')
         
-        # Create vision-compatible OpenAI client
-        vision_llm = trace_langchain_llm(ChatOpenAI(model='gpt-4o'))
+        # Create vision-compatible Azure OpenAI client
+        vision_llm = trace_langchain_llm(AzureChatOpenAI(
+            deployment_name="gpt-4.1",  # Using gpt-4.1 deployment for cost savings
+            model_name="gpt-4.1",
+            temperature=0.1,
+            api_version=os.getenv("OPENAI_API_VERSION", "2024-12-01-preview"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_key=os.getenv("AZURE_OPENAI_API_KEY")
+        ))
         
         # Base analysis text
         base_text = "Analyze this image and provide a detailed description of what you see. Focus on the main subjects, activities, objects, text, settings, and any other relevant details that could be useful for understanding the context and content."
