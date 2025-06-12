@@ -18,7 +18,7 @@ from utils.other.storage import delete_all_conversation_recordings, get_user_per
     delete_user_person_speech_samples
 from utils.webhooks import webhook_first_time_setup
 import database.users as users_db
-from database.users import get_user_speech_profile, delete_user_speech_profile, get_user_name, set_user_name, \
+from database.users import get_user_name, set_user_name, \
     get_user_store_recording_permission, set_user_store_recording_permission, \
     get_user_language_preference, set_user_language_preference, \
     get_user_translation_preference, set_user_translation_preference
