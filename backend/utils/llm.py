@@ -226,30 +226,50 @@ def should_discard_conversation(transcript: str) -> bool:
     parser = PydanticOutputParser(pydantic_object=DiscardConversation)
     prompt = ChatPromptTemplate.from_messages([
         '''
-    You will receive a transcript snippet. Length is never a reason to discard.
+You will receive a transcript snippet that may contain conversation fragments, device interactions, or meaningful dialogue.
 
-        Task
-        Decide if the snippet should be saved as a memory.
+TASK: Decide if this content is worth preserving as a personal memory that could provide value for personal growth, decision-making, or life improvement.
 
-        KEEP  → output:  discard = False
-        DISCARD → output: discard = True
+DISCARD (output: discard = True) if the transcript contains:
+• Incomplete sentences, fragments, or incoherent speech
+• Basic device interactions (Siri, Alexa, Google Assistant commands)
+• Random sounds, background noise, or meaningless words
+• Technical troubleshooting without personal context
+• Simple app/system commands without meaningful content
+• Accidental recordings or pocket-dial conversations
+• Repetitive or garbled audio with no clear meaning
+• Brief greetings without substantive content
 
-        KEEP (discard = False) if it contains any of the following:
-        • a task, request, or action item
-        • a decision, commitment, or plan
-        • a question that requires follow-up
-        • personal facts, preferences, or details likely useful later
-        • an insight, summary, or key takeaway
+KEEP (output: discard = False) ONLY if the transcript contains meaningful content such as:
+• Personal decisions, commitments, or important plans
+• Conversations with other people about substantive topics
+• Professional discussions, meetings, or work-related insights
+• Learning experiences, insights, or personal realizations
+• Questions that reveal personal interests or needs
+• Personal facts, preferences, or details useful for future reference
+• Emotional expressions or personal reflections
+• Problem-solving discussions or creative thinking
+• Health, relationship, financial, or other life-important topics
+• Goals, aspirations, or self-improvement discussions
 
-        If none of these are present, DISCARD (discard = True).
+IMPORTANT: Be strict about quality. The content must have clear personal value that would benefit from detailed analysis, action item extraction, and learning opportunity identification. When in doubt, DISCARD.
 
-        Return exactly one line:
-        discard = <True|False>
+Examples to DISCARD:
+- "Hey Siri, set alarm for 6 AM"
+- "User: And then... User: Hi sir... Speaker 1: alarm at 11:25"
+- "OK Google, what's the weather?"
+- "Alexa, play music"
+- Incomplete fragments like "And then... that would be..."
 
+Examples to KEEP:
+- "I've been thinking about switching careers because..."
+- "The meeting went well, we decided to..."
+- "I learned something interesting today about..."
+- "I need to follow up with John about the project..."
 
-    Transcript: ```{transcript}```
+Transcript: ```{transcript}```
 
-    {format_instructions}'''.replace('    ', '').strip()
+{format_instructions}'''.replace('        ', '').strip()
     ])
     chain = prompt | llm_mini | parser
     try:
