@@ -453,10 +453,8 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
                 )
             ]
         
-        # Even for discarded conversations, try to extract action items if they exist
-        print(f"🎯 BACKEND: Checking for action items in discarded conversation...")
-        dedicated_action_items = _generate_action_items_from_transcript(transcript, uid)
-        print(f"🎯 BACKEND: Found {len(dedicated_action_items)} action items in discarded conversation")
+        # Discarded conversations don't need action items - skip LLM call for efficiency
+        print(f"🎯 BACKEND: Skipping action item generation for discarded conversation (saves LLM call)")
         
         # Create discarded conversation
         conversation = Conversation(
@@ -470,21 +468,14 @@ def _create_discarded_conversation(uid: str, transcript: str) -> Dict[str, Any]:
                 title="",  # Empty title for discarded conversations
                 overview="",  # Empty overview for discarded conversations
                 category="other",
-                emoji=random.choice(['🧠', '🎉'])  # Same as standard discard logic
+                emoji=random.choice(['🧠', '🎉']),  # Same as standard discard logic
+                action_items=[]  # Empty action items for discarded conversations
             ),
             transcript_segments=transcript_segments,
             apps_results=[],  # No app processing for discarded conversations
             discarded=True,  # Mark as discarded
             deleted=False
         )
-        
-        # Add action items even to discarded conversations if they exist
-        if dedicated_action_items:
-            conversation.structured.action_items = [
-                ActionItem(description=item) 
-                for item in dedicated_action_items
-            ]
-            print(f"🎯 BACKEND: Added {len(dedicated_action_items)} action items to discarded conversation")
         
         # Mark conversation as completed
         conversation.status = ConversationStatus.completed
