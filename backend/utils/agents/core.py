@@ -16,6 +16,7 @@ from models.conversation import Conversation, CreateConversation
 from utils.agents.tools import get_agent_tools
 from utils.llms.memory import get_prompt_memories
 from utils.llm import retrieve_memory_context_params
+from utils.langsmith_wrapper import pull_prompt, format_prompt
 
 
 class ConversationAgent:
@@ -187,54 +188,20 @@ AZURE AGENT USAGE EXAMPLES (they can use web search automatically):
 
 Remember: You are analyzing conversations that have already happened. Your role is to help {user_name} understand patterns, gain insights, and decide on next steps based on their conversation history, current real-world information, AND specialized expert analysis from Azure agents."""
 
-    def analyze_conversation(
-        self, 
-        transcript: str, 
-        conversation_data: Optional[Dict] = None,
-        session_id: str = "default"
-    ) -> Dict[str, Any]:
+    def _get_fallback_prompt(self, user_name: str, memories_str: str, context_info: str, transcript: str) -> str:
         """
-        Analyze a conversation transcript and suggest actions
+        Get the fallback prompt when LangSmith is not available
         
         Args:
-            transcript: The conversation transcript to analyze
-            conversation_data: Optional additional conversation metadata
-            session_id: Session ID for conversation memory
+            user_name: The user's name
+            memories_str: User's memories/context
+            context_info: Additional conversation context
+            transcript: The conversation transcript
             
         Returns:
-            Analysis results with insights and suggested actions
+            Formatted fallback prompt
         """
-        print(f"🔥 DUPLICATE_DEBUG: ConversationAgent.analyze_conversation() ENTRY")
-        print(f"🔥 DUPLICATE_DEBUG: - uid: {self.uid}")
-        print(f"🔥 DUPLICATE_DEBUG: - transcript length: {len(transcript)}")
-        print(f"🔥 DUPLICATE_DEBUG: - session_id: {session_id}")
-        print(f"🔥 DUPLICATE_DEBUG: - conversation_data: {conversation_data}")
-        
-        import traceback
-        print(f"🔥 DUPLICATE_DEBUG: Agent analyze_conversation call stack:")
-        traceback.print_stack()
-        
-        try:
-            # Get user context (name + memories) similar to _get_system_prompt
-            try:
-                user_name, memories_str = get_prompt_memories(self.uid)
-            except Exception as e:
-                print(f"Error getting user memories in analyze_conversation: {e}")
-                user_name = "User"
-                memories_str = "No user memories available."
-            
-            # Prepare conversation context
-            context_info = ""
-            if conversation_data:
-                context_info = f"""
-CONVERSATION METADATA:
-- Created: {conversation_data.get('created_at', 'Unknown')}
-- Source: {conversation_data.get('source', 'Unknown')}
-- Category: {conversation_data.get('category', 'Unknown')}
-"""
-            
-            # Create analysis prompt that includes title generation and user context
-            analysis_prompt = f"""
+        return f"""
 You are analyzing a conversation for {user_name}.
 
 ABOUT THE USER:
@@ -332,6 +299,75 @@ Do NOT use generic titles like "Conversation" or "Discussion".
 
 IMPORTANT: Always include "Key Takeaways:", "Action Items:", and "URGENCY ASSESSMENT:" sections even if some lists are empty. The parsing system expects these exact section headers.
 """
+
+    def analyze_conversation(
+        self, 
+        transcript: str, 
+        conversation_data: Optional[Dict] = None,
+        session_id: str = "default"
+    ) -> Dict[str, Any]:
+        """
+        Analyze a conversation transcript and suggest actions
+        
+        Args:
+            transcript: The conversation transcript to analyze
+            conversation_data: Optional additional conversation metadata
+            session_id: Session ID for conversation memory
+            
+        Returns:
+            Analysis results with insights and suggested actions
+        """
+        print(f"🔥 DUPLICATE_DEBUG: ConversationAgent.analyze_conversation() ENTRY")
+        print(f"🔥 DUPLICATE_DEBUG: - uid: {self.uid}")
+        print(f"🔥 DUPLICATE_DEBUG: - transcript length: {len(transcript)}")
+        print(f"🔥 DUPLICATE_DEBUG: - session_id: {session_id}")
+        print(f"🔥 DUPLICATE_DEBUG: - conversation_data: {conversation_data}")
+        
+        import traceback
+        print(f"🔥 DUPLICATE_DEBUG: Agent analyze_conversation call stack:")
+        traceback.print_stack()
+        
+        try:
+            # Get user context (name + memories) similar to _get_system_prompt
+            try:
+                user_name, memories_str = get_prompt_memories(self.uid)
+            except Exception as e:
+                print(f"Error getting user memories in analyze_conversation: {e}")
+                user_name = "User"
+                memories_str = "No user memories available."
+            
+            # Prepare conversation context
+            context_info = ""
+            if conversation_data:
+                context_info = f"""
+CONVERSATION METADATA:
+- Created: {conversation_data.get('created_at', 'Unknown')}
+- Source: {conversation_data.get('source', 'Unknown')}
+- Category: {conversation_data.get('category', 'Unknown')}
+"""
+            
+            # Try to get the prompt from LangSmith first
+            langsmith_prompt = pull_prompt("sk0qvnghwihpl2dixzf14szsipa2_analyze_conversation", include_model=False)
+            
+            if langsmith_prompt:
+                # Use LangSmith prompt with variables
+                prompt_variables = {
+                    "user_name": user_name,
+                    "memories_str": memories_str,
+                    "context_info": context_info,
+                    "transcript": transcript
+                }
+                
+                analysis_prompt = format_prompt(langsmith_prompt, prompt_variables)
+                
+                if not analysis_prompt:
+                    print("⚠️ Failed to format LangSmith prompt, falling back to hardcoded prompt")
+                    analysis_prompt = self._get_fallback_prompt(user_name, memories_str, context_info, transcript)
+                else:
+                    print("✅ Using LangSmith prompt for conversation analysis")
+            else:
+                print("⚠️ Failed to pull LangSmith prompt, using fallback prompt")
+                analysis_prompt = self._get_fallback_prompt(user_name, memories_str, context_info, transcript)
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}

@@ -3,6 +3,14 @@ from typing import Optional, Callable, Any, Dict, List
 from functools import wraps
 import logging
 
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # dotenv not available, skip loading
+    pass
+
 # Initialize logging
 logger = logging.getLogger(__name__)
 
@@ -170,4 +178,73 @@ try:
 except ImportError:
     logger.warning("LangSmith OpenAI wrapper not available")
     def wrap_openai_client(client):
-        return client 
+        return client
+
+def pull_prompt(prompt_id: str, include_model: bool = False):
+    """
+    Pull a prompt from LangSmith.
+    
+    Args:
+        prompt_id: The LangSmith prompt ID to pull
+        include_model: Whether to include model configuration
+        
+    Returns:
+        The prompt object or None if not available
+    """
+    if not LANGSMITH_AVAILABLE:
+        logger.warning("LangSmith not available for prompt pulling")
+        return None
+        
+    if not LANGSMITH_CLIENT:
+        logger.warning("LangSmith client not initialized")
+        return None
+        
+    try:
+        prompt = LANGSMITH_CLIENT.pull_prompt(prompt_id, include_model=include_model)
+        logger.info(f"Successfully pulled prompt: {prompt_id}")
+        return prompt
+    except Exception as e:
+        logger.error(f"Error pulling prompt {prompt_id}: {e}")
+        return None
+
+def format_prompt(prompt, variables: Dict[str, Any] = None):
+    """
+    Format a LangSmith prompt with variables.
+    
+    Args:
+        prompt: The prompt object from LangSmith
+        variables: Dictionary of variables to substitute in the prompt
+        
+    Returns:
+        Formatted prompt string or None if formatting fails
+    """
+    if not prompt:
+        return None
+        
+    try:
+        if variables:
+            formatted = prompt.format(**variables)
+        else:
+            formatted = prompt.format()
+        
+        # If the result is a prompt template object, get the content
+        if hasattr(formatted, 'messages'):
+            # For ChatPromptTemplate, get the formatted message content
+            formatted_messages = formatted.messages
+            if formatted_messages and len(formatted_messages) > 0:
+                # Get the content from the first message (usually the main prompt)
+                if hasattr(formatted_messages[0], 'content'):
+                    return formatted_messages[0].content
+                elif hasattr(formatted_messages[0], 'prompt'):
+                    return formatted_messages[0].prompt.template
+        elif hasattr(formatted, 'template'):
+            return formatted.template
+        elif isinstance(formatted, str):
+            return formatted
+        else:
+            # Try to convert to string
+            return str(formatted)
+            
+    except Exception as e:
+        logger.error(f"Error formatting prompt: {e}")
+        return None 
