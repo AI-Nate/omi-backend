@@ -347,9 +347,20 @@ CONVERSATION METADATA:
 """
             
             # Try to get the prompt from LangSmith first
+            print("🔍 AGENT_DEBUG: Starting LangSmith prompt integration")
+            print(f"🔍 AGENT_DEBUG: User: {user_name}")
+            print(f"🔍 AGENT_DEBUG: Memories length: {len(memories_str)}")
+            print(f"🔍 AGENT_DEBUG: Context info length: {len(context_info)}")
+            print(f"🔍 AGENT_DEBUG: Transcript length: {len(transcript)}")
+            
             langsmith_prompt = pull_prompt("sk0qvnghwihpl2dixzf14szsipa2_analyze_conversation", include_model=False)
             
+            print(f"🔍 AGENT_DEBUG: pull_prompt result: {langsmith_prompt}")
+            print(f"🔍 AGENT_DEBUG: prompt type: {type(langsmith_prompt)}")
+            
             if langsmith_prompt:
+                print("🔍 AGENT_DEBUG: LangSmith prompt retrieved successfully")
+                
                 # Use LangSmith prompt with variables
                 prompt_variables = {
                     "user_name": user_name,
@@ -358,16 +369,24 @@ CONVERSATION METADATA:
                     "transcript": transcript
                 }
                 
+                print(f"🔍 AGENT_DEBUG: Calling format_prompt with variables: {list(prompt_variables.keys())}")
                 analysis_prompt = format_prompt(langsmith_prompt, prompt_variables)
+                print(f"🔍 AGENT_DEBUG: format_prompt result: {analysis_prompt is not None}")
+                
+                if analysis_prompt:
+                    print(f"🔍 AGENT_DEBUG: Formatted prompt length: {len(analysis_prompt)}")
+                    print(f"🔍 AGENT_DEBUG: First 200 chars: {analysis_prompt[:200]}...")
                 
                 if not analysis_prompt:
-                    print("⚠️ Failed to format LangSmith prompt, falling back to hardcoded prompt")
+                    print("🔍 AGENT_DEBUG: ⚠️ Failed to format LangSmith prompt, falling back to hardcoded prompt")
                     analysis_prompt = self._get_fallback_prompt(user_name, memories_str, context_info, transcript)
+                    print(f"🔍 AGENT_DEBUG: Using fallback prompt, length: {len(analysis_prompt)}")
                 else:
-                    print("✅ Using LangSmith prompt for conversation analysis")
+                    print("🔍 AGENT_DEBUG: ✅ Using LangSmith prompt for conversation analysis")
             else:
-                print("⚠️ Failed to pull LangSmith prompt, using fallback prompt")
+                print("🔍 AGENT_DEBUG: ⚠️ Failed to pull LangSmith prompt, using fallback prompt")
                 analysis_prompt = self._get_fallback_prompt(user_name, memories_str, context_info, transcript)
+                print(f"🔍 AGENT_DEBUG: Using fallback prompt, length: {len(analysis_prompt)}")
 
             # Configure the agent with conversation config
             config = {"configurable": {"thread_id": session_id}}
