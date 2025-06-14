@@ -275,28 +275,34 @@ def should_discard_conversation(transcript: str) -> bool:
 
     # Try LangSmith prompt first
     langsmith_prompt = pull_prompt("sk0qvnghwihpl2dixzf14szsipa2_should_discard_conversation", include_model=False)
+    
+    # Escape curly braces in format_instructions to prevent them from being treated as template variables
+    format_instructions = parser.get_format_instructions()
+    escaped_format_instructions = format_instructions.replace("{", "{{").replace("}", "}}")
+    
     prompt_variables = {
         "transcript": transcript.strip(),
-        "format_instructions": parser.get_format_instructions(),
+        "format_instructions": escaped_format_instructions,
     }
 
     if langsmith_prompt:
+        print("DEBUG: LangSmith prompt input_variables:", getattr(langsmith_prompt, 'input_variables', None))
         prompt_str = format_prompt(langsmith_prompt, prompt_variables)
         if not prompt_str:
             print("⚠️ LangSmith prompt formatting failed, using fallback.")
-            prompt_str = _get_fallback_discard_prompt(transcript, parser.get_format_instructions())
+            prompt_str = _get_fallback_discard_prompt(transcript, escaped_format_instructions)
         else:
             print("✅ Using LangSmith prompt for should_discard_conversation.")
     else:
         print("⚠️ LangSmith prompt unavailable, using fallback.")
-        prompt_str = _get_fallback_discard_prompt(transcript, parser.get_format_instructions())
+        prompt_str = _get_fallback_discard_prompt(transcript, escaped_format_instructions)
 
     prompt = ChatPromptTemplate.from_messages([prompt_str])
     chain = prompt | llm_mini | parser
     try:
         response: DiscardConversation = chain.invoke({
             'transcript': transcript.strip(),
-            'format_instructions': parser.get_format_instructions(),
+            'format_instructions': escaped_format_instructions,
         })
         return response.discard
 
