@@ -317,7 +317,7 @@ You MUST format your response exactly as follows:
 TITLE: [Generate a concise, descriptive title based on the main topic/theme of the conversation - max 60 characters]
 
 ANALYSIS:
-[Your comprehensive analysis including expert insights, web search results, and recommendations]
+[Your comprehensive analysis including expert insights, web search results, and recommendations. Focus on insights, patterns, context, and interpretation. DO NOT include bullet-pointed takeaways or action items here - those will go in their dedicated sections below.]
 
 Key Takeaways:
 - [3-5 key insights or important points from your analysis]
@@ -402,20 +402,20 @@ IMPORTANT: Always include "Key Takeaways:", "Action Items:", and "URGENCY ASSESS
                 
                 print(f"🔍 AGENT: Extracted title from response: '{title}'")
             
-            # Extract analysis part (everything after "ANALYSIS:")
-            analysis_match = re.search(r'ANALYSIS:\s*(.+?)(?=URGENCY ASSESSMENT:|$)', final_message, re.DOTALL | re.IGNORECASE)
+            # Extract analysis part (everything after "ANALYSIS:" but before "Key Takeaways:")
+            analysis_match = re.search(r'ANALYSIS:\s*(.+?)(?=Key Takeaways:|URGENCY ASSESSMENT:|$)', final_message, re.DOTALL | re.IGNORECASE)
             if analysis_match:
                 analysis = analysis_match.group(1).strip()
                 print(f"🔍 AGENT: Extracted analysis (length: {len(analysis)})")
             else:
-                # If no ANALYSIS: marker found, use everything after TITLE:
+                # If no ANALYSIS: marker found, use everything after TITLE: but before Key Takeaways:
                 if title_match:
                     analysis_text = final_message[title_match.end():].strip()
-                    # Remove any remaining "ANALYSIS:" markers and stop at urgency assessment
+                    # Remove any remaining "ANALYSIS:" markers and stop at Key Takeaways or urgency assessment
                     analysis_text = re.sub(r'^\s*ANALYSIS:\s*', '', analysis_text, flags=re.IGNORECASE)
-                    # Extract everything before URGENCY ASSESSMENT if it exists
-                    urgency_split = re.split(r'URGENCY ASSESSMENT:', analysis_text, flags=re.IGNORECASE)
-                    analysis = urgency_split[0].strip()
+                    # Extract everything before Key Takeaways or URGENCY ASSESSMENT
+                    analysis_split = re.split(r'Key Takeaways:|URGENCY ASSESSMENT:', analysis_text, flags=re.IGNORECASE)
+                    analysis = analysis_split[0].strip()
                 print(f"🔍 AGENT: Using fallback analysis extraction (length: {len(analysis)})")
             
             # Extract urgency assessment
