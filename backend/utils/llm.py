@@ -27,7 +27,7 @@ from models.trend import TrendEnum, ceo_options, company_options, software_produ
     ai_product_options, TrendType
 from utils.prompts import extract_memories_prompt, extract_learnings_prompt, extract_memories_text_content_prompt
 from utils.llms.memory import get_prompt_memories
-from utils.langsmith_wrapper import trace_langchain_llm, trace_function
+from utils.langsmith_wrapper import trace_langchain_llm, trace_function, pull_prompt, format_prompt
 
 # Initialize LLM models - CONVERTED TO AZURE OPENAI FOR COST SAVINGS
 from langchain_openai import AzureChatOpenAI
@@ -219,13 +219,8 @@ class SpeakerIdMatch(BaseModel):
     speaker_id: int = Field(description="The speaker id assigned to the segment")
 
 
-def should_discard_conversation(transcript: str) -> bool:
-    if len(transcript.split(' ')) > 100:
-        return False
-
-    parser = PydanticOutputParser(pydantic_object=DiscardConversation)
-    prompt = ChatPromptTemplate.from_messages([
-        '''
+def _get_fallback_discard_prompt(transcript, format_instructions):
+    return '''
 You will receive a transcript snippet that may contain conversation fragments, device interactions, or meaningful dialogue.
 
 TASK: Decide if this content is worth preserving as a personal memory that could provide value for personal growth, decision-making, or life improvement.
@@ -269,8 +264,34 @@ Examples to KEEP:
 
 Transcript: ```{transcript}```
 
-{format_instructions}'''.replace('        ', '').strip()
-    ])
+{format_instructions}
+'''.replace('        ', '').strip()
+
+def should_discard_conversation(transcript: str) -> bool:
+    if len(transcript.split(' ')) > 100:
+        return False
+
+    parser = PydanticOutputParser(pydantic_object=DiscardConversation)
+
+    # Try LangSmith prompt first
+    langsmith_prompt = pull_prompt("sk0qvnghwihpl2dixzf14szsipa2_should_discard_conversation", include_model=False)
+    prompt_variables = {
+        "transcript": transcript.strip(),
+        "format_instructions": parser.get_format_instructions(),
+    }
+
+    if langsmith_prompt:
+        prompt_str = format_prompt(langsmith_prompt, prompt_variables)
+        if not prompt_str:
+            print("⚠️ LangSmith prompt formatting failed, using fallback.")
+            prompt_str = _get_fallback_discard_prompt(transcript, parser.get_format_instructions())
+        else:
+            print("✅ Using LangSmith prompt for should_discard_conversation.")
+    else:
+        print("⚠️ LangSmith prompt unavailable, using fallback.")
+        prompt_str = _get_fallback_discard_prompt(transcript, parser.get_format_instructions())
+
+    prompt = ChatPromptTemplate.from_messages([prompt_str])
     chain = prompt | llm_mini | parser
     try:
         response: DiscardConversation = chain.invoke({
