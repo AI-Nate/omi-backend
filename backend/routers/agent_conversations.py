@@ -198,10 +198,17 @@ def create_conversation_with_agent(
             request.transcript
         )
         
-        # Generate dedicated action items using the same high-quality approach as standard API
-        print(f"🎯 BACKEND: Generating dedicated action items for action items view...")
-        dedicated_action_items = _generate_action_items_from_transcript(request.transcript, uid)
-        print(f"🎯 BACKEND: Generated {len(dedicated_action_items)} dedicated action items")
+        # Extract action items from agent analysis first, fallback to dedicated generation if none found
+        agent_action_items = structured_data.get("action_items", [])
+        if agent_action_items:
+            # Use action items extracted from agent analysis
+            dedicated_action_items = [item["content"] for item in agent_action_items]
+            print(f"🎯 BACKEND: Using {len(dedicated_action_items)} action items from agent analysis")
+        else:
+            # Fallback: Generate dedicated action items using the same high-quality approach as standard API
+            print(f"🎯 BACKEND: No action items in agent analysis, generating from transcript...")
+            dedicated_action_items = _generate_action_items_from_transcript(request.transcript, uid)
+            print(f"🎯 BACKEND: Generated {len(dedicated_action_items)} dedicated action items from transcript")
         
         # Use the agent generated title if available, otherwise use extracted title
         if agent_title and agent_title.strip():
