@@ -215,11 +215,11 @@ Remember: You are analyzing conversations that have already happened. Your role 
         traceback.print_stack()
         
         try:
-            # Get user name and memories
+            # Get user context (name + memories) similar to _get_system_prompt
             try:
                 user_name, memories_str = get_prompt_memories(self.uid)
             except Exception as e:
-                print(f"Error getting user memories: {e}")
+                print(f"Error getting user memories in analyze_conversation: {e}")
                 user_name = "User"
                 memories_str = "No user memories available."
             
@@ -235,81 +235,56 @@ CONVERSATION METADATA:
             
             # Create analysis prompt that includes title generation and user context
             analysis_prompt = f"""
-You are analyzing a conversation for {user_name} and helping them understand patterns, gain insights, and decide on next steps.
+You are analyzing a conversation for {user_name}.
 
-ABOUT {user_name.upper()}:
+ABOUT THE USER:
 {memories_str}
 
-AVAILABLE TOOLS & WHEN TO USE THEM:
-You have access to powerful tools to enhance your analysis. Use them intelligently based on the conversation's complexity and content:
+Please analyze this conversation transcript and help {user_name}. You MUST use your available tools to provide comprehensive analysis.
 
-1. **conversation_retrieval**: Use to find relevant past conversations and patterns
-   - ALWAYS use for complex topics or when historical context would be valuable
-   - Skip for simple, standalone conversations that don't need historical context
-
-2. **web_search**: Use when current information would be helpful
-   - Use for specific places, businesses, restaurants, services
-   - Use for factual data, prices, reviews, recommendations
-   - Use for current events or time-sensitive information
-   - Skip for personal conversations that don't require external information
-
-3. **azure_agent**: Use for specialized expert analysis when the conversation is complex
-   - Simple conversations: Can analyze directly without agents
-   - Complex conversations: Use 2-4 expert agents with different perspectives
-   - Always consider including Intent Analysis experts for deeper understanding:
-     * User Psychology Expert: "You are a behavioral psychologist specializing in understanding hidden motivations and unspoken needs. Analyze what {user_name} REALLY wants beyond their explicit requests. Consider their background: {memories_str[:200]}..."
-     * Context & Pattern Expert: "You are a conversation analysis expert. Analyze patterns and gaps for {user_name}. Consider their context: {memories_str[:200]}..."
-
-DECISION FRAMEWORK:
-- **Simple conversation** (casual chat, basic questions): Analyze directly, maybe use conversation_retrieval
-- **Medium complexity** (specific topics, decisions): Use conversation_retrieval + web_search if needed + 1-2 azure_agents
-- **Complex conversation** (important decisions, multiple topics): Use all tools with 2-4 expert agents
-
-WHEN USING EXPERT AGENTS (for medium/complex conversations):
-
-1. **Intent Analysis Priority**: When using azure_agent, prioritize understanding deeper needs:
+REQUIRED TOOL USAGE:
+1. ALWAYS use conversation_retrieval to search for relevant past conversations
+2. ALWAYS use web_search if the conversation involves:
+   - Specific places, restaurants, services, or businesses
+   - Questions that would benefit from current information
+   - Requests for recommendations or factual data
+3. MANDATORY: Start with Intent Analysis experts to understand deeper needs:
    - Use azure_agent with User Psychology Expert to analyze hidden motivations and unspoken needs
    - Use azure_agent with Context & Pattern Expert to identify overlooked aspects and historical patterns
-
-2. **Multi-Expert Analysis Strategy**: For complex conversations, use multiple azure_agent tools:
+4. USE MULTIPLE azure_agent tools for comprehensive multi-expert analysis:
    - Identify 2-4 different expertise areas needed for this conversation
    - Call azure_agent multiple times with different specialized system prompts
    - Each expert should focus on a different aspect or perspective
    - Examples: Technical + Business + Market + User Experience perspectives
 
-EXPERT ANALYSIS SECTIONS (include when using azure_agent):
-
-3. **🧠 Hidden Insights & Deeper Needs**: Include this section when using expert agents:
+5. **🧠 Hidden Insights & Deeper Needs**: ALWAYS include this section:
    - Present insights from User Psychology Expert about hidden motivations and unspoken needs
    - Present insights from Context & Pattern Expert about overlooked aspects and patterns
    - Reveal what {user_name} REALLY needs vs. what they explicitly asked for
 
-4. **🤖 Multi-Expert Consultation**: When using multiple azure_agents, format their insights:
+6. **🤖 Multi-Expert Consultation**: Use azure_agent tool multiple times to get diverse expert perspectives. For each expert:
    - Create a specific system prompt defining their role and expertise
    - Focus each expert on different aspects of the conversation
    - Get 2-4 different expert opinions (e.g., Business Analyst + Technical Expert + Market Researcher + Risk Analyst)
    - Note: Azure agents can automatically use web search when needed for current information
 
-5. **🔗 Expert Synthesis**: After consulting multiple experts, synthesize their insights:
+7. **🔗 Expert Synthesis**: After consulting multiple experts, synthesize their insights:
    - Identify where experts agree (consensus)
    - Highlight where they disagree and explain why
    - Provide integrated recommendations combining all expert perspectives
 
-6. **💡 What You Really Need**: Include this revelation section when using expert analysis:
+8. **💡 What You Really Need**: ALWAYS include this revelation section:
    - Contrast surface request vs. deeper need
    - Identify hidden priorities {user_name} should focus on
    - Point out blind spots and overlooked aspects
    - Define true success criteria for {user_name}
-
-ANALYSIS APPROACH:
-First, determine the conversation's complexity and choose appropriate tools. Then provide your analysis focusing on what {user_name} needs to know and do.
 
 {context_info}
 
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-Remember: The goal is to help {user_name} gain valuable insights and take meaningful action based on this conversation.
+IMPORTANT: You MUST use the available tools (conversation_retrieval, web_search, and azure_agent) to gather comprehensive information before providing your analysis.
 
 RESPONSE FORMAT REQUIREMENT:
 You MUST format your response exactly as follows:
@@ -317,7 +292,7 @@ You MUST format your response exactly as follows:
 TITLE: [Generate a concise, descriptive title based on the main topic/theme of the conversation - max 60 characters]
 
 ANALYSIS:
-[Your comprehensive analysis including expert insights, web search results, and recommendations. Focus on insights, patterns, context, and interpretation. DO NOT include bullet-pointed takeaways or action items here - those will go in their dedicated sections below.]
+[Your comprehensive analysis including expert insights, web search results, and recommendations]
 
 Key Takeaways:
 - [3-5 key insights or important points from your analysis]
@@ -326,7 +301,7 @@ Key Takeaways:
 
 Action Items:
 - [Specific, actionable steps {user_name} should take]
-- [Start each with an action verb like "Schedule", "Research", "Contact"]  
+- [Start each with an action verb like "Schedule", "Research", "Contact"]
 - [Make items concrete and measurable when possible]
 - [Include both immediate next steps and longer-term actions]
 
@@ -402,20 +377,20 @@ IMPORTANT: Always include "Key Takeaways:", "Action Items:", and "URGENCY ASSESS
                 
                 print(f"🔍 AGENT: Extracted title from response: '{title}'")
             
-            # Extract analysis part (everything after "ANALYSIS:" but before "Key Takeaways:")
-            analysis_match = re.search(r'ANALYSIS:\s*(.+?)(?=Key Takeaways:|URGENCY ASSESSMENT:|$)', final_message, re.DOTALL | re.IGNORECASE)
+            # Extract analysis part (everything after "ANALYSIS:")
+            analysis_match = re.search(r'ANALYSIS:\s*(.+?)(?=URGENCY ASSESSMENT:|$)', final_message, re.DOTALL | re.IGNORECASE)
             if analysis_match:
                 analysis = analysis_match.group(1).strip()
                 print(f"🔍 AGENT: Extracted analysis (length: {len(analysis)})")
             else:
-                # If no ANALYSIS: marker found, use everything after TITLE: but before Key Takeaways:
+                # If no ANALYSIS: marker found, use everything after TITLE:
                 if title_match:
                     analysis_text = final_message[title_match.end():].strip()
-                    # Remove any remaining "ANALYSIS:" markers and stop at Key Takeaways or urgency assessment
+                    # Remove any remaining "ANALYSIS:" markers and stop at urgency assessment
                     analysis_text = re.sub(r'^\s*ANALYSIS:\s*', '', analysis_text, flags=re.IGNORECASE)
-                    # Extract everything before Key Takeaways or URGENCY ASSESSMENT
-                    analysis_split = re.split(r'Key Takeaways:|URGENCY ASSESSMENT:', analysis_text, flags=re.IGNORECASE)
-                    analysis = analysis_split[0].strip()
+                    # Extract everything before URGENCY ASSESSMENT if it exists
+                    urgency_split = re.split(r'URGENCY ASSESSMENT:', analysis_text, flags=re.IGNORECASE)
+                    analysis = urgency_split[0].strip()
                 print(f"🔍 AGENT: Using fallback analysis extraction (length: {len(analysis)})")
             
             # Extract urgency assessment
@@ -498,14 +473,6 @@ IMPORTANT: Always include "Key Takeaways:", "Action Items:", and "URGENCY ASSESS
             Stream of analysis progress updates
         """
         try:
-            # Get user name and memories
-            try:
-                user_name, memories_str = get_prompt_memories(self.uid)
-            except Exception as e:
-                print(f"Error getting user memories: {e}")
-                user_name = "User"
-                memories_str = "No user memories available."
-                
             # Prepare context like in analyze_conversation
             context_info = ""
             if conversation_data:
@@ -517,25 +484,20 @@ CONVERSATION METADATA:
 """
             
             analysis_prompt = f"""
-You are analyzing a conversation for {user_name} and helping them understand patterns, gain insights, and decide on next steps.
-
-ABOUT {user_name.upper()}:
-{memories_str}
-
-Please analyze this conversation transcript and help {user_name} by providing:
+Please analyze this conversation transcript and help the user by providing:
 
 1. **Understanding the Context**: What is this conversation about? What are the main topics and themes?
 2. **Finding Relevant History**: Search for past conversations that relate to these topics.
-3. **Identifying Key Insights**: What patterns or important points should {user_name} know?
-4. **Suggesting Actions**: What specific actions should {user_name} take?
-5. **Learning Opportunities**: What can {user_name} learn from this conversation?
+3. **Identifying Key Insights**: What patterns or important points should the user know?
+4. **Suggesting Actions**: What specific actions should the user take?
+5. **Learning Opportunities**: What can the user learn from this conversation?
 
 {context_info}
 
 CONVERSATION TRANSCRIPT:
 {transcript}
 
-Please provide a comprehensive analysis with actionable recommendations tailored to {user_name}'s background and context. Do NOT include a title or header - start directly with your analysis content."""
+Please provide a comprehensive analysis with actionable recommendations. Do NOT include a title or header - start directly with your analysis content."""
 
             config = {"configurable": {"thread_id": session_id}}
             

@@ -198,17 +198,10 @@ def create_conversation_with_agent(
             request.transcript
         )
         
-        # Extract action items from agent analysis first, fallback to dedicated generation if none found
-        agent_action_items = structured_data.get("action_items", [])
-        if agent_action_items:
-            # Use action items extracted from agent analysis
-            dedicated_action_items = [item["content"] for item in agent_action_items]
-            print(f"🎯 BACKEND: Using {len(dedicated_action_items)} action items from agent analysis")
-        else:
-            # Fallback: Generate dedicated action items using the same high-quality approach as standard API
-            print(f"🎯 BACKEND: No action items in agent analysis, generating from transcript...")
-            dedicated_action_items = _generate_action_items_from_transcript(request.transcript, uid)
-            print(f"🎯 BACKEND: Generated {len(dedicated_action_items)} dedicated action items from transcript")
+        # Generate dedicated action items using the same high-quality approach as standard API
+        print(f"🎯 BACKEND: Generating dedicated action items for action items view...")
+        dedicated_action_items = _generate_action_items_from_transcript(request.transcript, uid)
+        print(f"🎯 BACKEND: Generated {len(dedicated_action_items)} dedicated action items")
         
         # Use the agent generated title if available, otherwise use extracted title
         if agent_title and agent_title.strip():
@@ -287,11 +280,6 @@ def create_conversation_with_agent(
         # Update key takeaways
         if structured_data.get("key_takeaways"):
             conversation.structured.key_takeaways = structured_data["key_takeaways"]
-            print(f"🔍 STORAGE: Added {len(structured_data['key_takeaways'])} key takeaways to conversation")
-            for i, takeaway in enumerate(structured_data["key_takeaways"]):
-                print(f"🔍 STORAGE: Takeaway {i+1}: {takeaway}")
-        else:
-            print(f"🔍 STORAGE: No key takeaways found in structured_data")
         
         # Update things to improve
         if structured_data.get("things_to_improve"):
@@ -730,37 +718,24 @@ def _extract_structured_data_from_agent_analysis(analysis: str, retrieved_conver
     # Extract key takeaways with enhanced patterns
     key_takeaways = []
     
-    print(f"🔍 EXTRACTION: Looking for key takeaways in analysis...")
-    
-    # Try to find "Key Takeaways:" section first (new format) - improved regex
-    takeaway_section_match = re.search(r'Key Takeaways?:\s*(.*?)(?:\n\n|\n(?=[A-Z].*?:)|(?=Action Items?:)|(?=URGENCY ASSESSMENT:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
+    # Try to find "Key Takeaways:" section first (new format)
+    takeaway_section_match = re.search(r'Key Takeaways?:\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
     if takeaway_section_match:
         takeaway_text = takeaway_section_match.group(1).strip()
-        print(f"🔍 EXTRACTION: Found Key Takeaways section: {takeaway_text[:200]}...")
-        
         # Extract bullet points from the key takeaways section
         bullet_takeaways = re.findall(r'^\s*[-•*]\s*(.+)$', takeaway_text, re.MULTILINE)
-        print(f"🔍 EXTRACTION: Found {len(bullet_takeaways)} bullet point takeaways")
-        
         for item in bullet_takeaways:
             cleaned_item = item.strip()
             if len(cleaned_item) > 5:  # Only meaningful takeaways
                 key_takeaways.append(cleaned_item)
-                print(f"🔍 EXTRACTION: Added takeaway: {cleaned_item}")
-    else:
-        print(f"🔍 EXTRACTION: No 'Key Takeaways:' section found")
     
     # Fallback to general patterns if no "Key Takeaways:" section found
     if not key_takeaways:
-        print(f"🔍 EXTRACTION: Trying fallback patterns for takeaways...")
         takeaway_match = re.search(r'(?:Insights?|Main Points?):\s*(.*?)(?:\n\n|\n(?=[A-Z][a-z]+:)|\Z)', analysis, re.DOTALL | re.IGNORECASE)
         if takeaway_match:
             takeaway_text = takeaway_match.group(1).strip()
             takeaways = [item.strip() for item in re.split(r'[-•*\n]', takeaway_text) if item.strip()]
             key_takeaways = [t for t in takeaways if len(t) > 5][:5]  # Limit to 5 takeaways
-            print(f"🔍 EXTRACTION: Found {len(key_takeaways)} fallback takeaways")
-    
-    print(f"🔍 EXTRACTION: Final key_takeaways count: {len(key_takeaways)}")
     
     # 🚀 ENHANCED: Generate content-based emoji and category from transcript
     print(f"🎨 AGENT: Generating content-based emoji and category from transcript...")
